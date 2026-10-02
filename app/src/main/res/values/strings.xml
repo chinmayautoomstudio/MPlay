@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">MPlay</string>
+
+    <string name="permission_title">Allow access to your music</string>
+    <string name="permission_rationale">MPlay needs permission to read the audio files on this device so it can show and play your music. Nothing leaves your phone: MPlay works fully offline.</string>
+    <string name="permission_denied_permanently">Access to audio was denied. Open the app settings and allow Music and audio (or Storage) to continue.</string>
+    <string name="permission_grant">Grant access</string>
+    <string name="permission_open_settings">Open settings</string>
+
+    <string name="library_title">Songs</string>
+    <plurals name="library_song_count">
+        <item quantity="one">%1$d song</item>
+        <item quantity="other">%1$d songs</item>
+    </plurals>
+    <string name="library_empty_title">No music found</string>
+    <string name="library_empty_message">Copy some audio files (MP3, FLAC, M4A, OGG or WAV) to this device and they will appear here automatically.</string>
+    <string name="album_art_description">Album art for %1$s</string>
+</resources>
