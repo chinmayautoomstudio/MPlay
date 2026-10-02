@@ -12,9 +12,11 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 
@@ -29,6 +31,9 @@ class LibraryViewModel(private val songRepository: SongRepository) : ViewModel()
 
     private val permissionGranted = MutableStateFlow<Boolean?>(null)
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<LibraryUiState> = permissionGranted
         .flatMapLatest { granted ->
@@ -36,6 +41,7 @@ class LibraryViewModel(private val songRepository: SongRepository) : ViewModel()
                 null -> flowOf(LibraryUiState.Loading)
                 false -> flowOf(LibraryUiState.NoPermission)
                 true -> songRepository.songs()
+                    .onEach { _isRefreshing.value = false }
                     .map { songs ->
                         if (songs.isEmpty()) LibraryUiState.Empty else LibraryUiState.Content(songs)
                     }
@@ -46,6 +52,11 @@ class LibraryViewModel(private val songRepository: SongRepository) : ViewModel()
 
     fun onPermissionChanged(granted: Boolean) {
         permissionGranted.value = granted
+    }
+
+    fun refresh() {
+        _isRefreshing.value = true
+        songRepository.refresh()
     }
 
     companion object {

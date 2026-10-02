@@ -1,44 +1,73 @@
 package com.autoomstudio.mplay.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 
-private val DarkColors = darkColorScheme(
-    primary = Indigo80,
-    secondary = Teal80,
-    tertiary = Rose80,
+private val NeonDarkColors = darkColorScheme(
+    primary = NeonPurple,
+    onPrimary = Color.White,
+    primaryContainer = NeonPurpleDeep,
+    onPrimaryContainer = Color.White,
+    secondary = NeonViolet,
+    onSecondary = MidnightBackground,
+    secondaryContainer = MidnightSelected,
+    onSecondaryContainer = MidnightOnSurface,
+    tertiary = NeonViolet,
+    background = MidnightBackground,
+    onBackground = MidnightOnSurface,
+    surface = MidnightBackground,
+    onSurface = MidnightOnSurface,
+    surfaceVariant = MidnightSelected,
+    onSurfaceVariant = MidnightOnSurfaceVariant,
+    surfaceContainerLowest = MidnightBackground,
+    surfaceContainerLow = MidnightSurface,
+    surfaceContainer = MidnightSurfaceContainer,
+    surfaceContainerHigh = MidnightSurfaceHigh,
+    surfaceContainerHighest = MidnightSelected,
+    outline = MidnightOutline,
+    outlineVariant = MidnightOutline,
 )
 
-private val LightColors = lightColorScheme(
-    primary = Indigo40,
-    secondary = Teal40,
-    tertiary = Rose40,
+private val NeonLightColors = lightColorScheme(
+    primary = NeonPurpleDeep,
+    onPrimary = Color.White,
+    primaryContainer = DaylightSelected,
+    onPrimaryContainer = NeonPurpleDeep,
+    secondary = NeonPurple,
+    onSecondary = Color.White,
+    secondaryContainer = DaylightSelected,
+    onSecondaryContainer = DaylightOnSurface,
+    tertiary = NeonPurple,
+    background = DaylightBackground,
+    onBackground = DaylightOnSurface,
+    surface = DaylightBackground,
+    onSurface = DaylightOnSurface,
+    surfaceVariant = DaylightSelected,
+    onSurfaceVariant = DaylightOnSurfaceVariant,
+    surfaceContainerLowest = DaylightSurface,
+    surfaceContainerLow = DaylightSurface,
+    surfaceContainer = DaylightSurfaceContainer,
+    surfaceContainerHigh = DaylightSurfaceHigh,
+    surfaceContainerHighest = DaylightSelected,
+    outline = DaylightOutline,
+    outlineVariant = DaylightOutline,
 )
+
+/** Gradient used for the "M" of the MPlay wordmark and other accent highlights. */
+val NeonBrush = Brush.linearGradient(listOf(NeonPurpleDeep, NeonPurple, NeonViolet))
 
 @Composable
 fun MPlayTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-        darkTheme -> DarkColors
-        else -> LightColors
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = if (darkTheme) NeonDarkColors else NeonLightColors,
         typography = MPlayTypography,
         content = content,
     )

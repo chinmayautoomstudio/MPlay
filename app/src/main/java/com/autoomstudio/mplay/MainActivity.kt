@@ -1,7 +1,9 @@
 package com.autoomstudio.mplay
 
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
@@ -12,7 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoomstudio.mplay.ui.library.LibraryUiState
 import com.autoomstudio.mplay.ui.library.LibraryViewModel
-import com.autoomstudio.mplay.ui.library.SongListScreen
+import com.autoomstudio.mplay.ui.main.MainScreen
 import com.autoomstudio.mplay.ui.permission.PermissionRationaleScreen
 import com.autoomstudio.mplay.ui.permission.rememberAudioPermissionState
 import com.autoomstudio.mplay.ui.theme.MPlayTheme
@@ -21,7 +23,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
         setContent {
             MPlayTheme {
                 MPlayRoot()
@@ -38,6 +43,7 @@ private fun MPlayRoot(viewModel: LibraryViewModel = viewModel(factory = LibraryV
     }
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     if (uiState is LibraryUiState.NoPermission) {
         PermissionRationaleScreen(
             permanentlyDenied = permission.isPermanentlyDenied,
@@ -45,6 +51,11 @@ private fun MPlayRoot(viewModel: LibraryViewModel = viewModel(factory = LibraryV
             onOpenSettings = permission::openSettings,
         )
     } else {
-        SongListScreen(state = uiState, onSongClick = { /* Playback arrives in M2. */ })
+        MainScreen(
+            libraryState = uiState,
+            isRefreshing = isRefreshing,
+            onRefresh = viewModel::refresh,
+            onSongClick = { /* Playback arrives in M2. */ },
+        )
     }
 }
