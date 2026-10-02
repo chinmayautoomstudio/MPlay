@@ -10,10 +10,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -31,9 +27,9 @@ fun ArtistDetailScreen(
     onAlbumClick: (Album) -> Unit,
     onPlay: (songs: List<Song>, start: Song) -> Unit,
     onShuffle: (songs: List<Song>) -> Unit,
+    actions: SongActions,
     modifier: Modifier = Modifier,
 ) {
-    var infoSongId by rememberSaveable { mutableStateOf<Long?>(null) }
     val songs = artist.songs
 
     LazyColumn(modifier = modifier, contentPadding = PaddingValues(bottom = 8.dp)) {
@@ -71,11 +67,9 @@ fun ArtistDetailScreen(
             currentSongId = currentSongId,
             isPlaying = isPlaying,
             onSongClick = { onPlay(songs, it) },
-            onShowInfo = { infoSongId = it.id },
+            actions = actions,
         )
     }
-
-    SongInfoHost(songs = songs, songId = infoSongId, onDismiss = { infoSongId = null })
 }
 
 @Composable

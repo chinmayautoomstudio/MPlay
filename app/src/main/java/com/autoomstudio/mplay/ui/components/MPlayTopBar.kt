@@ -56,6 +56,8 @@ fun MPlayTopBar(
     sortOrder: SongSortOrder,
     onSortOrderChange: (SongSortOrder) -> Unit,
     modifier: Modifier = Modifier,
+    /** False while the full player covers the top bar, so Back closes the player first. */
+    backEnabled: Boolean = true,
 ) {
     Row(
         modifier = modifier
@@ -70,6 +72,7 @@ fun MPlayTopBar(
                 query = searchQuery,
                 onQueryChange = onSearchQueryChange,
                 onClose = onCloseSearch,
+                backEnabled = backEnabled,
                 modifier = Modifier.weight(1f),
             )
         } else {
@@ -95,6 +98,7 @@ private fun SearchField(
     query: String,
     onQueryChange: (String) -> Unit,
     onClose: () -> Unit,
+    backEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -106,7 +110,7 @@ private fun SearchField(
         onQueryChange(it)
     }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    BackHandler(onBack = onClose)
+    BackHandler(enabled = backEnabled, onBack = onClose)
 
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onClose) {

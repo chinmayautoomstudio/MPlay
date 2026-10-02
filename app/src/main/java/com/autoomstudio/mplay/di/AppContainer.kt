@@ -6,6 +6,8 @@ import com.autoomstudio.mplay.data.library.AudioFolderWatcher
 import com.autoomstudio.mplay.data.library.LibraryPreferences
 import com.autoomstudio.mplay.data.library.MediaStoreSongSource
 import com.autoomstudio.mplay.data.library.SongRepository
+import com.autoomstudio.mplay.data.playlist.MPlayDatabase
+import com.autoomstudio.mplay.data.playlist.PlaylistRepository
 import com.autoomstudio.mplay.playback.PlaybackController
 import com.autoomstudio.mplay.playback.PlaybackSessionStore
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +34,10 @@ class AppContainer(context: Context) {
     val playbackSessionStore: PlaybackSessionStore by lazy { PlaybackSessionStore(appContext) }
 
     val libraryPreferences: LibraryPreferences by lazy { LibraryPreferences(appContext) }
+
+    private val database: MPlayDatabase by lazy { MPlayDatabase.create(appContext) }
+
+    val playlistRepository: PlaylistRepository by lazy { PlaylistRepository(database.playlistDao()) }
 
     fun createPlaybackController(scope: CoroutineScope): PlaybackController =
         PlaybackController(appContext, scope, songRepository, playbackSessionStore)

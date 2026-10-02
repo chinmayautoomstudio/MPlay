@@ -23,6 +23,7 @@ import com.autoomstudio.mplay.ui.main.MainScreen
 import com.autoomstudio.mplay.ui.permission.PermissionRationaleScreen
 import com.autoomstudio.mplay.ui.permission.rememberAudioPermissionState
 import com.autoomstudio.mplay.ui.playback.PlaybackViewModel
+import com.autoomstudio.mplay.ui.playlist.PlaylistsViewModel
 import com.autoomstudio.mplay.ui.theme.MPlayTheme
 
 class MainActivity : ComponentActivity() {
@@ -70,6 +71,7 @@ private fun MPlayRoot(
     onOpenNowPlayingHandled: () -> Unit,
     viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
     playbackViewModel: PlaybackViewModel = viewModel(factory = PlaybackViewModel.Factory),
+    playlistsViewModel: PlaylistsViewModel = viewModel(factory = PlaylistsViewModel.Factory),
 ) {
     val permission = rememberAudioPermissionState()
     LaunchedEffect(permission.isGranted) {
@@ -93,6 +95,15 @@ private fun MPlayRoot(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
     val nowPlaying by playbackViewModel.state.collectAsStateWithLifecycle()
+    val playlists by playlistsViewModel.playlists.collectAsStateWithLifecycle()
+    val librarySongs = when (val state = uiState) {
+        is LibraryUiState.Content -> state.allSongs
+        LibraryUiState.Empty -> emptyList()
+        else -> null
+    }
+    LaunchedEffect(librarySongs) {
+        librarySongs?.let(playlistsViewModel::onLibraryChanged)
+    }
     if (uiState is LibraryUiState.NoPermission) {
         PermissionRationaleScreen(
             permanentlyDenied = permission.isPermanentlyDenied,
@@ -116,6 +127,11 @@ private fun MPlayRoot(
             onSortOrderChange = viewModel::onSortOrderChange,
             onPlay = playbackViewModel::onSongClick,
             onShuffle = playbackViewModel::onShuffle,
+            onPlayNext = playbackViewModel::onPlayNext,
+            onAddToQueue = playbackViewModel::onAddToQueue,
+            playlists = playlists,
+            playlistActions = playlistsViewModel,
+            playlistMessages = playlistsViewModel.messages,
         )
     }
 }

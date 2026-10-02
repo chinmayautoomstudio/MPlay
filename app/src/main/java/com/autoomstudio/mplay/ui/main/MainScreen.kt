@@ -27,6 +27,8 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -35,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -45,15 +48,19 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.library.SongSortOrder
+import com.autoomstudio.mplay.data.model.Playlist
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.ui.components.ComingSoon
 import com.autoomstudio.mplay.ui.components.MPlayTopBar
 import com.autoomstudio.mplay.ui.library.LibraryScreen
 import com.autoomstudio.mplay.ui.library.LibraryUiState
+import com.autoomstudio.mplay.ui.library.SongActions
+import com.autoomstudio.mplay.ui.library.SongInfoHost
 import com.autoomstudio.mplay.ui.playback.ExpandablePlayer
 import com.autoomstudio.mplay.ui.playback.MiniPlayerSlotHeight
 import com.autoomstudio.mplay.ui.playback.PlayerActions
@@ -63,8 +70,14 @@ import com.autoomstudio.mplay.ui.playback.expandProgress
 import com.autoomstudio.mplay.ui.playback.rememberPlayerSheetFlingBehavior
 import com.autoomstudio.mplay.ui.playback.rememberPlayerSheetState
 import com.autoomstudio.mplay.ui.playback.updateSheetAnchors
+import com.autoomstudio.mplay.ui.playlist.AddToPlaylistSheet
+import com.autoomstudio.mplay.ui.playlist.PlaylistActions
+import com.autoomstudio.mplay.ui.playlist.PlaylistMessage
+import com.autoomstudio.mplay.ui.playlist.PlaylistNameDialog
+import com.autoomstudio.mplay.ui.playlist.PlaylistsScreen
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 
 private enum class Destination(
     @StringRes val label: Int,
@@ -97,9 +110,56 @@ fun MainScreen(
     onSortOrderChange: (SongSortOrder) -> Unit,
     onPlay: (songs: List<Song>, start: Song) -> Unit,
     onShuffle: (songs: List<Song>) -> Unit,
+    onPlayNext: (Song) -> Unit,
+    onAddToQueue: (Song) -> Unit,
+    playlists: List<Playlist>?,
+    playlistActions: PlaylistActions,
+    playlistMessages: Flow<PlaylistMessage>,
     modifier: Modifier = Modifier,
 ) {
     var destination by rememberSaveable { mutableStateOf(Destination.Library) }
+    val allSongs = (libraryState as? LibraryUiState.Content)?.allSongs.orEmpty()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val resources = LocalResources.current
+    val showMessage: (String) -> Unit = { text ->
+        scope.launch {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(text)
+        }
+    }
+    LaunchedEffect(playlistMessages) {
+        playlistMessages.collect { message ->
+            showMessage(
+                when (message) {
+                    is PlaylistMessage.Created -> resources.getString(R.string.message_playlist_created, message.name)
+                    is PlaylistMessage.Added -> resources.getString(R.string.message_added_to_playlist, message.name)
+                    is PlaylistMessage.AlreadyIn ->
+                        resources.getString(R.string.message_already_in_playlist, message.name)
+                    is PlaylistMessage.Deleted -> resources.getString(R.string.message_playlist_deleted, message.name)
+                },
+            )
+        }
+    }
+
+    var infoSongId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var addToPlaylistSongId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var newPlaylistSongId by rememberSaveable { mutableStateOf<Long?>(null) }
+    val songActions = remember(onPlayNext, onAddToQueue, resources) {
+        SongActions(
+            onAddToPlaylist = { addToPlaylistSongId = it.id },
+            onPlayNext = {
+                onPlayNext(it)
+                showMessage(resources.getString(R.string.message_playing_next))
+            },
+            onAddToQueue = {
+                onAddToQueue(it)
+                showMessage(resources.getString(R.string.message_added_to_queue))
+            },
+            onShowInfo = { infoSongId = it.id },
+        )
+    }
     var searchActive by rememberSaveable { mutableStateOf(false) }
     val closeSearch = {
         searchActive = false
@@ -130,12 +190,16 @@ fun MainScreen(
             }
     }
 
+    // The player's back handler is registered first, so screen handlers would otherwise win while it is open.
+    val contentBackEnabled = sheetState.targetValue != PlayerSheetValue.Expanded
+
     var collapsedTop by remember { mutableFloatStateOf(Float.NaN) }
     var miniSlotAttached by remember { mutableStateOf(false) }
 
     Box(modifier = modifier) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
                 MPlayTopBar(
                     showActions = destination == Destination.Library,
@@ -146,6 +210,7 @@ fun MainScreen(
                     onCloseSearch = closeSearch,
                     sortOrder = sortOrder,
                     onSortOrderChange = onSortOrderChange,
+                    backEnabled = contentBackEnabled,
                 )
             },
             bottomBar = {
@@ -195,14 +260,21 @@ fun MainScreen(
                     searchQuery = searchQuery,
                     onPlay = onPlay,
                     onShuffle = onShuffle,
+                    actions = songActions,
                     modifier = contentModifier,
+                    backEnabled = contentBackEnabled,
                 )
 
-                Destination.Playlists -> ComingSoon(
-                    icon = Icons.AutoMirrored.Outlined.QueueMusic,
-                    title = stringResource(R.string.nav_playlists),
-                    message = stringResource(R.string.coming_soon_playlists),
+                Destination.Playlists -> PlaylistsScreen(
+                    playlists = playlists,
+                    currentSongId = nowPlaying?.songId,
+                    isPlaying = nowPlaying?.isPlaying == true,
+                    playlistActions = playlistActions,
+                    songActions = songActions,
+                    onPlay = onPlay,
+                    onShuffle = onShuffle,
                     modifier = contentModifier,
+                    backEnabled = contentBackEnabled,
                 )
 
                 Destination.Settings -> ComingSoon(
@@ -228,6 +300,33 @@ fun MainScreen(
             )
         }
     }
+
+    addToPlaylistSongId?.let { id -> allSongs.firstOrNull { it.id == id } }?.let { song ->
+        AddToPlaylistSheet(
+            playlists = playlists.orEmpty(),
+            onPick = {
+                playlistActions.addToPlaylist(it, song)
+                addToPlaylistSongId = null
+            },
+            onNewPlaylist = {
+                addToPlaylistSongId = null
+                newPlaylistSongId = song.id
+            },
+            onDismiss = { addToPlaylistSongId = null },
+        )
+    }
+    newPlaylistSongId?.let { id -> allSongs.firstOrNull { it.id == id } }?.let { song ->
+        PlaylistNameDialog(
+            title = stringResource(R.string.playlist_new),
+            confirmLabel = stringResource(R.string.playlist_create),
+            onConfirm = {
+                playlistActions.createPlaylist(it, firstSong = song)
+                newPlaylistSongId = null
+            },
+            onDismiss = { newPlaylistSongId = null },
+        )
+    }
+    SongInfoHost(songs = allSongs, songId = infoSongId, onDismiss = { infoSongId = null })
 }
 
 @Composable

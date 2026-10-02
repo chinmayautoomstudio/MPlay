@@ -78,12 +78,15 @@ fun LibraryScreen(
     onRefresh: () -> Unit,
     onPlay: (songs: List<Song>, start: Song) -> Unit,
     onShuffle: (songs: List<Song>) -> Unit,
+    actions: SongActions,
     modifier: Modifier = Modifier,
+    /** False while the full player covers this screen, so Back closes the player first. */
+    backEnabled: Boolean = true,
 ) {
     var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
     val backStack = rememberSaveable(saver = RouteStackSaver) { mutableStateListOf() }
     val route = backStack.lastOrNull()
-    BackHandler(enabled = route != null) { backStack.removeAt(backStack.lastIndex) }
+    BackHandler(enabled = backEnabled && route != null) { backStack.removeAt(backStack.lastIndex) }
 
     if (state is LibraryUiState.Loading || state is LibraryUiState.NoPermission) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator() }
@@ -104,6 +107,7 @@ fun LibraryScreen(
             isRefreshing = isRefreshing,
             onRefresh = onRefresh,
             onPlay = onPlay,
+            actions = actions,
             onAlbumClick = { backStack.add(LibraryRoute.AlbumRoute(it.id)) },
             onArtistClick = { backStack.add(LibraryRoute.ArtistRoute(it.name)) },
             modifier = modifier,
@@ -123,6 +127,7 @@ fun LibraryScreen(
                     onBack = pop,
                     onPlay = onPlay,
                     onShuffle = onShuffle,
+                    actions = actions,
                     modifier = modifier,
                 )
             }
@@ -143,6 +148,7 @@ fun LibraryScreen(
                     onAlbumClick = { backStack.add(LibraryRoute.AlbumRoute(it.id)) },
                     onPlay = onPlay,
                     onShuffle = onShuffle,
+                    actions = actions,
                     modifier = modifier,
                 )
             }
@@ -161,6 +167,7 @@ private fun LibraryTabs(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     onPlay: (songs: List<Song>, start: Song) -> Unit,
+    actions: SongActions,
     onAlbumClick: (Album) -> Unit,
     onArtistClick: (Artist) -> Unit,
     modifier: Modifier = Modifier,
@@ -198,6 +205,7 @@ private fun LibraryTabs(
                 isRefreshing = isRefreshing,
                 onRefresh = onRefresh,
                 onPlay = onPlay,
+                actions = actions,
                 modifier = contentModifier,
             )
 

@@ -24,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,13 +43,22 @@ import com.autoomstudio.mplay.ui.common.formatDuration
 import com.autoomstudio.mplay.ui.components.ArtworkImage
 import com.autoomstudio.mplay.ui.components.NowPlayingBars
 
+/** Actions offered by every song row's three-dot menu. */
+@Immutable
+data class SongActions(
+    val onAddToPlaylist: (Song) -> Unit,
+    val onPlayNext: (Song) -> Unit,
+    val onAddToQueue: (Song) -> Unit,
+    val onShowInfo: (Song) -> Unit,
+)
+
 /** Song rows shared by the Songs tab and the album and artist screens. */
 fun LazyListScope.songItems(
     songs: List<Song>,
     currentSongId: Long?,
     isPlaying: Boolean,
     onSongClick: (Song) -> Unit,
-    onShowInfo: (Song) -> Unit,
+    actions: SongActions,
     showTrackNumbers: Boolean = false,
 ) {
     items(items = songs, key = { it.id }) { song ->
@@ -59,7 +69,7 @@ fun LazyListScope.songItems(
             isPlaying = isCurrent && isPlaying,
             showTrackNumber = showTrackNumbers,
             onClick = { onSongClick(song) },
-            onShowInfo = { onShowInfo(song) },
+            actions = actions,
         )
     }
 }
@@ -71,17 +81,24 @@ fun SongInfoHost(songs: List<Song>, songId: Long?, onDismiss: () -> Unit) {
     SongInfoDialog(song = song, onDismiss = onDismiss)
 }
 
+/**
+ * One song with its menu. [onRemove] adds "Remove from playlist" to the menu,
+ * and [trailingContent] is drawn after the menu button, for example a drag handle.
+ */
 @Composable
-private fun SongRow(
+fun SongRow(
     song: Song,
     isCurrent: Boolean,
     isPlaying: Boolean,
-    showTrackNumber: Boolean,
     onClick: () -> Unit,
-    onShowInfo: () -> Unit,
+    actions: SongActions,
+    modifier: Modifier = Modifier,
+    showTrackNumber: Boolean = false,
+    onRemove: (() -> Unit)? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
 ) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
             .clip(RoundedCornerShape(12.dp))
@@ -143,12 +160,13 @@ private fun SongRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        SongMenu(song = song, onShowInfo = onShowInfo)
+        SongMenu(song = song, actions = actions, onRemove = onRemove)
+        trailingContent?.invoke()
     }
 }
 
 @Composable
-private fun SongMenu(song: Song, onShowInfo: () -> Unit) {
+private fun SongMenu(song: Song, actions: SongActions, onRemove: (() -> Unit)?) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }) {
@@ -163,26 +181,27 @@ private fun SongMenu(song: Song, onShowInfo: () -> Unit) {
             onDismissRequest = { expanded = false },
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
-            listOf(
-                R.string.menu_add_to_playlist,
-                R.string.menu_play_next,
-                R.string.menu_add_to_queue,
-                R.string.menu_cut_and_save,
-                R.string.menu_set_as_ringtone,
-            ).forEach { label ->
+            val item: @Composable (Int, () -> Unit) -> Unit = { label, action ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(label)) },
+                    onClick = {
+                        expanded = false
+                        action()
+                    },
+                )
+            }
+            item(R.string.menu_add_to_playlist) { actions.onAddToPlaylist(song) }
+            item(R.string.menu_play_next) { actions.onPlayNext(song) }
+            item(R.string.menu_add_to_queue) { actions.onAddToQueue(song) }
+            if (onRemove != null) item(R.string.menu_remove_from_playlist, onRemove)
+            listOf(R.string.menu_cut_and_save, R.string.menu_set_as_ringtone).forEach { label ->
                 DropdownMenuItem(
                     text = { Text(stringResource(label)) },
                     onClick = {},
                     enabled = false,
                 )
             }
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.menu_song_info)) },
-                onClick = {
-                    expanded = false
-                    onShowInfo()
-                },
-            )
+            item(R.string.menu_song_info) { actions.onShowInfo(song) }
         }
     }
 }

@@ -78,6 +78,27 @@ class PlaybackController(
         }
     }
 
+    /** Inserts [song] after the current one, or plays it when nothing is queued. With shuffle on, Media3 picks its slot. */
+    fun playNext(song: Song) = withController { controller ->
+        if (controller.mediaItemCount == 0) {
+            controller.setMediaItem(song.toMediaItem())
+            controller.prepare()
+            controller.play()
+        } else {
+            controller.addMediaItem(controller.currentMediaItemIndex + 1, song.toMediaItem())
+        }
+    }
+
+    /** Appends [song] to the queue, or queues it paused when nothing is queued. */
+    fun addToQueue(song: Song) = withController { controller ->
+        if (controller.mediaItemCount == 0) {
+            controller.setMediaItem(song.toMediaItem())
+            controller.prepare()
+        } else {
+            controller.addMediaItem(song.toMediaItem())
+        }
+    }
+
     fun playPause() = withController { controller ->
         if (controller.isPlaying) {
             controller.pause()

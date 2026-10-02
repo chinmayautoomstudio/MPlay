@@ -9,10 +9,6 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -29,9 +25,9 @@ fun SongsTab(
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     onPlay: (songs: List<Song>, start: Song) -> Unit,
+    actions: SongActions,
     modifier: Modifier = Modifier,
 ) {
-    var infoSongId by rememberSaveable { mutableStateOf<Long?>(null) }
     val songs = content?.songs.orEmpty()
 
     val pullState = rememberPullToRefreshState()
@@ -60,7 +56,7 @@ fun SongsTab(
                     currentSongId = currentSongId,
                     isPlaying = isPlaying,
                     onSongClick = { onPlay(songs, it) },
-                    onShowInfo = { infoSongId = it.id },
+                    actions = actions,
                 )
             } else {
                 item {
@@ -73,6 +69,4 @@ fun SongsTab(
             }
         }
     }
-
-    SongInfoHost(songs = songs, songId = infoSongId, onDismiss = { infoSongId = null })
 }

@@ -43,7 +43,6 @@
     </plurals>
     <string name="count_separator">%1$s · %2$s</string>
 
-    <string name="coming_soon_playlists">Create and play your own playlists in an upcoming update.</string>
     <string name="coming_soon_settings">Theme and playback settings arrive in an upcoming update.</string>
 
     <string name="library_empty_title">No music found</string>
@@ -71,6 +70,36 @@
     <string name="menu_cut_and_save">Cut and save</string>
     <string name="menu_set_as_ringtone">Set as ringtone</string>
     <string name="menu_song_info">Song info</string>
+    <string name="menu_remove_from_playlist">Remove from playlist</string>
+
+    <string name="playlist_new">New playlist</string>
+    <string name="playlist_name_label">Playlist name</string>
+    <string name="playlist_create">Create</string>
+    <string name="playlist_rename">Rename</string>
+    <string name="playlist_rename_title">Rename playlist</string>
+    <string name="playlist_delete">Delete</string>
+    <string name="playlist_delete_title">Delete playlist?</string>
+    <string name="playlist_delete_message">\"%1$s\" will be deleted. The songs stay in your library.</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="add_to_playlist_title">Add to playlist</string>
+    <string name="playlists_empty_title">No playlists yet</string>
+    <string name="playlists_empty_message">Create a playlist, then add songs from any song\'s menu.</string>
+    <string name="playlist_empty_title">This playlist is empty</string>
+    <string name="playlist_empty_message">Add songs with Add to playlist in any song\'s menu.</string>
+    <string name="playlist_reorder_handle">Drag to reorder %1$s</string>
+    <string name="playlist_move_up">Move up</string>
+    <string name="playlist_move_down">Move down</string>
+    <plurals name="unavailable_count">
+        <item quantity="one">%d song unavailable</item>
+        <item quantity="other">%d songs unavailable</item>
+    </plurals>
+
+    <string name="message_added_to_playlist">Added to %1$s</string>
+    <string name="message_already_in_playlist">Already in %1$s</string>
+    <string name="message_playlist_created">Created %1$s</string>
+    <string name="message_playlist_deleted">Deleted %1$s</string>
+    <string name="message_playing_next">Playing next</string>
+    <string name="message_added_to_queue">Added to queue</string>
 
     <string name="song_info_artist">Artist</string>
     <string name="song_info_album">Album</string>

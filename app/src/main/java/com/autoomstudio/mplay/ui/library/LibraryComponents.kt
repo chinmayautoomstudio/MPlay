@@ -105,6 +105,7 @@ fun DetailHeader(
     subtitle: String,
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
+    actionsEnabled: Boolean = true,
     artwork: @Composable () -> Unit,
 ) {
     Column(
@@ -136,13 +137,14 @@ fun DetailHeader(
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Button(
                 onClick = onPlay,
+                enabled = actionsEnabled,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             ) {
                 Icon(Icons.Filled.PlayArrow, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.action_play_all))
             }
-            OutlinedButton(onClick = onShuffle) {
+            OutlinedButton(onClick = onShuffle, enabled = actionsEnabled) {
                 Icon(Icons.Filled.Shuffle, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.action_shuffle_all))
