@@ -9,7 +9,10 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -28,15 +31,23 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.stringResource
 import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.model.Song
@@ -45,10 +56,17 @@ import com.autoomstudio.mplay.ui.components.ComingSoon
 import com.autoomstudio.mplay.ui.components.MPlayTopBar
 import com.autoomstudio.mplay.ui.library.LibraryScreen
 import com.autoomstudio.mplay.ui.library.LibraryUiState
-import com.autoomstudio.mplay.ui.playback.MiniPlayer
-import com.autoomstudio.mplay.ui.playback.NowPlayingScreen
+import com.autoomstudio.mplay.ui.playback.ExpandablePlayer
+import com.autoomstudio.mplay.ui.playback.MiniPlayerSlotHeight
 import com.autoomstudio.mplay.ui.playback.PlayerActions
+import com.autoomstudio.mplay.ui.playback.PlayerSheetValue
+import com.autoomstudio.mplay.ui.playback.animateSheetTo
+import com.autoomstudio.mplay.ui.playback.expandProgress
+import com.autoomstudio.mplay.ui.playback.rememberPlayerSheetFlingBehavior
+import com.autoomstudio.mplay.ui.playback.rememberPlayerSheetState
+import com.autoomstudio.mplay.ui.playback.updateSheetAnchors
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 private enum class Destination(
@@ -94,6 +112,28 @@ fun MainScreen(
         .apply { if (nowPlaying != null) value = nowPlaying }
         .value
 
+    val sheetExpanded = showNowPlaying && nowPlaying != null
+    val sheetState = rememberPlayerSheetState(initiallyExpanded = sheetExpanded)
+    val sheetFling = rememberPlayerSheetFlingBehavior(sheetState)
+    LaunchedEffect(sheetExpanded) {
+        val target = if (sheetExpanded) PlayerSheetValue.Expanded else PlayerSheetValue.Collapsed
+        if (sheetState.settledValue != target || sheetState.targetValue != target) {
+            sheetState.animateSheetTo(target)
+        }
+    }
+    val hasNowPlaying by rememberUpdatedState(nowPlaying != null)
+    val currentOnShowNowPlayingChange by rememberUpdatedState(onShowNowPlayingChange)
+    LaunchedEffect(sheetState) {
+        snapshotFlow { sheetState.settledValue }
+            .drop(1)
+            .collect { value ->
+                if (hasNowPlaying) currentOnShowNowPlayingChange(value == PlayerSheetValue.Expanded)
+            }
+    }
+
+    var collapsedTop by remember { mutableFloatStateOf(Float.NaN) }
+    var miniSlotAttached by remember { mutableStateOf(false) }
+
     Box(modifier = modifier) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
@@ -105,16 +145,27 @@ fun MainScreen(
                         enter = slideInVertically { it } + fadeIn(),
                         exit = slideOutVertically { it } + fadeOut(),
                     ) {
-                        lastNowPlaying?.let { state ->
-                            MiniPlayer(
-                                state = state,
-                                position = position,
-                                actions = playerActions,
-                                onExpand = { onShowNowPlayingChange(true) },
-                            )
+                        DisposableEffect(Unit) {
+                            miniSlotAttached = true
+                            onDispose { miniSlotAttached = false }
                         }
+                        Spacer(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(MiniPlayerSlotHeight)
+                                .onGloballyPositioned { coordinates ->
+                                    collapsedTop = coordinates.positionInRoot().y
+                                    sheetState.updateSheetAnchors(collapsedTop)
+                                },
+                        )
                     }
-                    MPlayNavigationBar(selected = destination, onSelect = { destination = it })
+                    MPlayNavigationBar(
+                        selected = destination,
+                        onSelect = { destination = it },
+                        modifier = Modifier.graphicsLayer {
+                            translationY = sheetState.expandProgress * size.height
+                        },
+                    )
                 }
             },
             snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -149,26 +200,29 @@ fun MainScreen(
             }
         }
 
-        AnimatedVisibility(
-            visible = showNowPlaying && nowPlaying != null,
-            enter = slideInVertically { it },
-            exit = slideOutVertically { it },
-        ) {
-            lastNowPlaying?.let { state ->
-                NowPlayingScreen(
-                    state = state,
-                    position = position,
-                    actions = playerActions,
-                    onCollapse = { onShowNowPlayingChange(false) },
-                )
-            }
+        val state = lastNowPlaying
+        if (state != null && miniSlotAttached && !collapsedTop.isNaN()) {
+            ExpandablePlayer(
+                state = state,
+                position = position,
+                actions = playerActions,
+                sheetState = sheetState,
+                sheetFling = sheetFling,
+                collapsedTop = { collapsedTop },
+                onExpand = { onShowNowPlayingChange(true) },
+                onCollapse = { onShowNowPlayingChange(false) },
+            )
         }
     }
 }
 
 @Composable
-private fun MPlayNavigationBar(selected: Destination, onSelect: (Destination) -> Unit) {
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+private fun MPlayNavigationBar(
+    selected: Destination,
+    onSelect: (Destination) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    NavigationBar(modifier = modifier, containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
         Destination.entries.forEach { item ->
             val isSelected = item == selected
             NavigationBarItem(

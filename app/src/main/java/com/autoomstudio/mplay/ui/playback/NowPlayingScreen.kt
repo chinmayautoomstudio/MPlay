@@ -1,7 +1,9 @@
 package com.autoomstudio.mplay.ui.playback
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,7 +32,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -41,6 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -55,17 +58,21 @@ import com.autoomstudio.mplay.ui.common.formatDuration
 import com.autoomstudio.mplay.ui.components.ArtworkImage
 import kotlinx.coroutines.flow.Flow
 
+/** Full player layout without its own background; the surrounding card draws it. */
 @Composable
-fun NowPlayingScreen(
+fun NowPlayingContent(
     state: NowPlayingState,
     position: Flow<Long>,
     actions: PlayerActions,
     onCollapse: () -> Unit,
     modifier: Modifier = Modifier,
+    showArtwork: Boolean = true,
+    onArtworkPositioned: (LayoutCoordinates) -> Unit = {},
+    backEnabled: Boolean = true,
 ) {
-    BackHandler(onBack = onCollapse)
+    BackHandler(enabled = backEnabled, onBack = onCollapse)
 
-    Surface(modifier = modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -73,6 +80,12 @@ fun NowPlayingScreen(
                 .padding(horizontal = 24.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Box(
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .size(width = 36.dp, height = 4.dp)
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), CircleShape),
+            )
             Row(modifier = Modifier.fillMaxWidth()) {
                 IconButton(onClick = onCollapse) {
                     Icon(
@@ -90,22 +103,27 @@ fun NowPlayingScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                val artShape = RoundedCornerShape(28.dp)
-                ArtworkImage(
-                    uri = state.artworkUri,
-                    contentDescription = stringResource(R.string.album_art_description, state.title),
-                    cornerRadius = 28.dp,
-                    prominent = true,
-                    modifier = Modifier
-                        .weight(1f, fill = false)
-                        .aspectRatio(1f)
-                        .shadow(
+                val artModifier = Modifier
+                    .weight(1f, fill = false)
+                    .aspectRatio(1f)
+                    .onGloballyPositioned(onArtworkPositioned)
+                if (showArtwork) {
+                    val artShape = RoundedCornerShape(28.dp)
+                    ArtworkImage(
+                        uri = state.artworkUri,
+                        contentDescription = stringResource(R.string.album_art_description, state.title),
+                        cornerRadius = 28.dp,
+                        prominent = true,
+                        modifier = artModifier.shadow(
                             elevation = 32.dp,
                             shape = artShape,
                             ambientColor = MaterialTheme.colorScheme.primary,
                             spotColor = MaterialTheme.colorScheme.primary,
                         ),
-                )
+                    )
+                } else {
+                    Spacer(artModifier)
+                }
 
                 Spacer(Modifier.height(32.dp))
                 Column(modifier = Modifier.fillMaxWidth()) {
