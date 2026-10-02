@@ -31,6 +31,8 @@ private enum class LibraryTab(@StringRes val label: Int) {
 @Composable
 fun LibraryScreen(
     state: LibraryUiState,
+    currentSongId: Long?,
+    isPlaying: Boolean,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     onSongClick: (Song) -> Unit,
@@ -66,6 +68,8 @@ fun LibraryScreen(
         when (selectedTab) {
             LibraryTab.Songs -> SongsTab(
                 state = state,
+                currentSongId = currentSongId,
+                isPlaying = isPlaying,
                 isRefreshing = isRefreshing,
                 onRefresh = onRefresh,
                 onSongClick = onSongClick,

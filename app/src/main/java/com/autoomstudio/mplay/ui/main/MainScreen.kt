@@ -55,6 +55,8 @@ private enum class Destination(
 @Composable
 fun MainScreen(
     libraryState: LibraryUiState,
+    currentSongId: Long?,
+    isPlaying: Boolean,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     onSongClick: (Song) -> Unit,
@@ -108,6 +110,8 @@ fun MainScreen(
         when (destination) {
             Destination.Library -> LibraryScreen(
                 state = libraryState,
+                currentSongId = currentSongId,
+                isPlaying = isPlaying,
                 isRefreshing = isRefreshing,
                 onRefresh = onRefresh,
                 onSongClick = onSongClick,

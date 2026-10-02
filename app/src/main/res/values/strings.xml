@@ -28,6 +28,8 @@
     <string name="library_empty_title">No music found</string>
     <string name="library_empty_message">Copy some audio files (MP3, FLAC, M4A, OGG or WAV) to this device and they will appear here automatically.</string>
     <string name="album_art_description">Album art for %1$s</string>
+    <string name="now_playing">Now playing</string>
+    <string name="paused">Paused</string>
 
     <string name="menu_add_to_playlist">Add to playlist</string>
     <string name="menu_play_next">Play next</string>

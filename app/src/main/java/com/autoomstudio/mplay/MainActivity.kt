@@ -16,6 +16,7 @@ import com.autoomstudio.mplay.ui.library.LibraryUiState
 import com.autoomstudio.mplay.ui.library.LibraryViewModel
 import com.autoomstudio.mplay.ui.main.MainScreen
 import com.autoomstudio.mplay.ui.permission.PermissionRationaleScreen
+import com.autoomstudio.mplay.ui.playback.PlaybackViewModel
 import com.autoomstudio.mplay.ui.permission.rememberAudioPermissionState
 import com.autoomstudio.mplay.ui.theme.MPlayTheme
 
@@ -36,7 +37,10 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun MPlayRoot(viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory)) {
+private fun MPlayRoot(
+    viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
+    playbackViewModel: PlaybackViewModel = viewModel(factory = PlaybackViewModel.Factory),
+) {
     val permission = rememberAudioPermissionState()
     LaunchedEffect(permission.isGranted) {
         viewModel.onPermissionChanged(permission.isGranted)
@@ -44,6 +48,8 @@ private fun MPlayRoot(viewModel: LibraryViewModel = viewModel(factory = LibraryV
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val currentSongId by playbackViewModel.currentSongId.collectAsStateWithLifecycle()
+    val isPlaying by playbackViewModel.isPlaying.collectAsStateWithLifecycle()
     if (uiState is LibraryUiState.NoPermission) {
         PermissionRationaleScreen(
             permanentlyDenied = permission.isPermanentlyDenied,
@@ -53,9 +59,14 @@ private fun MPlayRoot(viewModel: LibraryViewModel = viewModel(factory = LibraryV
     } else {
         MainScreen(
             libraryState = uiState,
+            currentSongId = currentSongId,
+            isPlaying = isPlaying,
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refresh,
-            onSongClick = { /* Playback arrives in M2. */ },
+            onSongClick = { song ->
+                val songs = (uiState as? LibraryUiState.Content)?.songs.orEmpty()
+                playbackViewModel.onSongClick(songs, song)
+            },
         )
     }
 }

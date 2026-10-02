@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -51,11 +52,14 @@ import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.ui.common.formatDuration
 import com.autoomstudio.mplay.ui.components.ComingSoon
+import com.autoomstudio.mplay.ui.components.NowPlayingBars
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SongsTab(
     state: LibraryUiState,
+    currentSongId: Long?,
+    isPlaying: Boolean,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
     onSongClick: (Song) -> Unit,
@@ -92,8 +96,11 @@ fun SongsTab(
                 ) {
                     if (state is LibraryUiState.Content) {
                         items(items = state.songs, key = { it.id }) { song ->
+                            val isCurrent = song.id == currentSongId
                             SongRow(
                                 song = song,
+                                isCurrent = isCurrent,
+                                isPlaying = isCurrent && isPlaying,
                                 onClick = { onSongClick(song) },
                                 onShowInfo = { infoSongId = song.id },
                             )
@@ -120,13 +127,24 @@ fun SongsTab(
 }
 
 @Composable
-private fun SongRow(song: Song, onClick: () -> Unit, onShowInfo: () -> Unit) {
+private fun SongRow(
+    song: Song,
+    isCurrent: Boolean,
+    isPlaying: Boolean,
+    onClick: () -> Unit,
+    onShowInfo: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (isCurrent) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+            )
             .heightIn(min = 72.dp)
             .clickable(onClick = onClick)
-            .padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 4.dp),
+            .padding(start = 8.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AlbumArt(song = song, modifier = Modifier.size(52.dp))
@@ -151,11 +169,20 @@ private fun SongRow(song: Song, onClick: () -> Unit, onShowInfo: () -> Unit) {
             )
         }
         Spacer(Modifier.width(12.dp))
-        Text(
-            text = formatDuration(song.durationMs),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (isCurrent) {
+            NowPlayingBars(
+                animate = isPlaying,
+                contentDescription = stringResource(
+                    if (isPlaying) R.string.now_playing else R.string.paused,
+                ),
+            )
+        } else {
+            Text(
+                text = formatDuration(song.durationMs),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         SongMenu(song = song, onShowInfo = onShowInfo)
     }
 }
