@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="splash_background">#FFF7F5FC</color>
+    <!-- Matches the launcher foreground's backdrop where the splash circle mask cuts it. -->
+    <color name="splash_screen_background">#FF09072F</color>
 </resources>
