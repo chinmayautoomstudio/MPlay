@@ -8,19 +8,28 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.autoomstudio.mplay.MPlayApp
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.di.AppContainer
+import com.autoomstudio.mplay.playback.NowPlayingState
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
-class PlaybackViewModel(container: AppContainer) : ViewModel() {
+class PlaybackViewModel(container: AppContainer) : ViewModel(), PlayerActions {
 
     private val controller = container.createPlaybackController(viewModelScope).also { it.connect() }
 
-    val currentSongId: StateFlow<Long?> = controller.currentSongId
-    val isPlaying: StateFlow<Boolean> = controller.isPlaying
+    val state: StateFlow<NowPlayingState?> = controller.state
+    val position: Flow<Long> = controller.positionMs()
 
     /** Queues [songs] and starts playback from [song]. */
     fun onSongClick(songs: List<Song>, song: Song) {
         controller.playQueue(songs, songs.indexOfFirst { it.id == song.id })
     }
+
+    override fun playPause() = controller.playPause()
+    override fun next() = controller.next()
+    override fun previous() = controller.previous()
+    override fun seekTo(positionMs: Long) = controller.seekTo(positionMs)
+    override fun toggleShuffle() = controller.toggleShuffle()
+    override fun cycleRepeat() = controller.cycleRepeat()
 
     override fun onCleared() {
         controller.release()

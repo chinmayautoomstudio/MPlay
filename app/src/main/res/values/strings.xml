@@ -31,6 +31,19 @@
     <string name="now_playing">Now playing</string>
     <string name="paused">Paused</string>
 
+    <string name="action_play">Play</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_next">Next song</string>
+    <string name="action_previous">Previous song</string>
+    <string name="action_shuffle_on">Shuffle is on</string>
+    <string name="action_shuffle_off">Shuffle is off</string>
+    <string name="action_repeat_off">Repeat is off</string>
+    <string name="action_repeat_all">Repeat all</string>
+    <string name="action_repeat_one">Repeat one</string>
+    <string name="action_collapse_player">Close player</string>
+    <string name="action_open_player">Open player for %1$s</string>
+    <string name="seek_bar_description">Playback position</string>
+
     <string name="menu_add_to_playlist">Add to playlist</string>
     <string name="menu_play_next">Play next</string>
     <string name="menu_add_to_queue">Add to queue</string>

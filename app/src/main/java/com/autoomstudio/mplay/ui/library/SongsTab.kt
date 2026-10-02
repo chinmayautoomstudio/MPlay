@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -42,15 +41,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.AsyncImage
 import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.ui.common.formatDuration
+import com.autoomstudio.mplay.ui.components.ArtworkImage
 import com.autoomstudio.mplay.ui.components.ComingSoon
 import com.autoomstudio.mplay.ui.components.NowPlayingBars
 
@@ -147,7 +145,11 @@ private fun SongRow(
             .padding(start = 8.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AlbumArt(song = song, modifier = Modifier.size(52.dp))
+        ArtworkImage(
+            uri = song.albumArtUri,
+            contentDescription = stringResource(R.string.album_art_description, song.album),
+            modifier = Modifier.size(52.dp),
+        )
         Spacer(Modifier.width(16.dp))
         Column(
             modifier = Modifier.weight(1f),
@@ -224,27 +226,5 @@ private fun SongMenu(song: Song, onShowInfo: () -> Unit) {
                 },
             )
         }
-    }
-}
-
-@Composable
-private fun AlbumArt(song: Song, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Filled.MusicNote,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        AsyncImage(
-            model = song.albumArtUri,
-            contentDescription = stringResource(R.string.album_art_description, song.album),
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
     }
 }

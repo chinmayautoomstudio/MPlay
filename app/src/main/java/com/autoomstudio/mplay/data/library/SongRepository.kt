@@ -33,6 +33,9 @@ class SongRepository(
         .conflate()
         .map { source.querySongs() }
 
+    /** One-off snapshot of the library. */
+    suspend fun loadSongs(): List<Song> = source.querySongs()
+
     fun refresh() {
         refreshRequests.tryEmit(Unit)
     }
