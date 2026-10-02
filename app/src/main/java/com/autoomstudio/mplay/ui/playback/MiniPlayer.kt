@@ -1,6 +1,10 @@
 package com.autoomstudio.mplay.ui.playback
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,26 +19,40 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.playback.NowPlayingState
+import com.autoomstudio.mplay.ui.common.formatDuration
 import com.autoomstudio.mplay.ui.components.ArtworkImage
 import kotlinx.coroutines.flow.Flow
 
 private val ProgressLineHeight = 2.dp
+private val ScrubLineHeight = 4.dp
+private val ScrubThumbRadius = 4.dp
+private val ScrubStripHeight = 16.dp
 private val RowHeight = 64.dp
 private val RowVerticalPadding = 6.dp
 
@@ -55,80 +73,179 @@ fun MiniPlayerContent(
 ) {
     val positionMs by position.collectAsStateWithLifecycle(initialValue = 0L)
     val openLabel = stringResource(R.string.action_open_player, state.title)
+    // Follows the finger while scrubbing, so position polls don't pull the line back.
+    var scrubFraction by remember { mutableStateOf<Float?>(null) }
+    val durationMs = state.durationMs
+    val playedFraction = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+    val shownFraction = scrubFraction ?: playedFraction
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        LinearProgressIndicator(
-            progress = {
-                if (state.durationMs > 0) {
-                    (positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
+    Box(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Spacer(Modifier.height(ProgressLineHeight))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(RowHeight)
+                    .clickable(onClickLabel = openLabel, onClick = onExpand)
+                    .padding(
+                        start = MiniArtworkStart,
+                        end = 4.dp,
+                        top = RowVerticalPadding,
+                        bottom = RowVerticalPadding,
+                    ),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (showArtwork) {
+                    ArtworkImage(
+                        uri = state.artworkUri,
+                        contentDescription = null,
+                        modifier = Modifier.size(MiniArtworkSize),
+                        cornerRadius = 8.dp,
+                    )
                 } else {
-                    0f
+                    Spacer(Modifier.size(MiniArtworkSize))
                 }
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(ProgressLineHeight),
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = Color.Transparent,
-            strokeCap = StrokeCap.Butt,
-            gapSize = 0.dp,
-            drawStopIndicator = {},
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(RowHeight)
-                .clickable(onClickLabel = openLabel, onClick = onExpand)
-                .padding(start = MiniArtworkStart, end = 4.dp, top = RowVerticalPadding, bottom = RowVerticalPadding),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (showArtwork) {
-                ArtworkImage(
-                    uri = state.artworkUri,
-                    contentDescription = null,
-                    modifier = Modifier.size(MiniArtworkSize),
-                    cornerRadius = 8.dp,
-                )
-            } else {
-                Spacer(Modifier.size(MiniArtworkSize))
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = state.title,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = state.artist,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            IconButton(onClick = actions::playPause) {
-                Icon(
-                    imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = stringResource(
-                        if (state.isPlaying) R.string.action_pause else R.string.action_play,
-                    ),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(30.dp),
-                )
-            }
-            IconButton(onClick = actions::next, enabled = state.hasNext) {
-                Icon(
-                    imageVector = Icons.Filled.SkipNext,
-                    contentDescription = stringResource(R.string.action_next),
-                    tint = MaterialTheme.colorScheme.onSurface.copy(
-                        alpha = if (state.hasNext) 1f else 0.38f,
-                    ),
-                    modifier = Modifier.size(30.dp),
-                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = state.title,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    val scrubbing = scrubFraction
+                    Text(
+                        text = if (scrubbing != null) {
+                            stringResource(
+                                R.string.scrub_position,
+                                formatDuration((scrubbing * durationMs).toLong()),
+                                formatDuration(durationMs),
+                            )
+                        } else {
+                            state.artist
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (scrubbing != null) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                IconButton(onClick = actions::playPause) {
+                    Icon(
+                        imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = stringResource(
+                            if (state.isPlaying) R.string.action_pause else R.string.action_play,
+                        ),
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(30.dp),
+                    )
+                }
+                IconButton(onClick = actions::next, enabled = state.hasNext) {
+                    Icon(
+                        imageVector = Icons.Filled.SkipNext,
+                        contentDescription = stringResource(R.string.action_next),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(
+                            alpha = if (state.hasNext) 1f else 0.38f,
+                        ),
+                        modifier = Modifier.size(30.dp),
+                    )
+                }
             }
         }
+
+        ScrubStrip(
+            fraction = shownFraction,
+            scrubbing = scrubFraction != null,
+            durationMs = durationMs,
+            onScrub = { scrubFraction = it },
+            onScrubEnd = { commit ->
+                val fraction = scrubFraction
+                scrubFraction = null
+                if (commit && fraction != null) actions.seekTo((fraction * durationMs).toLong())
+            },
+            onSeek = { actions.seekTo((it * durationMs).toLong()) },
+        )
     }
+}
+
+/**
+ * Progress line with a taller transparent touch area over the top of the mini player.
+ * Horizontal drags scrub and taps seek; vertical drags are left for the card's swipe-up.
+ */
+@Composable
+private fun ScrubStrip(
+    fraction: Float,
+    scrubbing: Boolean,
+    durationMs: Long,
+    onScrub: (Float) -> Unit,
+    onScrubEnd: (commit: Boolean) -> Unit,
+    onSeek: (Float) -> Unit,
+) {
+    val lineHeight by animateDpAsState(if (scrubbing) ScrubLineHeight else ProgressLineHeight, label = "lineHeight")
+    val lineColor = MaterialTheme.colorScheme.primary
+    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    val seekDescription = stringResource(R.string.seek_bar_description)
+    val enabled = durationMs > 0
+    val currentOnScrub by rememberUpdatedState(onScrub)
+    val currentOnScrubEnd by rememberUpdatedState(onScrubEnd)
+    val currentOnSeek by rememberUpdatedState(onSeek)
+
+    var gestureModifier: Modifier = Modifier
+    if (enabled) {
+        gestureModifier = Modifier
+            .pointerInput(Unit) {
+                detectTapGestures { offset -> currentOnSeek((offset.x / size.width).coerceIn(0f, 1f)) }
+            }
+            .pointerInput(Unit) {
+                var dragFraction = 0f
+                detectHorizontalDragGestures(
+                    onDragStart = { offset ->
+                        dragFraction = (offset.x / size.width).coerceIn(0f, 1f)
+                        currentOnScrub(dragFraction)
+                    },
+                    onDragEnd = { currentOnScrubEnd(true) },
+                    onDragCancel = { currentOnScrubEnd(false) },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        dragFraction = (dragFraction + dragAmount / size.width).coerceIn(0f, 1f)
+                        currentOnScrub(dragFraction)
+                    },
+                )
+            }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(ScrubStripHeight)
+            .semantics {
+                contentDescription = seekDescription
+                progressBarRangeInfo = ProgressBarRangeInfo(fraction, 0f..1f)
+                if (enabled) {
+                    setProgress { target ->
+                        currentOnSeek(target.coerceIn(0f, 1f))
+                        true
+                    }
+                }
+            }
+            .then(gestureModifier)
+            .drawBehind {
+                val linePx = lineHeight.toPx()
+                if (scrubbing) drawRect(trackColor, size = Size(size.width, linePx))
+                drawRect(lineColor, size = Size(size.width * fraction, linePx))
+                if (scrubbing) {
+                    val radius = ScrubThumbRadius.toPx()
+                    drawCircle(
+                        color = lineColor,
+                        radius = radius,
+                        center = Offset((size.width * fraction).coerceIn(radius, size.width - radius), radius),
+                    )
+                }
+            },
+    )
 }

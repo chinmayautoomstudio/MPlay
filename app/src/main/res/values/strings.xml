@@ -63,6 +63,7 @@
     <string name="action_collapse_player">Close player</string>
     <string name="action_open_player">Open player for %1$s</string>
     <string name="seek_bar_description">Playback position</string>
+    <string name="scrub_position">%1$s / %2$s</string>
 
     <string name="menu_add_to_playlist">Add to playlist</string>
     <string name="menu_play_next">Play next</string>
