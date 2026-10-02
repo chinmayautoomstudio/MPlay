@@ -49,6 +49,8 @@ data class SongActions(
     val onAddToPlaylist: (Song) -> Unit,
     val onPlayNext: (Song) -> Unit,
     val onAddToQueue: (Song) -> Unit,
+    val onCutAndSave: (Song) -> Unit,
+    val onSetAsRingtone: (Song) -> Unit,
     val onShowInfo: (Song) -> Unit,
 )
 
@@ -160,20 +162,27 @@ fun SongRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        SongMenu(song = song, actions = actions, onRemove = onRemove)
+        SongMenuButton(song = song, actions = actions, onRemove = onRemove)
         trailingContent?.invoke()
     }
 }
 
+/** The three-dot button and its menu, shared by song rows and Now Playing. */
 @Composable
-private fun SongMenu(song: Song, actions: SongActions, onRemove: (() -> Unit)?) {
+fun SongMenuButton(
+    song: Song,
+    actions: SongActions,
+    modifier: Modifier = Modifier,
+    onRemove: (() -> Unit)? = null,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
     var expanded by remember { mutableStateOf(false) }
-    Box {
+    Box(modifier = modifier) {
         IconButton(onClick = { expanded = true }) {
             Icon(
                 imageVector = Icons.Filled.MoreVert,
                 contentDescription = stringResource(R.string.action_more_options, song.title),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = tint,
             )
         }
         DropdownMenu(
@@ -181,27 +190,27 @@ private fun SongMenu(song: Song, actions: SongActions, onRemove: (() -> Unit)?) 
             onDismissRequest = { expanded = false },
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
-            val item: @Composable (Int, () -> Unit) -> Unit = { label, action ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(label)) },
-                    onClick = {
-                        expanded = false
-                        action()
-                    },
-                )
-            }
-            item(R.string.menu_add_to_playlist) { actions.onAddToPlaylist(song) }
-            item(R.string.menu_play_next) { actions.onPlayNext(song) }
-            item(R.string.menu_add_to_queue) { actions.onAddToQueue(song) }
-            if (onRemove != null) item(R.string.menu_remove_from_playlist, onRemove)
-            listOf(R.string.menu_cut_and_save, R.string.menu_set_as_ringtone).forEach { label ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(label)) },
-                    onClick = {},
-                    enabled = false,
-                )
-            }
-            item(R.string.menu_song_info) { actions.onShowInfo(song) }
+            SongMenuItems(song = song, actions = actions, onRemove = onRemove, onDismiss = { expanded = false })
         }
     }
+}
+
+@Composable
+fun SongMenuItems(song: Song, actions: SongActions, onRemove: (() -> Unit)?, onDismiss: () -> Unit) {
+    val item: @Composable (Int, () -> Unit) -> Unit = { label, action ->
+        DropdownMenuItem(
+            text = { Text(stringResource(label)) },
+            onClick = {
+                onDismiss()
+                action()
+            },
+        )
+    }
+    item(R.string.menu_add_to_playlist) { actions.onAddToPlaylist(song) }
+    item(R.string.menu_play_next) { actions.onPlayNext(song) }
+    item(R.string.menu_add_to_queue) { actions.onAddToQueue(song) }
+    if (onRemove != null) item(R.string.menu_remove_from_playlist, onRemove)
+    item(R.string.menu_cut_and_save) { actions.onCutAndSave(song) }
+    item(R.string.menu_set_as_ringtone) { actions.onSetAsRingtone(song) }
+    item(R.string.menu_song_info) { actions.onShowInfo(song) }
 }

@@ -23,7 +23,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
 import com.autoomstudio.mplay.R
 
-/** Asks for a playlist name, for both creating and renaming. Confirm stays disabled while the name is blank. */
+/** Asks for a name, for playlists and saved clips. Confirm stays disabled while the name is blank. */
 @Composable
 fun PlaylistNameDialog(
     title: String,
@@ -31,6 +31,7 @@ fun PlaylistNameDialog(
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
     initialName: String = "",
+    label: String = stringResource(R.string.playlist_name_label),
 ) {
     var field by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(initialName, TextRange(initialName.length)))
@@ -47,7 +48,7 @@ fun PlaylistNameDialog(
             OutlinedTextField(
                 value = field,
                 onValueChange = { field = it },
-                label = { Text(stringResource(R.string.playlist_name_label)) },
+                label = { Text(label) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences,

@@ -14,3 +14,11 @@ fun formatDuration(durationMs: Long): String {
         String.format(Locale.ROOT, "%d:%02d", minutes, seconds)
     }
 }
+
+/** Formats milliseconds as `m:ss.s`, for trim positions that move in tenths of a second. */
+fun formatPreciseDuration(durationMs: Long): String {
+    val tenths = durationMs.coerceAtLeast(0L) / 100
+    val minutes = tenths / 600
+    val seconds = (tenths % 600) / 10
+    return String.format(Locale.ROOT, "%d:%02d.%d", minutes, seconds, tenths % 10)
+}

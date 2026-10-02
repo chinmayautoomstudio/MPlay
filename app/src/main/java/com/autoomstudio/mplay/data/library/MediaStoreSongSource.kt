@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import androidx.core.net.toUri
+import com.autoomstudio.mplay.data.clip.ClipStore
 import com.autoomstudio.mplay.data.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,11 +32,19 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
             MediaStore.Audio.Media.DISPLAY_NAME,
             MediaStore.Audio.Media.TRACK,
         )
+        // Saved clips can be shorter than the minimum, so their folder skips the length check.
+        @Suppress("DEPRECATION")
+        val (pathColumn, clipsPattern) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            MediaStore.Audio.Media.RELATIVE_PATH to "${ClipStore.CLIPS_RELATIVE_PATH}%"
+        } else {
+            MediaStore.Audio.Media.DATA to "%/${ClipStore.CLIPS_RELATIVE_PATH}%"
+        }
         // NULL means the scanner has not extracted metadata yet; show those rows rather than hide them.
         val selection =
             "(${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.IS_MUSIC} IS NULL)" +
-                " AND (${MediaStore.Audio.Media.DURATION} >= ? OR ${MediaStore.Audio.Media.DURATION} IS NULL)"
-        val selectionArgs = arrayOf(MIN_DURATION_MS.toString())
+                " AND (${MediaStore.Audio.Media.DURATION} >= ? OR ${MediaStore.Audio.Media.DURATION} IS NULL" +
+                " OR $pathColumn LIKE ?)"
+        val selectionArgs = arrayOf(MIN_DURATION_MS.toString(), clipsPattern)
         val sortOrder = "${MediaStore.Audio.Media.TITLE} COLLATE NOCASE ASC"
 
         val songs = mutableListOf<Song>()

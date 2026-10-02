@@ -102,6 +102,61 @@
     <string name="message_playing_next">Playing next</string>
     <string name="message_added_to_queue">Added to queue</string>
 
+    <string name="trim_title_cut">Cut and save</string>
+    <string name="trim_title_ringtone">Set as ringtone</string>
+    <string name="trim_start">Start</string>
+    <string name="trim_end">End</string>
+    <string name="trim_start_handle">Start handle, %1$s</string>
+    <string name="trim_end_handle">End handle, %1$s</string>
+    <string name="trim_move_earlier">Move 1 second earlier</string>
+    <string name="trim_move_later">Move 1 second later</string>
+    <string name="trim_nudge_back">Move %1$s back 0.1 seconds</string>
+    <string name="trim_nudge_forward">Move %1$s forward 0.1 seconds</string>
+    <string name="trim_nudge_minus">−0.1</string>
+    <string name="trim_nudge_plus">+0.1</string>
+    <string name="trim_length">Length %1$s</string>
+    <string name="trim_long_ringtone_warning">Longer than 40 seconds. Many phones stop ringing before a clip this long ends.</string>
+    <string name="trim_preview">Preview</string>
+    <string name="trim_stop_preview">Stop preview</string>
+    <string name="trim_save_clip">Save clip</string>
+    <string name="trim_use_full_track">Use full track</string>
+    <string name="trim_set_as">Set as…</string>
+    <string name="trim_clip_name_title">Save clip</string>
+    <string name="trim_clip_name_label">Clip name</string>
+    <string name="trim_save">Save</string>
+    <string name="trim_exporting">Creating clip…</string>
+    <string name="trim_exporting_percent">Creating clip… %1$d%%</string>
+    <string name="trim_saving">Saving to Music/MPlay Clips…</string>
+    <string name="trim_cancel_export">Cancel</string>
+    <string name="trim_waveform_loading">Loading waveform</string>
+    <string name="trim_waveform_failed">This file can\'t be read. It may be damaged or in a format this phone can\'t decode.</string>
+
+    <string name="sound_sheet_title">Set as</string>
+    <string name="sound_ringtone">Phone ringtone</string>
+    <string name="sound_notification">Notification sound</string>
+    <string name="sound_alarm">Alarm sound</string>
+
+    <string name="write_settings_title">Allow MPlay to change sounds?</string>
+    <string name="write_settings_message">To set a clip as your ringtone, notification or alarm sound, turn on Modify system settings for MPlay on the next screen. MPlay only uses it to change the sound you pick.</string>
+    <string name="write_settings_open">Open settings</string>
+    <string name="write_settings_not_now">Not now</string>
+
+    <string name="action_undo">Undo</string>
+    <string name="message_clip_saved">Saved to Music/MPlay Clips</string>
+    <string name="message_sound_set_ringtone">Set as phone ringtone</string>
+    <string name="message_sound_set_notification">Set as notification sound</string>
+    <string name="message_sound_set_alarm">Set as alarm sound</string>
+    <string name="message_sound_not_set">Clip saved to Music/MPlay Clips. To use it, choose it in Sound settings.</string>
+    <string name="message_open_sound_settings">Settings</string>
+    <string name="message_clip_deleted">Clip deleted</string>
+    <string name="message_sound_restored">Previous sound restored</string>
+
+    <string name="error_unsupported_file">This file can\'t be cut. It may be damaged or in an unsupported format.</string>
+    <string name="error_not_enough_storage">Not enough storage to save the clip.</string>
+    <string name="error_permission_denied">MPlay needs storage permission to save clips.</string>
+    <string name="error_export_failed">Couldn\'t create the clip. Try again.</string>
+    <string name="error_save_failed">Couldn\'t save the clip to Music/MPlay Clips.</string>
+
     <string name="song_info_artist">Artist</string>
     <string name="song_info_album">Album</string>
     <string name="song_info_duration">Duration</string>

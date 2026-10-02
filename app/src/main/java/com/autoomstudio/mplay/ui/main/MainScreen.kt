@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import com.autoomstudio.mplay.R
@@ -75,6 +76,8 @@ import com.autoomstudio.mplay.ui.playlist.PlaylistActions
 import com.autoomstudio.mplay.ui.playlist.PlaylistMessage
 import com.autoomstudio.mplay.ui.playlist.PlaylistNameDialog
 import com.autoomstudio.mplay.ui.playlist.PlaylistsScreen
+import com.autoomstudio.mplay.ui.trim.TrimEditorActivity
+import com.autoomstudio.mplay.ui.trim.TrimMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
@@ -146,7 +149,8 @@ fun MainScreen(
     var infoSongId by rememberSaveable { mutableStateOf<Long?>(null) }
     var addToPlaylistSongId by rememberSaveable { mutableStateOf<Long?>(null) }
     var newPlaylistSongId by rememberSaveable { mutableStateOf<Long?>(null) }
-    val songActions = remember(onPlayNext, onAddToQueue, resources) {
+    val context = LocalContext.current
+    val songActions = remember(onPlayNext, onAddToQueue, resources, context) {
         SongActions(
             onAddToPlaylist = { addToPlaylistSongId = it.id },
             onPlayNext = {
@@ -157,6 +161,8 @@ fun MainScreen(
                 onAddToQueue(it)
                 showMessage(resources.getString(R.string.message_added_to_queue))
             },
+            onCutAndSave = { context.startActivity(TrimEditorActivity.intent(context, it, TrimMode.Cut)) },
+            onSetAsRingtone = { context.startActivity(TrimEditorActivity.intent(context, it, TrimMode.Ringtone)) },
             onShowInfo = { infoSongId = it.id },
         )
     }
@@ -297,6 +303,8 @@ fun MainScreen(
                 collapsedTop = { collapsedTop },
                 onExpand = { onShowNowPlayingChange(true) },
                 onCollapse = { onShowNowPlayingChange(false) },
+                song = allSongs.firstOrNull { it.id == state.songId },
+                songActions = songActions,
             )
         }
     }

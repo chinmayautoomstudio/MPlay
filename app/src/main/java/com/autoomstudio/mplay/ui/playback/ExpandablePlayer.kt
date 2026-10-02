@@ -30,8 +30,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.util.lerp
 import com.autoomstudio.mplay.R
+import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.ui.components.ArtworkImage
+import com.autoomstudio.mplay.ui.library.SongActions
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.Flow
 
@@ -60,6 +62,8 @@ fun ExpandablePlayer(
     collapsedTop: () -> Float,
     onExpand: () -> Unit,
     onCollapse: () -> Unit,
+    song: Song?,
+    songActions: SongActions,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -127,6 +131,8 @@ fun ExpandablePlayer(
                 onCollapse = onCollapse,
                 showArtwork = false,
                 backEnabled = backEnabled,
+                song = song,
+                songActions = songActions,
                 onArtworkPositioned = {
                     positions.fullArt = it
                     updateFullArtRect()

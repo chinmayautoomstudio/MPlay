@@ -1,6 +1,10 @@
 package com.autoomstudio.mplay.di
 
 import android.content.Context
+import com.autoomstudio.mplay.data.clip.ClipExporter
+import com.autoomstudio.mplay.data.clip.ClipStore
+import com.autoomstudio.mplay.data.clip.RingtoneSetter
+import com.autoomstudio.mplay.data.clip.WaveformExtractor
 import com.autoomstudio.mplay.data.library.AudioFolderScanner
 import com.autoomstudio.mplay.data.library.AudioFolderWatcher
 import com.autoomstudio.mplay.data.library.LibraryPreferences
@@ -38,6 +42,14 @@ class AppContainer(context: Context) {
     private val database: MPlayDatabase by lazy { MPlayDatabase.create(appContext) }
 
     val playlistRepository: PlaylistRepository by lazy { PlaylistRepository(database.playlistDao()) }
+
+    val clipStore: ClipStore by lazy { ClipStore(appContext) }
+
+    val clipExporter: ClipExporter by lazy { ClipExporter(appContext) }
+
+    val waveformExtractor: WaveformExtractor by lazy { WaveformExtractor(appContext) }
+
+    val ringtoneSetter: RingtoneSetter by lazy { RingtoneSetter(appContext) }
 
     fun createPlaybackController(scope: CoroutineScope): PlaybackController =
         PlaybackController(appContext, scope, songRepository, playbackSessionStore)

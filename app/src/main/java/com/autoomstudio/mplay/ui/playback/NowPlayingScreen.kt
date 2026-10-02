@@ -52,10 +52,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.autoomstudio.mplay.R
+import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.playback.RepeatMode
 import com.autoomstudio.mplay.ui.common.formatDuration
 import com.autoomstudio.mplay.ui.components.ArtworkImage
+import com.autoomstudio.mplay.ui.library.SongActions
+import com.autoomstudio.mplay.ui.library.SongMenuButton
 import kotlinx.coroutines.flow.Flow
 
 /** Full player layout without its own background; the surrounding card draws it. */
@@ -69,6 +72,8 @@ fun NowPlayingContent(
     showArtwork: Boolean = true,
     onArtworkPositioned: (LayoutCoordinates) -> Unit = {},
     backEnabled: Boolean = true,
+    song: Song? = null,
+    songActions: SongActions? = null,
 ) {
     BackHandler(enabled = backEnabled, onBack = onCollapse)
 
@@ -93,6 +98,10 @@ fun NowPlayingContent(
                         contentDescription = stringResource(R.string.action_collapse_player),
                         tint = MaterialTheme.colorScheme.onSurface,
                     )
+                }
+                Spacer(Modifier.weight(1f))
+                if (song != null && songActions != null) {
+                    SongMenuButton(song = song, actions = songActions, tint = MaterialTheme.colorScheme.onSurface)
                 }
             }
 
