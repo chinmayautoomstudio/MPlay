@@ -18,10 +18,31 @@
     <string name="action_search">Search</string>
     <string name="action_sort">Sort</string>
     <string name="action_more_options">More options for %1$s</string>
-    <string name="coming_soon_snackbar">Coming in a later update</string>
+    <string name="action_back">Back</string>
+    <string name="action_close_search">Close search</string>
+    <string name="action_clear_search">Clear search</string>
+    <string name="search_hint">Search songs, artists, albums</string>
+    <string name="search_no_results_title">No results</string>
+    <string name="search_no_results_message">Nothing matches \"%1$s\".</string>
 
-    <string name="coming_soon_albums">Browse your music by album in an upcoming update.</string>
-    <string name="coming_soon_artists">Browse your music by artist in an upcoming update.</string>
+    <string name="sort_title">Title</string>
+    <string name="sort_artist">Artist</string>
+    <string name="sort_album">Album</string>
+    <string name="sort_date_added">Date added</string>
+    <string name="sort_duration">Duration</string>
+
+    <string name="action_play_all">Play</string>
+    <string name="action_shuffle_all">Shuffle</string>
+    <plurals name="song_count">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
+    </plurals>
+    <plurals name="album_count">
+        <item quantity="one">%d album</item>
+        <item quantity="other">%d albums</item>
+    </plurals>
+    <string name="count_separator">%1$s · %2$s</string>
+
     <string name="coming_soon_playlists">Create and play your own playlists in an upcoming update.</string>
     <string name="coming_soon_settings">Theme and playback settings arrive in an upcoming update.</string>
 

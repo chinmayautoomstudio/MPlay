@@ -45,6 +45,11 @@ class PlaybackService : MediaSessionService() {
             .build()
         player.addListener(SkipUnplayableListener(player))
         player.addListener(SessionSaver())
+        serviceScope.launch {
+            val modes = sessionStore.loadModes() ?: return@launch
+            player.shuffleModeEnabled = modes.shuffleEnabled
+            player.repeatMode = modes.repeatMode
+        }
 
         val sessionActivity = PendingIntent.getActivity(
             this,
@@ -108,6 +113,14 @@ class PlaybackService : MediaSessionService() {
                 )
             ) {
                 saveSession(player)
+            }
+            if (events.containsAny(
+                    Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED,
+                    Player.EVENT_REPEAT_MODE_CHANGED,
+                )
+            ) {
+                val modes = PlaybackModes(player.shuffleModeEnabled, player.repeatMode)
+                saveScope.launch { sessionStore.saveModes(modes) }
             }
             if (events.contains(Player.EVENT_IS_PLAYING_CHANGED)) {
                 if (player.isPlaying) startPeriodicSave(player) else periodicSave?.cancel()

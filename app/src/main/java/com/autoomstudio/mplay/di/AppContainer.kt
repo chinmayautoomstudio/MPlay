@@ -3,6 +3,7 @@ package com.autoomstudio.mplay.di
 import android.content.Context
 import com.autoomstudio.mplay.data.library.AudioFolderScanner
 import com.autoomstudio.mplay.data.library.AudioFolderWatcher
+import com.autoomstudio.mplay.data.library.LibraryPreferences
 import com.autoomstudio.mplay.data.library.MediaStoreSongSource
 import com.autoomstudio.mplay.data.library.SongRepository
 import com.autoomstudio.mplay.playback.PlaybackController
@@ -29,6 +30,8 @@ class AppContainer(context: Context) {
     }
 
     val playbackSessionStore: PlaybackSessionStore by lazy { PlaybackSessionStore(appContext) }
+
+    val libraryPreferences: LibraryPreferences by lazy { LibraryPreferences(appContext) }
 
     fun createPlaybackController(scope: CoroutineScope): PlaybackController =
         PlaybackController(appContext, scope, songRepository, playbackSessionStore)

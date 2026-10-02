@@ -29,6 +29,7 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.DATE_ADDED,
             MediaStore.Audio.Media.DISPLAY_NAME,
+            MediaStore.Audio.Media.TRACK,
         )
         // NULL means the scanner has not extracted metadata yet; show those rows rather than hide them.
         val selection =
@@ -48,6 +49,7 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
                 val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
                 val dateAddedCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
                 val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
+                val trackCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
 
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idCol)
@@ -65,6 +67,8 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
                         durationMs = cursor.getLong(durationCol),
                         dateAdded = cursor.getLong(dateAddedCol),
                         albumArtUri = ContentUris.withAppendedId(ALBUM_ART_URI, albumId),
+                        // MediaStore encodes disc and track as disc * 1000 + track.
+                        trackNumber = cursor.getInt(trackCol) % 1000,
                     )
                 }
             }

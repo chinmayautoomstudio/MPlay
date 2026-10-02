@@ -67,6 +67,17 @@ class PlaybackController(
         }
     }
 
+    /** Turns shuffle on and plays [songs] starting from a random one. */
+    fun shuffleQueue(songs: List<Song>) {
+        if (songs.isEmpty()) return
+        withController { controller ->
+            controller.shuffleModeEnabled = true
+            controller.setMediaItems(songs.map { it.toMediaItem() }, songs.indices.random(), 0L)
+            controller.prepare()
+            controller.play()
+        }
+    }
+
     fun playPause() = withController { controller ->
         if (controller.isPlaying) {
             controller.pause()

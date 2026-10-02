@@ -90,6 +90,8 @@ private fun MPlayRoot(
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
     val nowPlaying by playbackViewModel.state.collectAsStateWithLifecycle()
     if (uiState is LibraryUiState.NoPermission) {
         PermissionRationaleScreen(
@@ -107,10 +109,13 @@ private fun MPlayRoot(
             onShowNowPlayingChange = { showNowPlaying = it },
             isRefreshing = isRefreshing,
             onRefresh = viewModel::refresh,
-            onSongClick = { song ->
-                val songs = (uiState as? LibraryUiState.Content)?.songs.orEmpty()
-                playbackViewModel.onSongClick(songs, song)
-            },
+            searchQuery = searchQuery,
+            onSearchQueryChange = viewModel::onSearchQueryChange,
+            onClearSearch = viewModel::clearSearch,
+            sortOrder = sortOrder,
+            onSortOrderChange = viewModel::onSortOrderChange,
+            onPlay = playbackViewModel::onSongClick,
+            onShuffle = playbackViewModel::onShuffle,
         )
     }
 }

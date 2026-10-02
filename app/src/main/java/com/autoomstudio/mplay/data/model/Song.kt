@@ -12,4 +12,6 @@ data class Song(
     val durationMs: Long,
     val dateAdded: Long,
     val albumArtUri: Uri,
+    /** Position within its album disc; 0 when the file has no track tag. */
+    val trackNumber: Int = 0,
 )

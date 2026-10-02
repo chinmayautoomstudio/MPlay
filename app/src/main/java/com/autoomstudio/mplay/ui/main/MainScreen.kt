@@ -27,8 +27,6 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -37,7 +35,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -50,6 +47,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.res.stringResource
 import com.autoomstudio.mplay.R
+import com.autoomstudio.mplay.data.library.SongSortOrder
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.ui.components.ComingSoon
@@ -67,7 +65,6 @@ import com.autoomstudio.mplay.ui.playback.rememberPlayerSheetState
 import com.autoomstudio.mplay.ui.playback.updateSheetAnchors
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.launch
 
 private enum class Destination(
     @StringRes val label: Int,
@@ -93,18 +90,20 @@ fun MainScreen(
     onShowNowPlayingChange: (Boolean) -> Unit,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
-    onSongClick: (Song) -> Unit,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onClearSearch: () -> Unit,
+    sortOrder: SongSortOrder,
+    onSortOrderChange: (SongSortOrder) -> Unit,
+    onPlay: (songs: List<Song>, start: Song) -> Unit,
+    onShuffle: (songs: List<Song>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var destination by rememberSaveable { mutableStateOf(Destination.Library) }
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-    val comingSoon = stringResource(R.string.coming_soon_snackbar)
-    val showComingSoon: () -> Unit = {
-        scope.launch {
-            snackbarHostState.currentSnackbarData?.dismiss()
-            snackbarHostState.showSnackbar(comingSoon)
-        }
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+    val closeSearch = {
+        searchActive = false
+        onClearSearch()
     }
 
     // Keeps the last song on screen while the player surfaces animate out after the queue is cleared.
@@ -137,7 +136,18 @@ fun MainScreen(
     Box(modifier = modifier) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
-            topBar = { MPlayTopBar(onSearchClick = showComingSoon, onSortClick = showComingSoon) },
+            topBar = {
+                MPlayTopBar(
+                    showActions = destination == Destination.Library,
+                    searchActive = searchActive && destination == Destination.Library,
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = onSearchQueryChange,
+                    onOpenSearch = { searchActive = true },
+                    onCloseSearch = closeSearch,
+                    sortOrder = sortOrder,
+                    onSortOrderChange = onSortOrderChange,
+                )
+            },
             bottomBar = {
                 Column(Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)) {
                     AnimatedVisibility(
@@ -161,14 +171,16 @@ fun MainScreen(
                     }
                     MPlayNavigationBar(
                         selected = destination,
-                        onSelect = { destination = it },
+                        onSelect = {
+                            if (it != Destination.Library && searchActive) closeSearch()
+                            destination = it
+                        },
                         modifier = Modifier.graphicsLayer {
                             translationY = sheetState.expandProgress * size.height
                         },
                     )
                 }
             },
-            snackbarHost = { SnackbarHost(snackbarHostState) },
         ) { innerPadding ->
             val contentModifier = Modifier
                 .fillMaxSize()
@@ -180,7 +192,9 @@ fun MainScreen(
                     isPlaying = nowPlaying?.isPlaying == true,
                     isRefreshing = isRefreshing,
                     onRefresh = onRefresh,
-                    onSongClick = onSongClick,
+                    searchQuery = searchQuery,
+                    onPlay = onPlay,
+                    onShuffle = onShuffle,
                     modifier = contentModifier,
                 )
 

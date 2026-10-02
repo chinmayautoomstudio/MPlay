@@ -24,6 +24,11 @@ class PlaybackViewModel(container: AppContainer) : ViewModel(), PlayerActions {
         controller.playQueue(songs, songs.indexOfFirst { it.id == song.id })
     }
 
+    /** Queues [songs] with shuffle on, starting from a random song. */
+    fun onShuffle(songs: List<Song>) {
+        controller.shuffleQueue(songs)
+    }
+
     override fun playPause() = controller.playPause()
     override fun next() = controller.next()
     override fun previous() = controller.previous()

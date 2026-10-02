@@ -6,15 +6,26 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.autoomstudio.mplay.MPlayApp
+import com.autoomstudio.mplay.data.library.LibraryPreferences
+import com.autoomstudio.mplay.data.library.LibraryQueries
 import com.autoomstudio.mplay.data.library.SongRepository
+import com.autoomstudio.mplay.data.library.SongSortOrder
+import com.autoomstudio.mplay.data.model.Album
+import com.autoomstudio.mplay.data.model.Artist
 import com.autoomstudio.mplay.data.model.Song
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
@@ -25,15 +36,41 @@ sealed interface LibraryUiState {
     data object Loading : LibraryUiState
     data object NoPermission : LibraryUiState
     data object Empty : LibraryUiState
-    data class Content(val songs: List<Song>) : LibraryUiState
+
+    /**
+     * [songs] are filtered and sorted; [albums] and [artists] are grouped from the filtered songs.
+     * [allSongs] is the unfiltered library, so album and artist screens stay complete during a search.
+     */
+    data class Content(
+        val songs: List<Song>,
+        val albums: List<Album>,
+        val artists: List<Artist>,
+        val isFiltered: Boolean,
+        val allSongs: List<Song>,
+    ) : LibraryUiState
 }
 
-class LibraryViewModel(private val songRepository: SongRepository) : ViewModel() {
+class LibraryViewModel(
+    private val songRepository: SongRepository,
+    private val libraryPreferences: LibraryPreferences,
+) : ViewModel() {
 
     private val permissionGranted = MutableStateFlow<Boolean?>(null)
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    val sortOrder: StateFlow<SongSortOrder> = libraryPreferences.sortOrder
+        .stateIn(viewModelScope, SharingStarted.Eagerly, SongSortOrder.Title)
+
+    @OptIn(FlowPreview::class)
+    private val effectiveQuery = _searchQuery
+        .map { it.trim() }
+        .distinctUntilChanged()
+        .debounce { if (it.isEmpty()) 0L else SEARCH_DEBOUNCE_MS }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val uiState: StateFlow<LibraryUiState> = permissionGranted
@@ -41,11 +78,12 @@ class LibraryViewModel(private val songRepository: SongRepository) : ViewModel()
             when (granted) {
                 null -> flowOf(LibraryUiState.Loading)
                 false -> flowOf(LibraryUiState.NoPermission)
-                true -> songRepository.songs()
-                    .onEach { _isRefreshing.value = false }
-                    .map { songs ->
-                        if (songs.isEmpty()) LibraryUiState.Empty else LibraryUiState.Content(songs)
-                    }
+                true -> combine(
+                    songRepository.songs().onEach { _isRefreshing.value = false },
+                    effectiveQuery,
+                    libraryPreferences.sortOrder,
+                ) { songs, query, order -> buildState(songs, query, order) }
+                    .flowOn(Dispatchers.Default)
                     .onStart { emit(LibraryUiState.Loading) }
             }
         }
@@ -68,13 +106,38 @@ class LibraryViewModel(private val songRepository: SongRepository) : ViewModel()
         viewModelScope.launch { songRepository.rescanIfStale(FOREGROUND_SCAN_INTERVAL_MS) }
     }
 
+    fun onSearchQueryChange(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun clearSearch() {
+        _searchQuery.value = ""
+    }
+
+    fun onSortOrderChange(order: SongSortOrder) {
+        viewModelScope.launch { libraryPreferences.setSortOrder(order) }
+    }
+
+    private fun buildState(songs: List<Song>, query: String, order: SongSortOrder): LibraryUiState {
+        if (songs.isEmpty()) return LibraryUiState.Empty
+        val filtered = LibraryQueries.filterSongs(songs, query)
+        return LibraryUiState.Content(
+            songs = LibraryQueries.sortSongs(filtered, order),
+            albums = LibraryQueries.groupAlbums(filtered),
+            artists = LibraryQueries.groupArtists(filtered),
+            isFiltered = query.isNotEmpty(),
+            allSongs = songs,
+        )
+    }
+
     companion object {
         private const val FOREGROUND_SCAN_INTERVAL_MS = 2_000L
+        private const val SEARCH_DEBOUNCE_MS = 250L
 
         val Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as MPlayApp
-                LibraryViewModel(app.container.songRepository)
+                LibraryViewModel(app.container.songRepository, app.container.libraryPreferences)
             }
         }
     }
