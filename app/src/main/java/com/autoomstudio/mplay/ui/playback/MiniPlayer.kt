@@ -49,9 +49,9 @@ import com.autoomstudio.mplay.ui.components.ArtworkImage
 import com.autoomstudio.mplay.ui.components.pressBounce
 import kotlinx.coroutines.flow.Flow
 
-private val ProgressLineHeight = 2.dp
-private val ScrubLineHeight = 4.dp
-private val ScrubThumbRadius = 4.dp
+private val ProgressLineHeight = 4.dp
+private val ScrubLineHeight = 6.dp
+private val ScrubThumbRadius = 7.dp
 private val ScrubStripHeight = 16.dp
 private val RowHeight = 64.dp
 private val RowVerticalPadding = 6.dp
@@ -195,6 +195,11 @@ private fun ScrubStrip(
     onSeek: (Float) -> Unit,
 ) {
     val lineHeight by animateDpAsState(if (scrubbing) ScrubLineHeight else ProgressLineHeight, label = "lineHeight")
+    // The head must fit inside the strip, so the line drops to the head's centre while scrubbing.
+    val lineCenter by animateDpAsState(
+        if (scrubbing) ScrubThumbRadius else ProgressLineHeight / 2,
+        label = "lineCenter",
+    )
     val lineColor = MaterialTheme.colorScheme.primary
     val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
     val seekDescription = stringResource(R.string.seek_bar_description)
@@ -244,14 +249,16 @@ private fun ScrubStrip(
             .then(gestureModifier)
             .drawBehind {
                 val linePx = lineHeight.toPx()
-                if (scrubbing) drawRect(trackColor, size = Size(size.width, linePx))
-                drawRect(lineColor, size = Size(size.width * fraction, linePx))
+                val centerY = lineCenter.toPx()
+                val lineTop = Offset(0f, centerY - linePx / 2)
+                if (scrubbing) drawRect(trackColor, topLeft = lineTop, size = Size(size.width, linePx))
+                drawRect(lineColor, topLeft = lineTop, size = Size(size.width * fraction, linePx))
                 if (scrubbing) {
                     val radius = ScrubThumbRadius.toPx()
                     drawCircle(
                         color = lineColor,
                         radius = radius,
-                        center = Offset((size.width * fraction).coerceIn(radius, size.width - radius), radius),
+                        center = Offset((size.width * fraction).coerceIn(radius, size.width - radius), centerY),
                     )
                 }
             },
