@@ -48,11 +48,14 @@ fun PlayerSheetState.updateSheetAnchors(collapsedTopPx: Float) {
     )
 }
 
-/** 0 when collapsed, 1 when expanded. */
+/** 0 when collapsed, 1 when expanded; 0 until the sheet has been measured. */
 val PlayerSheetState.expandProgress: Float
     get() {
-        val fraction = progress(from = PlayerSheetValue.Collapsed, to = PlayerSheetValue.Expanded)
-        return if (fraction.isNaN()) 0f else fraction.coerceIn(0f, 1f)
+        // AnchoredDraggableState.progress() reports 1 while anchors are missing, so compute it directly.
+        val collapsed = anchors.positionOf(PlayerSheetValue.Collapsed)
+        val expanded = anchors.positionOf(PlayerSheetValue.Expanded)
+        if (collapsed.isNaN() || expanded.isNaN() || collapsed == expanded || offset.isNaN()) return 0f
+        return ((collapsed - offset) / (collapsed - expanded)).coerceIn(0f, 1f)
     }
 
 suspend fun PlayerSheetState.animateSheetTo(target: PlayerSheetValue) {
