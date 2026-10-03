@@ -32,7 +32,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -82,6 +81,7 @@ import com.autoomstudio.mplay.playback.SleepTimer
 import com.autoomstudio.mplay.playback.SleepTimerStatus
 import com.autoomstudio.mplay.ui.common.formatDuration
 import com.autoomstudio.mplay.ui.components.ArtworkImage
+import com.autoomstudio.mplay.ui.components.LofiWaveIcon
 import com.autoomstudio.mplay.ui.components.popOnChange
 import com.autoomstudio.mplay.ui.components.pressBounce
 import com.autoomstudio.mplay.ui.theme.MotionMedium
@@ -231,7 +231,7 @@ fun NowPlayingContent(
                 TransportControls(state = state, actions = actions)
 
                 Spacer(Modifier.height(12.dp))
-                LofiToggle(enabled = state.lofiEnabled, onToggle = actions::setLofi)
+                LofiToggle(enabled = state.lofiEnabled, isPlaying = state.isPlaying, onToggle = actions::setLofi)
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -283,7 +283,7 @@ private fun SleepTimerButton(status: SleepTimerStatus, onClick: () -> Unit) {
 }
 
 @Composable
-private fun LofiToggle(enabled: Boolean, onToggle: (Boolean) -> Unit) {
+private fun LofiToggle(enabled: Boolean, isPlaying: Boolean, onToggle: (Boolean) -> Unit) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -293,10 +293,11 @@ private fun LofiToggle(enabled: Boolean, onToggle: (Boolean) -> Unit) {
             onClick = { onToggle(!enabled) },
             label = { Text(stringResource(R.string.lofi_mode)) },
             leadingIcon = {
-                Icon(
-                    imageVector = Icons.Filled.GraphicEq,
-                    contentDescription = null,
-                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                LofiWaveIcon(
+                    active = enabled && isPlaying,
+                    modifier = Modifier
+                        .size(FilterChipDefaults.IconSize)
+                        .popOnChange(enabled, enabled = enabled),
                 )
             },
         )
