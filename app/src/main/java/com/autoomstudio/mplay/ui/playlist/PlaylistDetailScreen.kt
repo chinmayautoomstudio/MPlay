@@ -27,6 +27,7 @@ import com.autoomstudio.mplay.ui.components.ComingSoon
 import com.autoomstudio.mplay.ui.library.DetailBackButton
 import com.autoomstudio.mplay.ui.library.DetailHeader
 import com.autoomstudio.mplay.ui.library.SongActions
+import com.autoomstudio.mplay.ui.library.SongSelection
 import com.autoomstudio.mplay.ui.library.songCountText
 
 @Composable
@@ -40,6 +41,7 @@ fun PlaylistDetailScreen(
     actions: SongActions,
     onRemove: (Song) -> Unit,
     onReorder: (List<Song>) -> Unit,
+    selection: SongSelection,
     modifier: Modifier = Modifier,
 ) {
     // Local copy so rows move instantly while dragging; saved once on drop.
@@ -97,6 +99,7 @@ fun PlaylistDetailScreen(
             onRemove = onRemove,
             onMove = { from, to -> order = PlaylistQueries.moveItem(order, from, to) },
             onDragEnd = { if (order != playlist.songs) onReorder(order) },
+            selection = selection,
         )
     }
 }

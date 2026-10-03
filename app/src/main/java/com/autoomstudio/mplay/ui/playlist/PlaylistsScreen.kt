@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,6 +43,7 @@ import com.autoomstudio.mplay.ui.components.LoadingIndicator
 import com.autoomstudio.mplay.ui.theme.fadeThrough
 import com.autoomstudio.mplay.ui.theme.sharedAxisX
 import com.autoomstudio.mplay.ui.library.SongActions
+import com.autoomstudio.mplay.ui.library.SongSelection
 import com.autoomstudio.mplay.ui.library.songCountText
 
 /** [playlists] is null while loading. */
@@ -54,6 +56,7 @@ fun PlaylistsScreen(
     songActions: SongActions,
     onPlay: (songs: List<Song>, start: Song) -> Unit,
     onShuffle: (songs: List<Song>) -> Unit,
+    selection: SongSelection,
     modifier: Modifier = Modifier,
     /** False while the full player covers this screen, so Back closes the player first. */
     backEnabled: Boolean = true,
@@ -63,6 +66,13 @@ fun PlaylistsScreen(
     var renameId by rememberSaveable { mutableStateOf<Long?>(null) }
     var deleteId by rememberSaveable { mutableStateOf<Long?>(null) }
     BackHandler(enabled = backEnabled && selectedId != null) { selectedId = null }
+    DisposableEffect(selectedId) {
+        selection.playlistId = selectedId
+        onDispose {
+            selection.clear()
+            selection.playlistId = null
+        }
+    }
 
     if (playlists == null) {
         LoadingIndicator(modifier = modifier)
@@ -90,8 +100,9 @@ fun PlaylistsScreen(
                 onPlay = onPlay,
                 onShuffle = onShuffle,
                 actions = songActions,
-                onRemove = { playlistActions.removeFromPlaylist(shown, it) },
+                onRemove = { playlistActions.removeFromPlaylist(shown, listOf(it)) },
                 onReorder = { playlistActions.reorderPlaylist(shown, it) },
+                selection = selection,
                 modifier = Modifier.fillMaxSize(),
             )
         } else {

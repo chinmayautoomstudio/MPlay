@@ -25,8 +25,12 @@ abstract class PlaylistDao {
     @Query("DELETE FROM playlists WHERE id = :id")
     abstract suspend fun delete(id: Long)
 
-    @Query("DELETE FROM playlist_songs WHERE playlistId = :playlistId AND songId = :songId")
-    protected abstract suspend fun deleteEntry(playlistId: Long, songId: Long)
+    @Query("DELETE FROM playlist_songs WHERE playlistId = :playlistId AND songId IN (:songIds)")
+    protected abstract suspend fun deleteEntries(playlistId: Long, songIds: List<Long>)
+
+    /** Drops songs that no longer exist on the device from every playlist. */
+    @Query("DELETE FROM playlist_songs WHERE songId IN (:songIds)")
+    abstract suspend fun removeSongsEverywhere(songIds: List<Long>)
 
     @Query("SELECT songId FROM playlist_songs WHERE playlistId = :playlistId ORDER BY position")
     abstract suspend fun songIds(playlistId: Long): List<Long>
@@ -56,8 +60,8 @@ abstract class PlaylistDao {
     }
 
     @Transaction
-    open suspend fun removeSong(playlistId: Long, songId: Long, now: Long) {
-        deleteEntry(playlistId, songId)
+    open suspend fun removeSongs(playlistId: Long, songIds: List<Long>, now: Long) {
+        deleteEntries(playlistId, songIds)
         touch(playlistId, now)
     }
 

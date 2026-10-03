@@ -71,6 +71,7 @@
     <string name="menu_set_as_ringtone">Set as ringtone</string>
     <string name="menu_song_info">Song info</string>
     <string name="menu_remove_from_playlist">Remove from playlist</string>
+    <string name="menu_delete_from_device">Delete from device</string>
 
     <string name="playlist_new">New playlist</string>
     <string name="playlist_name_label">Playlist name</string>
@@ -100,6 +101,48 @@
     <string name="message_playlist_deleted">Deleted %1$s</string>
     <string name="message_playing_next">Playing next</string>
     <string name="message_added_to_queue">Added to queue</string>
+    <plurals name="message_songs_added_to_playlist">
+        <item quantity="one">Added %1$d song to %2$s</item>
+        <item quantity="other">Added %1$d songs to %2$s</item>
+    </plurals>
+    <plurals name="message_songs_playing_next">
+        <item quantity="one">%d song playing next</item>
+        <item quantity="other">%d songs playing next</item>
+    </plurals>
+    <plurals name="message_songs_added_to_queue">
+        <item quantity="one">Added %d song to queue</item>
+        <item quantity="other">Added %d songs to queue</item>
+    </plurals>
+    <plurals name="message_songs_removed_from_playlist">
+        <item quantity="one">Removed %1$d song from %2$s</item>
+        <item quantity="other">Removed %1$d songs from %2$s</item>
+    </plurals>
+
+    <plurals name="selected_count">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <string name="action_select">Select</string>
+    <string name="action_clear_selection">Clear selection</string>
+    <string name="action_more_selection_options">More options for selected songs</string>
+    <string name="action_delete">Delete</string>
+
+    <string name="delete_song_title">Delete \"%1$s\"?</string>
+    <plurals name="delete_songs_title">
+        <item quantity="one">Delete %d song?</item>
+        <item quantity="other">Delete %d songs?</item>
+    </plurals>
+    <plurals name="delete_songs_message">
+        <item quantity="one">The file will be permanently deleted from your device.</item>
+        <item quantity="other">The files will be permanently deleted from your device.</item>
+    </plurals>
+    <plurals name="message_songs_deleted">
+        <item quantity="one">Deleted %d song</item>
+        <item quantity="other">Deleted %d songs</item>
+    </plurals>
+    <string name="message_songs_partly_deleted">Deleted %1$d of %2$d songs. The rest couldn\'t be deleted.</string>
+    <string name="message_delete_failed">Couldn\'t delete. The files may be in use or protected.</string>
+    <string name="message_delete_needs_permission">Storage access is needed to delete songs</string>
 
     <string name="trim_title_cut">Cut and save</string>
     <string name="trim_title_ringtone">Set as ringtone</string>

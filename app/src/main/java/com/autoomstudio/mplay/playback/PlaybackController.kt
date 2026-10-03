@@ -78,24 +78,46 @@ class PlaybackController(
         }
     }
 
-    /** Inserts [song] after the current one, or plays it when nothing is queued. With shuffle on, Media3 picks its slot. */
-    fun playNext(song: Song) = withController { controller ->
-        if (controller.mediaItemCount == 0) {
-            controller.setMediaItem(song.toMediaItem())
-            controller.prepare()
-            controller.play()
-        } else {
-            controller.addMediaItem(controller.currentMediaItemIndex + 1, song.toMediaItem())
+    /**
+     * Inserts [songs] in order after the current one, or plays them when nothing is queued.
+     * With shuffle on, Media3 picks their slots.
+     */
+    fun playNext(songs: List<Song>) {
+        if (songs.isEmpty()) return
+        withController { controller ->
+            val items = songs.map { it.toMediaItem() }
+            if (controller.mediaItemCount == 0) {
+                controller.setMediaItems(items, 0, 0L)
+                controller.prepare()
+                controller.play()
+            } else {
+                controller.addMediaItems(controller.currentMediaItemIndex + 1, items)
+            }
         }
     }
 
-    /** Appends [song] to the queue, or queues it paused when nothing is queued. */
-    fun addToQueue(song: Song) = withController { controller ->
-        if (controller.mediaItemCount == 0) {
-            controller.setMediaItem(song.toMediaItem())
-            controller.prepare()
-        } else {
-            controller.addMediaItem(song.toMediaItem())
+    /** Appends [songs] to the queue, or queues them paused when nothing is queued. */
+    fun addToQueue(songs: List<Song>) {
+        if (songs.isEmpty()) return
+        withController { controller ->
+            val items = songs.map { it.toMediaItem() }
+            if (controller.mediaItemCount == 0) {
+                controller.setMediaItems(items, 0, 0L)
+                controller.prepare()
+            } else {
+                controller.addMediaItems(items)
+            }
+        }
+    }
+
+    /** Drops every queue entry for [songIds], for example after the files were deleted. */
+    fun removeSongs(songIds: Set<Long>) {
+        if (songIds.isEmpty()) return
+        withController { controller ->
+            for (index in controller.mediaItemCount - 1 downTo 0) {
+                val id = controller.getMediaItemAt(index).mediaId.toLongOrNull()
+                if (id in songIds) controller.removeMediaItem(index)
+            }
         }
     }
 

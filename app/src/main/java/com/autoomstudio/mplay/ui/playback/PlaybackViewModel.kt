@@ -29,9 +29,11 @@ class PlaybackViewModel(container: AppContainer) : ViewModel(), PlayerActions {
         controller.shuffleQueue(songs)
     }
 
-    fun onPlayNext(song: Song) = controller.playNext(song)
+    fun onPlayNext(songs: List<Song>) = controller.playNext(songs)
 
-    fun onAddToQueue(song: Song) = controller.addToQueue(song)
+    fun onAddToQueue(songs: List<Song>) = controller.addToQueue(songs)
+
+    fun removeFromQueue(songIds: Set<Long>) = controller.removeSongs(songIds)
 
     override fun playPause() = controller.playPause()
     override fun next() = controller.next()

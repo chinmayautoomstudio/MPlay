@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -30,6 +31,7 @@ import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.ui.components.LoadingIndicator
 import com.autoomstudio.mplay.ui.theme.fadeThrough
 import com.autoomstudio.mplay.ui.theme.sharedAxisX
+import kotlinx.coroutines.flow.drop
 
 private enum class LibraryTab(@StringRes val label: Int) {
     Songs(R.string.tab_songs),
@@ -80,6 +82,7 @@ fun LibraryScreen(
     onPlay: (songs: List<Song>, start: Song) -> Unit,
     onShuffle: (songs: List<Song>) -> Unit,
     actions: SongActions,
+    selection: SongSelection,
     modifier: Modifier = Modifier,
     /** False while the full player covers this screen, so Back closes the player first. */
     backEnabled: Boolean = true,
@@ -88,6 +91,9 @@ fun LibraryScreen(
     val backStack = rememberSaveable(saver = RouteStackSaver) { mutableStateListOf() }
     val route = backStack.lastOrNull()
     BackHandler(enabled = backEnabled && route != null) { backStack.removeAt(backStack.lastIndex) }
+    LaunchedEffect(selection) {
+        snapshotFlow { selectedIndex to backStack.toList() }.drop(1).collect { selection.clear() }
+    }
 
     val isLoading = state is LibraryUiState.Loading || state is LibraryUiState.NoPermission
     AnimatedContent(
@@ -118,6 +124,7 @@ fun LibraryScreen(
                     onPlay = onPlay,
                     onShuffle = onShuffle,
                     actions = actions,
+                    selection = selection,
                 )
             }
         }
@@ -141,6 +148,7 @@ private fun LibraryRouteContent(
     onPlay: (songs: List<Song>, start: Song) -> Unit,
     onShuffle: (songs: List<Song>) -> Unit,
     actions: SongActions,
+    selection: SongSelection,
 ) {
     val modifier = Modifier.fillMaxSize()
     val content = state as? LibraryUiState.Content
@@ -161,6 +169,7 @@ private fun LibraryRouteContent(
             onRefresh = onRefresh,
             onPlay = onPlay,
             actions = actions,
+            selection = selection,
             onAlbumClick = { backStack.add(LibraryRoute.AlbumRoute(it.id)) },
             onArtistClick = { backStack.add(LibraryRoute.ArtistRoute(it.name)) },
             modifier = modifier,
@@ -181,6 +190,7 @@ private fun LibraryRouteContent(
                     onPlay = onPlay,
                     onShuffle = onShuffle,
                     actions = actions,
+                    selection = selection,
                     modifier = modifier,
                 )
             }
@@ -202,6 +212,7 @@ private fun LibraryRouteContent(
                     onPlay = onPlay,
                     onShuffle = onShuffle,
                     actions = actions,
+                    selection = selection,
                     modifier = modifier,
                 )
             }
@@ -221,6 +232,7 @@ private fun LibraryTabs(
     onRefresh: () -> Unit,
     onPlay: (songs: List<Song>, start: Song) -> Unit,
     actions: SongActions,
+    selection: SongSelection,
     onAlbumClick: (Album) -> Unit,
     onArtistClick: (Artist) -> Unit,
     modifier: Modifier = Modifier,
@@ -264,6 +276,7 @@ private fun LibraryTabs(
                     onRefresh = onRefresh,
                     onPlay = onPlay,
                     actions = actions,
+                    selection = selection,
                     modifier = contentModifier,
                 )
 

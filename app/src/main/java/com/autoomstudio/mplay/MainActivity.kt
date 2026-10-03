@@ -85,6 +85,7 @@ private fun MPlayRoot(
     playbackViewModel: PlaybackViewModel = viewModel(factory = PlaybackViewModel.Factory),
     playlistsViewModel: PlaylistsViewModel = viewModel(factory = PlaylistsViewModel.Factory),
 ) {
+    val songDeleter = (LocalContext.current.applicationContext as MPlayApp).container.songDeleter
     val permission = rememberAudioPermissionState()
     LaunchedEffect(permission.isGranted) {
         viewModel.onPermissionChanged(permission.isGranted)
@@ -148,6 +149,11 @@ private fun MPlayRoot(
             playlists = playlists,
             playlistActions = playlistsViewModel,
             playlistMessages = playlistsViewModel.messages,
+            songDeleter = songDeleter,
+            onSongsDeleted = { ids ->
+                playbackViewModel.removeFromQueue(ids)
+                playlistsViewModel.onSongsDeleted(ids)
+            },
             themeSettings = themeSettings,
             onThemeModeChange = settingsViewModel::setThemeMode,
             onDynamicColorChange = settingsViewModel::setDynamicColor,

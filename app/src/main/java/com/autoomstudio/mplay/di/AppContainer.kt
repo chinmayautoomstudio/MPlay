@@ -9,6 +9,7 @@ import com.autoomstudio.mplay.data.library.AudioFolderScanner
 import com.autoomstudio.mplay.data.library.AudioFolderWatcher
 import com.autoomstudio.mplay.data.library.LibraryPreferences
 import com.autoomstudio.mplay.data.library.MediaStoreSongSource
+import com.autoomstudio.mplay.data.library.SongDeleter
 import com.autoomstudio.mplay.data.library.SongRepository
 import com.autoomstudio.mplay.data.playlist.MPlayDatabase
 import com.autoomstudio.mplay.data.playlist.PlaylistRepository
@@ -53,6 +54,8 @@ class AppContainer(context: Context) {
     val waveformExtractor: WaveformExtractor by lazy { WaveformExtractor(appContext) }
 
     val ringtoneSetter: RingtoneSetter by lazy { RingtoneSetter(appContext) }
+
+    val songDeleter: SongDeleter by lazy { SongDeleter(appContext) }
 
     val widgetStateStore: WidgetStateStore by lazy { WidgetStateStore(appContext) }
 

@@ -28,6 +28,7 @@ fun ArtistDetailScreen(
     onPlay: (songs: List<Song>, start: Song) -> Unit,
     onShuffle: (songs: List<Song>) -> Unit,
     actions: SongActions,
+    selection: SongSelection,
     modifier: Modifier = Modifier,
 ) {
     val songs = artist.songs
@@ -68,6 +69,7 @@ fun ArtistDetailScreen(
             isPlaying = isPlaying,
             onSongClick = { onPlay(songs, it) },
             actions = actions,
+            selection = selection,
         )
     }
 }

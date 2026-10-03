@@ -32,6 +32,7 @@ import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.ui.library.SongActions
 import com.autoomstudio.mplay.ui.library.SongRow
+import com.autoomstudio.mplay.ui.library.SongSelection
 
 /** Tracks the row being dragged; rows are keyed by song ID in the surrounding lazy list. */
 @Stable
@@ -87,6 +88,7 @@ fun LazyListScope.reorderableSongItems(
     onRemove: (Song) -> Unit,
     onMove: (from: Int, to: Int) -> Unit,
     onDragEnd: () -> Unit,
+    selection: SongSelection? = null,
 ) {
     itemsIndexed(items = songs, key = { _, song -> song.id }) { index, song ->
         val isCurrent = song.id == currentSongId
@@ -114,6 +116,7 @@ fun LazyListScope.reorderableSongItems(
             onClick = { onSongClick(song) },
             actions = actions,
             onRemove = { onRemove(song) },
+            selection = selection,
             modifier = rowModifier.semantics {
                 customActions = buildList {
                     if (index > 0) {

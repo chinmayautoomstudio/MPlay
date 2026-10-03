@@ -24,19 +24,19 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 interface PlaylistActions {
-    /** Creates a playlist and, when [firstSong] is given, adds it straight away. */
-    fun createPlaylist(name: String, firstSong: Song? = null)
+    /** Creates a playlist and adds [firstSongs] to it straight away. */
+    fun createPlaylist(name: String, firstSongs: List<Song> = emptyList())
     fun renamePlaylist(playlist: Playlist, name: String)
     fun deletePlaylist(playlist: Playlist)
-    fun addToPlaylist(playlist: Playlist, song: Song)
-    fun removeFromPlaylist(playlist: Playlist, song: Song)
+    fun addToPlaylist(playlist: Playlist, songs: List<Song>)
+    fun removeFromPlaylist(playlist: Playlist, songs: List<Song>)
     fun reorderPlaylist(playlist: Playlist, songs: List<Song>)
 }
 
 /** One-shot results shown in a snackbar. */
 sealed interface PlaylistMessage {
     data class Created(val name: String) : PlaylistMessage
-    data class Added(val name: String) : PlaylistMessage
+    data class Added(val name: String, val count: Int) : PlaylistMessage
     data class AlreadyIn(val name: String) : PlaylistMessage
     data class Deleted(val name: String) : PlaylistMessage
 }
@@ -62,14 +62,14 @@ class PlaylistsViewModel(private val repository: PlaylistRepository) : ViewModel
         librarySongs.value = songs
     }
 
-    override fun createPlaylist(name: String, firstSong: Song?) {
+    override fun createPlaylist(name: String, firstSongs: List<Song>) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         viewModelScope.launch {
             val id = repository.create(trimmed)
-            if (firstSong != null) {
-                repository.addSongs(id, listOf(firstSong))
-                _messages.send(PlaylistMessage.Added(trimmed))
+            if (firstSongs.isNotEmpty()) {
+                val added = repository.addSongs(id, firstSongs)
+                _messages.send(PlaylistMessage.Added(trimmed, added))
             } else {
                 _messages.send(PlaylistMessage.Created(trimmed))
             }
@@ -88,17 +88,25 @@ class PlaylistsViewModel(private val repository: PlaylistRepository) : ViewModel
         }
     }
 
-    override fun addToPlaylist(playlist: Playlist, song: Song) {
+    override fun addToPlaylist(playlist: Playlist, songs: List<Song>) {
+        if (songs.isEmpty()) return
         viewModelScope.launch {
-            val added = repository.addSongs(playlist.id, listOf(song))
+            val added = repository.addSongs(playlist.id, songs)
             _messages.send(
-                if (added > 0) PlaylistMessage.Added(playlist.name) else PlaylistMessage.AlreadyIn(playlist.name),
+                if (added > 0) PlaylistMessage.Added(playlist.name, added) else PlaylistMessage.AlreadyIn(playlist.name),
             )
         }
     }
 
-    override fun removeFromPlaylist(playlist: Playlist, song: Song) {
-        viewModelScope.launch { repository.remove(playlist.id, song) }
+    override fun removeFromPlaylist(playlist: Playlist, songs: List<Song>) {
+        if (songs.isEmpty()) return
+        viewModelScope.launch { repository.remove(playlist.id, songs) }
+    }
+
+    /** Forgets songs that were deleted from the device. */
+    fun onSongsDeleted(songIds: Collection<Long>) {
+        if (songIds.isEmpty()) return
+        viewModelScope.launch { repository.removeSongsEverywhere(songIds) }
     }
 
     override fun reorderPlaylist(playlist: Playlist, songs: List<Song>) {

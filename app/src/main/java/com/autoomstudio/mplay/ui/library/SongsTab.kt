@@ -26,6 +26,7 @@ fun SongsTab(
     onRefresh: () -> Unit,
     onPlay: (songs: List<Song>, start: Song) -> Unit,
     actions: SongActions,
+    selection: SongSelection,
     modifier: Modifier = Modifier,
 ) {
     val songs = content?.songs.orEmpty()
@@ -57,6 +58,7 @@ fun SongsTab(
                     isPlaying = isPlaying,
                     onSongClick = { onPlay(songs, it) },
                     actions = actions,
+                    selection = selection,
                 )
             } else {
                 item {

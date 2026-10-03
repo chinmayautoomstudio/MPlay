@@ -21,6 +21,7 @@ fun AlbumDetailScreen(
     onPlay: (songs: List<Song>, start: Song) -> Unit,
     onShuffle: (songs: List<Song>) -> Unit,
     actions: SongActions,
+    selection: SongSelection,
     modifier: Modifier = Modifier,
 ) {
     val songs = album.songs
@@ -51,6 +52,7 @@ fun AlbumDetailScreen(
             onSongClick = { onPlay(songs, it) },
             actions = actions,
             showTrackNumbers = true,
+            selection = selection,
         )
     }
 }

@@ -1,5 +1,6 @@
 package com.autoomstudio.mplay.ui.main
 
+import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -59,11 +60,16 @@ import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.data.settings.ThemeMode
 import com.autoomstudio.mplay.data.settings.ThemeSettings
 import com.autoomstudio.mplay.playback.NowPlayingState
+import com.autoomstudio.mplay.data.library.SongDeleter
 import com.autoomstudio.mplay.ui.components.MPlayTopBar
+import com.autoomstudio.mplay.ui.components.SelectionTopBar
+import com.autoomstudio.mplay.ui.library.DeleteResult
+import com.autoomstudio.mplay.ui.library.DeleteSongsHost
 import com.autoomstudio.mplay.ui.library.LibraryScreen
 import com.autoomstudio.mplay.ui.library.LibraryUiState
 import com.autoomstudio.mplay.ui.library.SongActions
 import com.autoomstudio.mplay.ui.library.SongInfoHost
+import com.autoomstudio.mplay.ui.library.rememberSongSelection
 import com.autoomstudio.mplay.ui.playback.ExpandablePlayer
 import com.autoomstudio.mplay.ui.playback.MiniPlayerSlotHeight
 import com.autoomstudio.mplay.ui.playback.PlayerActions
@@ -117,11 +123,14 @@ fun MainScreen(
     onSortOrderChange: (SongSortOrder) -> Unit,
     onPlay: (songs: List<Song>, start: Song) -> Unit,
     onShuffle: (songs: List<Song>) -> Unit,
-    onPlayNext: (Song) -> Unit,
-    onAddToQueue: (Song) -> Unit,
+    onPlayNext: (List<Song>) -> Unit,
+    onAddToQueue: (List<Song>) -> Unit,
     playlists: List<Playlist>?,
     playlistActions: PlaylistActions,
     playlistMessages: Flow<PlaylistMessage>,
+    songDeleter: SongDeleter,
+    /** Called after files were deleted, to drop them from the queue and playlists. */
+    onSongsDeleted: (Set<Long>) -> Unit,
     themeSettings: ThemeSettings,
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
@@ -144,7 +153,16 @@ fun MainScreen(
             showMessage(
                 when (message) {
                     is PlaylistMessage.Created -> resources.getString(R.string.message_playlist_created, message.name)
-                    is PlaylistMessage.Added -> resources.getString(R.string.message_added_to_playlist, message.name)
+                    is PlaylistMessage.Added -> if (message.count == 1) {
+                        resources.getString(R.string.message_added_to_playlist, message.name)
+                    } else {
+                        resources.getQuantityString(
+                            R.plurals.message_songs_added_to_playlist,
+                            message.count,
+                            message.count,
+                            message.name,
+                        )
+                    }
                     is PlaylistMessage.AlreadyIn ->
                         resources.getString(R.string.message_already_in_playlist, message.name)
                     is PlaylistMessage.Deleted -> resources.getString(R.string.message_playlist_deleted, message.name)
@@ -154,25 +172,34 @@ fun MainScreen(
     }
 
     var infoSongId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var addToPlaylistSongId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var newPlaylistSongId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var addToPlaylistSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
+    var newPlaylistSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
+    var deleteSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
     val context = LocalContext.current
     val songActions = remember(onPlayNext, onAddToQueue, resources, context) {
         SongActions(
-            onAddToPlaylist = { addToPlaylistSongId = it.id },
+            onAddToPlaylist = { addToPlaylistSongIds = longArrayOf(it.id) },
             onPlayNext = {
-                onPlayNext(it)
+                onPlayNext(listOf(it))
                 showMessage(resources.getString(R.string.message_playing_next))
             },
             onAddToQueue = {
-                onAddToQueue(it)
+                onAddToQueue(listOf(it))
                 showMessage(resources.getString(R.string.message_added_to_queue))
             },
             onCutAndSave = { context.startActivity(TrimEditorActivity.intent(context, it, TrimMode.Cut)) },
             onSetAsRingtone = { context.startActivity(TrimEditorActivity.intent(context, it, TrimMode.Ringtone)) },
             onShowInfo = { infoSongId = it.id },
+            onDelete = { deleteSongIds = longArrayOf(it.id) },
         )
     }
+
+    val selection = rememberSongSelection()
+    val songsById = remember(allSongs) { allSongs.associateBy { it.id } }
+    if (libraryState is LibraryUiState.Content || libraryState is LibraryUiState.Empty) {
+        LaunchedEffect(songsById) { selection.retainOnly(songsById.keys) }
+    }
+    val selectedSongs: () -> List<Song> = { selection.selectedIds.mapNotNull { songsById[it] } }
     var searchActive by rememberSaveable { mutableStateOf(false) }
     val closeSearch = {
         searchActive = false
@@ -214,17 +241,58 @@ fun MainScreen(
             containerColor = MaterialTheme.colorScheme.background,
             snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
-                MPlayTopBar(
-                    showActions = destination == Destination.Library,
-                    searchActive = searchActive && destination == Destination.Library,
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = onSearchQueryChange,
-                    onOpenSearch = { searchActive = true },
-                    onCloseSearch = closeSearch,
-                    sortOrder = sortOrder,
-                    onSortOrderChange = onSortOrderChange,
-                    backEnabled = contentBackEnabled,
-                )
+                if (selection.isActive) {
+                    val openPlaylist = selection.playlistId?.let { id -> playlists?.firstOrNull { it.id == id } }
+                    SelectionTopBar(
+                        count = selection.selectedIds.size,
+                        onClose = selection::clear,
+                        onAddToPlaylist = { addToPlaylistSongIds = selection.selectedIds.toLongArray() },
+                        onPlayNext = {
+                            val songs = selectedSongs()
+                            onPlayNext(songs)
+                            selection.clear()
+                            showMessage(
+                                resources.getQuantityString(R.plurals.message_songs_playing_next, songs.size, songs.size),
+                            )
+                        },
+                        onAddToQueue = {
+                            val songs = selectedSongs()
+                            onAddToQueue(songs)
+                            selection.clear()
+                            showMessage(
+                                resources.getQuantityString(R.plurals.message_songs_added_to_queue, songs.size, songs.size),
+                            )
+                        },
+                        onDelete = { deleteSongIds = selection.selectedIds.toLongArray() },
+                        onRemoveFromPlaylist = openPlaylist?.let { playlist ->
+                            {
+                                val songs = selectedSongs()
+                                playlistActions.removeFromPlaylist(playlist, songs)
+                                selection.clear()
+                                showMessage(
+                                    resources.getQuantityString(
+                                        R.plurals.message_songs_removed_from_playlist,
+                                        songs.size,
+                                        songs.size,
+                                        playlist.name,
+                                    ),
+                                )
+                            }
+                        },
+                    )
+                } else {
+                    MPlayTopBar(
+                        showActions = destination == Destination.Library,
+                        searchActive = searchActive && destination == Destination.Library,
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = onSearchQueryChange,
+                        onOpenSearch = { searchActive = true },
+                        onCloseSearch = closeSearch,
+                        sortOrder = sortOrder,
+                        onSortOrderChange = onSortOrderChange,
+                        backEnabled = contentBackEnabled,
+                    )
+                }
             },
             bottomBar = {
                 Column(Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)) {
@@ -251,6 +319,7 @@ fun MainScreen(
                         selected = destination,
                         onSelect = {
                             if (it != Destination.Library && searchActive) closeSearch()
+                            if (it != destination) selection.clear()
                             destination = it
                         },
                         modifier = Modifier.graphicsLayer {
@@ -270,7 +339,8 @@ fun MainScreen(
                     .padding(innerPadding),
             ) { shown ->
                 // The outgoing screen stays composed during the transition and must not claim Back.
-                val screenBackEnabled = contentBackEnabled && shown == destination
+                // While selecting, Back clears the selection instead.
+                val screenBackEnabled = contentBackEnabled && shown == destination && !selection.isActive
                 when (shown) {
                     Destination.Library -> LibraryScreen(
                         state = libraryState,
@@ -282,6 +352,7 @@ fun MainScreen(
                         onPlay = onPlay,
                         onShuffle = onShuffle,
                         actions = songActions,
+                        selection = selection,
                         modifier = contentModifier,
                         backEnabled = screenBackEnabled,
                     )
@@ -294,6 +365,7 @@ fun MainScreen(
                         songActions = songActions,
                         onPlay = onPlay,
                         onShuffle = onShuffle,
+                        selection = selection,
                         modifier = contentModifier,
                         backEnabled = screenBackEnabled,
                     )
@@ -325,31 +397,61 @@ fun MainScreen(
         }
     }
 
-    addToPlaylistSongId?.let { id -> allSongs.firstOrNull { it.id == id } }?.let { song ->
+    // Registered after the screens' handlers so it wins while songs are selected.
+    BackHandler(enabled = contentBackEnabled && selection.isActive) { selection.clear() }
+
+    addToPlaylistSongIds?.let { ids -> ids.toList().mapNotNull { songsById[it] } }?.takeIf { it.isNotEmpty() }?.let { songs ->
         AddToPlaylistSheet(
             playlists = playlists.orEmpty(),
             onPick = {
-                playlistActions.addToPlaylist(it, song)
-                addToPlaylistSongId = null
+                playlistActions.addToPlaylist(it, songs)
+                addToPlaylistSongIds = null
+                selection.clear()
             },
             onNewPlaylist = {
-                addToPlaylistSongId = null
-                newPlaylistSongId = song.id
+                newPlaylistSongIds = addToPlaylistSongIds
+                addToPlaylistSongIds = null
             },
-            onDismiss = { addToPlaylistSongId = null },
+            onDismiss = { addToPlaylistSongIds = null },
         )
     }
-    newPlaylistSongId?.let { id -> allSongs.firstOrNull { it.id == id } }?.let { song ->
+    newPlaylistSongIds?.let { ids -> ids.toList().mapNotNull { songsById[it] } }?.takeIf { it.isNotEmpty() }?.let { songs ->
         PlaylistNameDialog(
             title = stringResource(R.string.playlist_new),
             confirmLabel = stringResource(R.string.playlist_create),
             onConfirm = {
-                playlistActions.createPlaylist(it, firstSong = song)
-                newPlaylistSongId = null
+                playlistActions.createPlaylist(it, firstSongs = songs)
+                newPlaylistSongIds = null
+                selection.clear()
             },
-            onDismiss = { newPlaylistSongId = null },
+            onDismiss = { newPlaylistSongIds = null },
         )
     }
+    DeleteSongsHost(
+        request = deleteSongIds,
+        allSongs = allSongs,
+        deleter = songDeleter,
+        onResult = { result ->
+            deleteSongIds = null
+            when (result) {
+                is DeleteResult.Deleted -> {
+                    onSongsDeleted(result.ids)
+                    selection.retainOnly(selection.selectedIds - result.ids)
+                    showMessage(
+                        if (result.ids.size < result.requested) {
+                            resources.getString(R.string.message_songs_partly_deleted, result.ids.size, result.requested)
+                        } else {
+                            resources.getQuantityString(R.plurals.message_songs_deleted, result.ids.size, result.ids.size)
+                        },
+                    )
+                }
+                DeleteResult.Cancelled -> Unit
+                DeleteResult.Failed -> showMessage(resources.getString(R.string.message_delete_failed))
+                DeleteResult.PermissionDenied ->
+                    showMessage(resources.getString(R.string.message_delete_needs_permission))
+            }
+        },
+    )
     SongInfoHost(songs = allSongs, songId = infoSongId, onDismiss = { infoSongId = null })
 }
 
