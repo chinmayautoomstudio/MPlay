@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -85,6 +86,12 @@ class LibraryViewModel(
                 ) { songs, query, order -> buildState(songs, query, order) }
                     .flowOn(Dispatchers.Default)
                     .onStart { emit(LibraryUiState.Loading) }
+                    // Access can be revoked between the resume check and the query.
+                    .catch { e ->
+                        if (e !is SecurityException) throw e
+                        _isRefreshing.value = false
+                        emit(LibraryUiState.NoPermission)
+                    }
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState.Loading)

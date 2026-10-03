@@ -1,14 +1,25 @@
 package com.autoomstudio.mplay.ui.theme
 
+import android.os.Build
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import com.autoomstudio.mplay.data.settings.ThemeMode
+import com.autoomstudio.mplay.data.settings.ThemeSettings
+import android.graphics.Color as AndroidColor
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
-private val NeonDarkColors = darkColorScheme(
+internal val NeonDarkColors = darkColorScheme(
     primary = NeonPurple,
     onPrimary = Color.White,
     primaryContainer = NeonPurpleDeep,
@@ -33,7 +44,7 @@ private val NeonDarkColors = darkColorScheme(
     outlineVariant = MidnightOutline,
 )
 
-private val NeonLightColors = lightColorScheme(
+internal val NeonLightColors = lightColorScheme(
     primary = NeonPurpleDeep,
     onPrimary = Color.White,
     primaryContainer = DaylightSelected,
@@ -58,16 +69,50 @@ private val NeonLightColors = lightColorScheme(
     outlineVariant = DaylightOutline,
 )
 
+/**
+ * Applies the user's theme settings and matches the edge-to-edge system bar icons to them, so a
+ * forced light or dark theme doesn't leave unreadable status bar icons.
+ */
+@Composable
+fun MPlayAppTheme(
+    activity: ComponentActivity,
+    settings: ThemeSettings,
+    content: @Composable () -> Unit,
+) {
+    val darkTheme = when (settings.mode) {
+        ThemeMode.System -> isSystemInDarkTheme()
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
+    LaunchedEffect(activity, darkTheme) {
+        activity.enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { darkTheme },
+            navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { darkTheme },
+        )
+    }
+    MPlayTheme(darkTheme = darkTheme, dynamicColor = settings.dynamicColor, content = content)
+}
+
 /** Gradient used for the "M" of the MPlay wordmark and other accent highlights. */
 val NeonBrush = Brush.linearGradient(listOf(NeonPurpleDeep, NeonPurple, NeonViolet))
 
 @Composable
 fun MPlayTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    /** Wallpaper colors; ignored below Android 12, where they don't exist. */
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val context = LocalContext.current
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        darkTheme -> NeonDarkColors
+        else -> NeonLightColors
+    }
     MaterialTheme(
-        colorScheme = if (darkTheme) NeonDarkColors else NeonLightColors,
+        colorScheme = colorScheme,
         typography = MPlayTypography,
         content = content,
     )

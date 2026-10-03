@@ -13,7 +13,10 @@ import com.autoomstudio.mplay.data.library.SongRepository
 import com.autoomstudio.mplay.data.playlist.MPlayDatabase
 import com.autoomstudio.mplay.data.playlist.PlaylistRepository
 import com.autoomstudio.mplay.playback.PlaybackController
+import com.autoomstudio.mplay.data.settings.AppSettings
 import com.autoomstudio.mplay.playback.PlaybackSessionStore
+import com.autoomstudio.mplay.widget.WidgetStatePublisher
+import com.autoomstudio.mplay.widget.WidgetStateStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -50,6 +53,13 @@ class AppContainer(context: Context) {
     val waveformExtractor: WaveformExtractor by lazy { WaveformExtractor(appContext) }
 
     val ringtoneSetter: RingtoneSetter by lazy { RingtoneSetter(appContext) }
+
+    val widgetStateStore: WidgetStateStore by lazy { WidgetStateStore(appContext) }
+
+    val appSettings: AppSettings by lazy { AppSettings(appContext) }
+
+    fun createWidgetStatePublisher(): WidgetStatePublisher =
+        WidgetStatePublisher(appContext, widgetStateStore, applicationScope)
 
     fun createPlaybackController(scope: CoroutineScope): PlaybackController =
         PlaybackController(appContext, scope, songRepository, playbackSessionStore)

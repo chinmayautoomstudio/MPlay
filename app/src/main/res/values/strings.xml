@@ -43,8 +43,6 @@
     </plurals>
     <string name="count_separator">%1$s · %2$s</string>
 
-    <string name="coming_soon_settings">Theme and playback settings arrive in an upcoming update.</string>
-
     <string name="library_empty_title">No music found</string>
     <string name="library_empty_message">Copy some audio files (MP3, FLAC, M4A, OGG or WAV) to this device and they will appear here automatically.</string>
     <string name="album_art_description">Album art for %1$s</string>
@@ -162,4 +160,29 @@
     <string name="song_info_duration">Duration</string>
     <string name="song_info_date_added">Date added</string>
     <string name="dialog_close">Close</string>
+
+    <string name="unknown_title">Unknown title</string>
+    <string name="unknown_artist">Unknown Artist</string>
+
+    <string name="widget_description">Control MPlay from your home screen</string>
+    <string name="widget_idle_title">Nothing playing</string>
+    <string name="widget_idle_message">Tap to open MPlay</string>
+    <string name="widget_preview_title">Song title</string>
+    <string name="widget_preview_artist">Artist</string>
+
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_system">System default</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_dynamic_color">Dynamic color</string>
+    <string name="settings_dynamic_color_summary">Use colors from your wallpaper</string>
+    <string name="settings_section_playback">Background playback</string>
+    <string name="settings_battery_title">Battery optimization</string>
+    <string name="settings_battery_restricted">Some phones stop music in the background to save battery. If playback stops when the screen is off, turn off battery optimization for MPlay.</string>
+    <string name="settings_battery_unrestricted">MPlay is not battery optimized, so background playback won\'t be cut off.</string>
+    <string name="settings_battery_open">Open battery settings</string>
+    <string name="settings_section_about">About</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="settings_offline_note">Fully offline. MPlay has no internet permission, no ads and no analytics.</string>
 </resources>

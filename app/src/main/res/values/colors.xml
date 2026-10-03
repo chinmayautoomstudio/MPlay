@@ -3,4 +3,10 @@
     <color name="splash_background">#FFF7F5FC</color>
     <!-- Matches the launcher foreground's backdrop where the splash circle mask cuts it. -->
     <color name="splash_screen_background">#FF09072F</color>
+
+    <color name="widget_surface">#FFFFFFFF</color>
+    <color name="widget_artwork">#FFE9E5F4</color>
+    <color name="widget_accent">#FF6D3FE0</color>
+    <color name="widget_on_surface">#FF16151F</color>
+    <color name="widget_on_surface_variant">#FF6B6878</color>
 </resources>

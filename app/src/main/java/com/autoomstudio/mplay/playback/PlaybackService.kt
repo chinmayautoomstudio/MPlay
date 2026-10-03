@@ -2,20 +2,27 @@ package com.autoomstudio.mplay.playback
 
 import android.app.PendingIntent
 import android.content.Intent
+import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import com.autoomstudio.mplay.MPlayApp
 import com.autoomstudio.mplay.MainActivity
+import com.autoomstudio.mplay.data.library.SongRepository
+import com.autoomstudio.mplay.data.model.Song
+import com.autoomstudio.mplay.widget.WidgetStatePublisher
+import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -27,6 +34,8 @@ class PlaybackService : MediaSessionService() {
 
     private lateinit var sessionStore: PlaybackSessionStore
     private lateinit var saveScope: CoroutineScope
+    private lateinit var widgetPublisher: WidgetStatePublisher
+    private lateinit var songRepository: SongRepository
 
     override fun onCreate() {
         super.onCreate()
@@ -45,6 +54,8 @@ class PlaybackService : MediaSessionService() {
             .build()
         player.addListener(SkipUnplayableListener(player))
         player.addListener(SessionSaver())
+        widgetPublisher = container.createWidgetStatePublisher().also(player::addListener)
+        songRepository = container.songRepository
         serviceScope.launch {
             val modes = sessionStore.loadModes() ?: return@launch
             player.shuffleModeEnabled = modes.shuffleEnabled
@@ -61,6 +72,7 @@ class PlaybackService : MediaSessionService() {
         )
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(sessionActivity)
+            .setCallback(ResumptionCallback())
             .build()
     }
 
@@ -83,6 +95,7 @@ class PlaybackService : MediaSessionService() {
         serviceScope.cancel()
         mediaSession?.run {
             saveSession(player)
+            widgetPublisher.publish(player, forcePaused = true)
             player.release()
             release()
         }
@@ -135,6 +148,28 @@ class PlaybackService : MediaSessionService() {
                     saveSession(player)
                 }
             }
+        }
+    }
+
+    /**
+     * Rebuilds the last saved queue when play is requested with nothing loaded, for example from the
+     * widget, a headset button or the system's media resumption controls after the app was killed.
+     */
+    private inner class ResumptionCallback : MediaSession.Callback {
+        @OptIn(UnstableApi::class)
+        override fun onPlaybackResumption(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            isForPlayback: Boolean,
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = serviceScope.future {
+            val saved = sessionStore.load() ?: throw UnsupportedOperationException("No saved session")
+            val restored = restoreQueue(saved, songRepository.loadSongs(), Song::id)
+                ?: throw UnsupportedOperationException("Saved songs are no longer in the library")
+            MediaSession.MediaItemsWithStartPosition(
+                restored.items.map { it.toMediaItem() },
+                restored.index,
+                restored.positionMs,
+            )
         }
     }
 

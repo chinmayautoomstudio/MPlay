@@ -55,8 +55,9 @@ import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.library.SongSortOrder
 import com.autoomstudio.mplay.data.model.Playlist
 import com.autoomstudio.mplay.data.model.Song
+import com.autoomstudio.mplay.data.settings.ThemeMode
+import com.autoomstudio.mplay.data.settings.ThemeSettings
 import com.autoomstudio.mplay.playback.NowPlayingState
-import com.autoomstudio.mplay.ui.components.ComingSoon
 import com.autoomstudio.mplay.ui.components.MPlayTopBar
 import com.autoomstudio.mplay.ui.library.LibraryScreen
 import com.autoomstudio.mplay.ui.library.LibraryUiState
@@ -76,6 +77,7 @@ import com.autoomstudio.mplay.ui.playlist.PlaylistActions
 import com.autoomstudio.mplay.ui.playlist.PlaylistMessage
 import com.autoomstudio.mplay.ui.playlist.PlaylistNameDialog
 import com.autoomstudio.mplay.ui.playlist.PlaylistsScreen
+import com.autoomstudio.mplay.ui.settings.SettingsScreen
 import com.autoomstudio.mplay.ui.trim.TrimEditorActivity
 import com.autoomstudio.mplay.ui.trim.TrimMode
 import kotlinx.coroutines.flow.Flow
@@ -118,6 +120,9 @@ fun MainScreen(
     playlists: List<Playlist>?,
     playlistActions: PlaylistActions,
     playlistMessages: Flow<PlaylistMessage>,
+    themeSettings: ThemeSettings,
+    onThemeModeChange: (ThemeMode) -> Unit,
+    onDynamicColorChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var destination by rememberSaveable { mutableStateOf(Destination.Library) }
@@ -283,10 +288,10 @@ fun MainScreen(
                     backEnabled = contentBackEnabled,
                 )
 
-                Destination.Settings -> ComingSoon(
-                    icon = Icons.Outlined.Settings,
-                    title = stringResource(R.string.nav_settings),
-                    message = stringResource(R.string.coming_soon_settings),
+                Destination.Settings -> SettingsScreen(
+                    theme = themeSettings,
+                    onThemeModeChange = onThemeModeChange,
+                    onDynamicColorChange = onDynamicColorChange,
                     modifier = contentModifier,
                 )
             }

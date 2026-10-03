@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import android.provider.MediaStore
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -51,6 +52,7 @@ class ClipStore(private val context: Context) {
         resolver.delete(uri, null, null)
     }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun saveScoped(temp: File, name: String, artist: String): Uri {
         val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val values = ContentValues().apply {

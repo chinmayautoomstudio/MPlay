@@ -1,22 +1,28 @@
 package com.autoomstudio.mplay
 
+import android.Manifest
 import android.content.Intent
-import android.graphics.Color
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.autoomstudio.mplay.data.settings.ThemeSettings
 import com.autoomstudio.mplay.ui.library.LibraryUiState
 import com.autoomstudio.mplay.ui.library.LibraryViewModel
 import com.autoomstudio.mplay.ui.main.MainScreen
@@ -24,26 +30,30 @@ import com.autoomstudio.mplay.ui.permission.PermissionRationaleScreen
 import com.autoomstudio.mplay.ui.permission.rememberAudioPermissionState
 import com.autoomstudio.mplay.ui.playback.PlaybackViewModel
 import com.autoomstudio.mplay.ui.playlist.PlaylistsViewModel
-import com.autoomstudio.mplay.ui.theme.MPlayTheme
+import com.autoomstudio.mplay.ui.settings.SettingsViewModel
+import com.autoomstudio.mplay.ui.theme.MPlayAppTheme
 
 class MainActivity : ComponentActivity() {
 
     /** Set when launched from the media notification; consumed once by the UI. */
     private var openNowPlayingRequest by mutableStateOf(false)
 
+    private val settingsViewModel: SettingsViewModel by viewModels { SettingsViewModel.Factory }
+
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
-        )
+        // Holds the splash until the saved theme is known, so a forced light or dark theme doesn't flash.
+        splash.setKeepOnScreenCondition { settingsViewModel.theme.value == null }
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
-            MPlayTheme {
+            val theme = settingsViewModel.theme.collectAsStateWithLifecycle().value ?: return@setContent
+            MPlayAppTheme(activity = this, settings = theme) {
                 MPlayRoot(
                     openNowPlayingRequest = openNowPlayingRequest,
                     onOpenNowPlayingHandled = { openNowPlayingRequest = false },
+                    themeSettings = theme,
+                    settingsViewModel = settingsViewModel,
                 )
             }
         }
@@ -69,6 +79,8 @@ class MainActivity : ComponentActivity() {
 private fun MPlayRoot(
     openNowPlayingRequest: Boolean,
     onOpenNowPlayingHandled: () -> Unit,
+    themeSettings: ThemeSettings,
+    settingsViewModel: SettingsViewModel,
     viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
     playbackViewModel: PlaybackViewModel = viewModel(factory = PlaybackViewModel.Factory),
     playlistsViewModel: PlaylistsViewModel = viewModel(factory = PlaylistsViewModel.Factory),
@@ -77,6 +89,10 @@ private fun MPlayRoot(
     LaunchedEffect(permission.isGranted) {
         viewModel.onPermissionChanged(permission.isGranted)
     }
+    NotificationPermissionPrompt(
+        audioGranted = permission.isGranted,
+        claimPrompt = settingsViewModel::claimNotificationPrompt,
+    )
     LifecycleResumeEffect(viewModel) {
         viewModel.onAppForeground()
         onPauseOrDispose { }
@@ -132,6 +148,26 @@ private fun MPlayRoot(
             playlists = playlists,
             playlistActions = playlistsViewModel,
             playlistMessages = playlistsViewModel.messages,
+            themeSettings = themeSettings,
+            onThemeModeChange = settingsViewModel::setThemeMode,
+            onDynamicColorChange = settingsViewModel::setDynamicColor,
         )
+    }
+}
+
+/**
+ * Asks once for POST_NOTIFICATIONS (Android 13+) after audio access is granted, so the two prompts
+ * don't stack on first launch. Playback works without it; only the media notification is affected.
+ */
+@Composable
+private fun NotificationPermissionPrompt(audioGranted: Boolean, claimPrompt: suspend () -> Boolean) {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(audioGranted) {
+        if (!audioGranted) return@LaunchedEffect
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (!granted && claimPrompt()) launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }
