@@ -11,6 +11,11 @@ import android.provider.Settings
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -38,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +54,10 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.ui.components.MPlayWordmark
+import com.autoomstudio.mplay.ui.components.ThemedLottie
+import com.autoomstudio.mplay.ui.components.rememberAnimationsEnabled
+import com.autoomstudio.mplay.ui.theme.EmphasizedEasing
+import com.autoomstudio.mplay.ui.theme.MotionLong
 import com.autoomstudio.mplay.ui.theme.NeonBrush
 import com.autoomstudio.mplay.ui.theme.WordmarkStyle
 
@@ -131,18 +141,43 @@ fun PermissionRationaleScreen(
     ) {
         MPlayWordmark(style = WordmarkStyle.copy(fontSize = 40.sp, lineHeight = 48.sp))
         Spacer(Modifier.height(8.dp))
+        val animationsEnabled = rememberAnimationsEnabled()
+        val pulse = if (animationsEnabled) {
+            rememberInfiniteTransition(label = "permissionPulse").animateFloat(
+                initialValue = 1f,
+                targetValue = 1.04f,
+                animationSpec = infiniteRepeatable(
+                    tween(MotionLong * 2, easing = EmphasizedEasing),
+                    RepeatMode.Reverse,
+                ),
+                label = "permissionPulseScale",
+            ).value
+        } else {
+            1f
+        }
         Box(
             modifier = Modifier
-                .size(88.dp)
+                .size(120.dp)
+                .graphicsLayer {
+                    scaleX = pulse
+                    scaleY = pulse
+                }
                 .background(NeonBrush, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Icons.Filled.LibraryMusic,
-                contentDescription = null,
-                modifier = Modifier.size(44.dp),
-                tint = Color.White,
-            )
+            ThemedLottie(
+                animation = R.raw.anim_permission,
+                primary = Color.White,
+                accent = Color.White,
+                modifier = Modifier.size(104.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.LibraryMusic,
+                    contentDescription = null,
+                    modifier = Modifier.size(44.dp),
+                    tint = Color.White,
+                )
+            }
         }
         Text(
             text = stringResource(R.string.permission_title),

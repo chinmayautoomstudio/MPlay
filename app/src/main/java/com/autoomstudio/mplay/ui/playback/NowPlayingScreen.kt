@@ -1,7 +1,20 @@
 package com.autoomstudio.mplay.ui.playback
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,8 +31,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -34,6 +45,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
@@ -49,6 +62,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.autoomstudio.mplay.R
@@ -57,6 +71,10 @@ import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.playback.RepeatMode
 import com.autoomstudio.mplay.ui.common.formatDuration
 import com.autoomstudio.mplay.ui.components.ArtworkImage
+import com.autoomstudio.mplay.ui.components.popOnChange
+import com.autoomstudio.mplay.ui.components.pressBounce
+import com.autoomstudio.mplay.ui.theme.MotionMedium
+import com.autoomstudio.mplay.ui.theme.MotionShort
 import com.autoomstudio.mplay.ui.library.SongActions
 import com.autoomstudio.mplay.ui.library.SongMenuButton
 import kotlinx.coroutines.flow.Flow
@@ -118,17 +136,24 @@ fun NowPlayingContent(
                     .onGloballyPositioned(onArtworkPositioned)
                 if (showArtwork) {
                     val artShape = RoundedCornerShape(28.dp)
+                    val artScale by animateArtworkScale(state.isPlaying)
+                    val artShadow by animateArtworkShadow(state.isPlaying, 32.dp)
                     ArtworkImage(
                         uri = state.artworkUri,
                         contentDescription = stringResource(R.string.album_art_description, state.title),
                         cornerRadius = 28.dp,
                         prominent = true,
-                        modifier = artModifier.shadow(
-                            elevation = 32.dp,
-                            shape = artShape,
-                            ambientColor = MaterialTheme.colorScheme.primary,
-                            spotColor = MaterialTheme.colorScheme.primary,
-                        ),
+                        modifier = artModifier
+                            .graphicsLayer {
+                                scaleX = artScale
+                                scaleY = artScale
+                            }
+                            .shadow(
+                                elevation = artShadow,
+                                shape = artShape,
+                                ambientColor = MaterialTheme.colorScheme.primary,
+                                spotColor = MaterialTheme.colorScheme.primary,
+                            ),
                     )
                 } else {
                     Spacer(artModifier)
@@ -162,6 +187,22 @@ fun NowPlayingContent(
         }
     }
 }
+
+private val ArtworkSpring = spring<Float>(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow)
+
+/** Full-size artwork while playing; it settles back slightly when paused. */
+@Composable
+fun animateArtworkScale(isPlaying: Boolean): State<Float> =
+    animateFloatAsState(if (isPlaying) 1f else 0.9f, ArtworkSpring, label = "artworkScale")
+
+/** The primary-colored glow under the artwork dims while paused. */
+@Composable
+fun animateArtworkShadow(isPlaying: Boolean, playingElevation: Dp): State<Dp> =
+    animateDpAsState(
+        targetValue = if (isPlaying) playingElevation else 8.dp,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow),
+        label = "artworkShadow",
+    )
 
 @Composable
 private fun SeekBar(durationMs: Long, position: Flow<Long>, onSeek: (Long) -> Unit) {
@@ -210,22 +251,53 @@ private fun SeekBar(durationMs: Long, position: Flow<Long>, onSeek: (Long) -> Un
 private fun TransportControls(state: NowPlayingState, actions: PlayerActions) {
     val active = MaterialTheme.colorScheme.primary
     val inactive = MaterialTheme.colorScheme.onSurface
+    val shuffleTint by animateColorAsState(
+        if (state.shuffleEnabled) active else inactive.copy(alpha = 0.7f),
+        tween(MotionMedium),
+        label = "shuffleTint",
+    )
+    val repeatTint by animateColorAsState(
+        if (state.repeatMode == RepeatMode.Off) inactive.copy(alpha = 0.7f) else active,
+        tween(MotionMedium),
+        label = "repeatTint",
+    )
+    val nextTint by animateColorAsState(
+        inactive.copy(alpha = if (state.hasNext) 1f else 0.38f),
+        tween(MotionMedium),
+        label = "nextTint",
+    )
+    val shuffleSource = remember { MutableInteractionSource() }
+    val previousSource = remember { MutableInteractionSource() }
+    val playSource = remember { MutableInteractionSource() }
+    val nextSource = remember { MutableInteractionSource() }
+    val repeatSource = remember { MutableInteractionSource() }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = actions::toggleShuffle) {
+        IconButton(
+            onClick = actions::toggleShuffle,
+            interactionSource = shuffleSource,
+            modifier = Modifier.pressBounce(shuffleSource),
+        ) {
             Icon(
                 imageVector = Icons.Filled.Shuffle,
                 contentDescription = stringResource(
                     if (state.shuffleEnabled) R.string.action_shuffle_on else R.string.action_shuffle_off,
                 ),
-                tint = if (state.shuffleEnabled) active else inactive.copy(alpha = 0.7f),
+                tint = shuffleTint,
+                modifier = Modifier.popOnChange(state.shuffleEnabled, enabled = state.shuffleEnabled),
             )
         }
-        IconButton(onClick = actions::previous, modifier = Modifier.size(56.dp)) {
+        IconButton(
+            onClick = actions::previous,
+            interactionSource = previousSource,
+            modifier = Modifier
+                .size(56.dp)
+                .pressBounce(previousSource),
+        ) {
             Icon(
                 imageVector = Icons.Filled.SkipPrevious,
                 contentDescription = stringResource(R.string.action_previous),
@@ -235,45 +307,59 @@ private fun TransportControls(state: NowPlayingState, actions: PlayerActions) {
         }
         FilledIconButton(
             onClick = actions::playPause,
-            modifier = Modifier.size(76.dp),
+            interactionSource = playSource,
+            modifier = Modifier
+                .size(76.dp)
+                .pressBounce(playSource),
             shape = CircleShape,
             colors = IconButtonDefaults.filledIconButtonColors(
                 containerColor = active,
                 contentColor = Color.White,
             ),
         ) {
-            Icon(
-                imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = stringResource(
-                    if (state.isPlaying) R.string.action_pause else R.string.action_play,
-                ),
-                modifier = Modifier.size(40.dp),
-            )
+            PlayPauseIcon(isPlaying = state.isPlaying, tint = Color.White, modifier = Modifier.size(44.dp))
         }
         IconButton(
             onClick = actions::next,
             enabled = state.hasNext,
-            modifier = Modifier.size(56.dp),
+            interactionSource = nextSource,
+            modifier = Modifier
+                .size(56.dp)
+                .pressBounce(nextSource),
         ) {
             Icon(
                 imageVector = Icons.Filled.SkipNext,
                 contentDescription = stringResource(R.string.action_next),
-                tint = inactive.copy(alpha = if (state.hasNext) 1f else 0.38f),
+                tint = nextTint,
                 modifier = Modifier.size(36.dp),
             )
         }
-        IconButton(onClick = actions::cycleRepeat) {
-            Icon(
-                imageVector = if (state.repeatMode == RepeatMode.One) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
-                contentDescription = stringResource(
-                    when (state.repeatMode) {
-                        RepeatMode.Off -> R.string.action_repeat_off
-                        RepeatMode.All -> R.string.action_repeat_all
-                        RepeatMode.One -> R.string.action_repeat_one
-                    },
-                ),
-                tint = if (state.repeatMode == RepeatMode.Off) inactive.copy(alpha = 0.7f) else active,
-            )
+        IconButton(
+            onClick = actions::cycleRepeat,
+            interactionSource = repeatSource,
+            modifier = Modifier.pressBounce(repeatSource),
+        ) {
+            AnimatedContent(
+                targetState = state.repeatMode == RepeatMode.One,
+                transitionSpec = {
+                    (fadeIn(tween(MotionShort)) + scaleIn(tween(MotionShort), initialScale = 0.6f)) togetherWith
+                        (fadeOut(tween(MotionShort)) + scaleOut(tween(MotionShort), targetScale = 0.6f))
+                },
+                label = "repeatIcon",
+                modifier = Modifier.popOnChange(state.repeatMode, enabled = state.repeatMode != RepeatMode.Off),
+            ) { repeatOne ->
+                Icon(
+                    imageVector = if (repeatOne) Icons.Filled.RepeatOne else Icons.Filled.Repeat,
+                    contentDescription = stringResource(
+                        when (state.repeatMode) {
+                            RepeatMode.Off -> R.string.action_repeat_off
+                            RepeatMode.All -> R.string.action_repeat_all
+                            RepeatMode.One -> R.string.action_repeat_one
+                        },
+                    ),
+                    tint = repeatTint,
+                )
+            }
         }
     }
 }

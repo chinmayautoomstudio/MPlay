@@ -1,6 +1,7 @@
 package com.autoomstudio.mplay.ui.playlist
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -14,7 +15,6 @@ import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -38,6 +38,9 @@ import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.model.Playlist
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.ui.components.ComingSoon
+import com.autoomstudio.mplay.ui.components.LoadingIndicator
+import com.autoomstudio.mplay.ui.theme.fadeThrough
+import com.autoomstudio.mplay.ui.theme.sharedAxisX
 import com.autoomstudio.mplay.ui.library.SongActions
 import com.autoomstudio.mplay.ui.library.songCountText
 
@@ -62,7 +65,7 @@ fun PlaylistsScreen(
     BackHandler(enabled = backEnabled && selectedId != null) { selectedId = null }
 
     if (playlists == null) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        LoadingIndicator(modifier = modifier)
         return
     }
     val byId = remember(playlists) { playlists.associateBy { it.id } }
@@ -71,59 +74,74 @@ fun PlaylistsScreen(
     if (selectedId != null && selected == null) {
         LaunchedEffect(selectedId) { selectedId = null }
     }
-    if (selected != null) {
-        PlaylistDetailScreen(
-            playlist = selected,
-            currentSongId = currentSongId,
-            isPlaying = isPlaying,
-            onBack = { selectedId = null },
-            onPlay = onPlay,
-            onShuffle = onShuffle,
-            actions = songActions,
-            onRemove = { playlistActions.removeFromPlaylist(selected, it) },
-            onReorder = { playlistActions.reorderPlaylist(selected, it) },
-            modifier = modifier,
-        )
-    } else {
-        Box(modifier = modifier) {
-            if (playlists.isEmpty()) {
-                ComingSoon(
-                    icon = Icons.AutoMirrored.Outlined.QueueMusic,
-                    title = stringResource(R.string.playlists_empty_title),
-                    message = stringResource(R.string.playlists_empty_message),
-                )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
-                ) {
-                    items(items = playlists, key = { it.id }) { playlist ->
-                        PlaylistListRow(
-                            title = playlist.name,
-                            subtitle = songCountText(playlist.songs.size),
-                            onClick = { selectedId = playlist.id },
-                            leading = { PlaylistArtwork(playlist, size = 52.dp) },
-                            trailing = {
-                                PlaylistMenu(
-                                    playlist = playlist,
-                                    onRename = { renameId = playlist.id },
-                                    onDelete = { deleteId = playlist.id },
-                                )
-                            },
-                            modifier = Modifier.animateItem(),
+    AnimatedContent(
+        targetState = selected?.id,
+        transitionSpec = { sharedAxisX(forward = targetState != null) },
+        label = "playlistDetail",
+        modifier = modifier,
+    ) { id ->
+        val shown = id?.let { byId[it] }
+        if (shown != null) {
+            PlaylistDetailScreen(
+                playlist = shown,
+                currentSongId = currentSongId,
+                isPlaying = isPlaying,
+                onBack = { selectedId = null },
+                onPlay = onPlay,
+                onShuffle = onShuffle,
+                actions = songActions,
+                onRemove = { playlistActions.removeFromPlaylist(shown, it) },
+                onReorder = { playlistActions.reorderPlaylist(shown, it) },
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AnimatedContent(
+                    targetState = playlists.isEmpty(),
+                    transitionSpec = { fadeThrough() },
+                    label = "playlistsEmpty",
+                ) { empty ->
+                    if (empty) {
+                        ComingSoon(
+                            icon = Icons.AutoMirrored.Outlined.QueueMusic,
+                            title = stringResource(R.string.playlists_empty_title),
+                            message = stringResource(R.string.playlists_empty_message),
+                            animation = R.raw.anim_empty_playlist,
                         )
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
+                        ) {
+                            items(items = playlists, key = { it.id }) { playlist ->
+                                PlaylistListRow(
+                                    title = playlist.name,
+                                    subtitle = songCountText(playlist.songs.size),
+                                    onClick = { selectedId = playlist.id },
+                                    leading = { PlaylistArtwork(playlist, size = 52.dp) },
+                                    trailing = {
+                                        PlaylistMenu(
+                                            playlist = playlist,
+                                            onRename = { renameId = playlist.id },
+                                            onDelete = { deleteId = playlist.id },
+                                        )
+                                    },
+                                    modifier = Modifier.animateItem(),
+                                )
+                            }
+                        }
                     }
                 }
-            }
-            ExtendedFloatingActionButton(
-                onClick = { showCreate = true },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp),
-            ) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Spacer(Modifier.width(12.dp))
-                Text(stringResource(R.string.playlist_new))
+                ExtendedFloatingActionButton(
+                    onClick = { showCreate = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp),
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(Modifier.width(12.dp))
+                    Text(stringResource(R.string.playlist_new))
+                }
             }
         }
     }

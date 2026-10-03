@@ -54,6 +54,7 @@
     <string name="action_next">Next song</string>
     <string name="action_previous">Previous song</string>
     <string name="action_shuffle_on">Shuffle is on</string>
+    <string name="loading">Loading</string>
     <string name="action_shuffle_off">Shuffle is off</string>
     <string name="action_repeat_off">Repeat is off</string>
     <string name="action_repeat_all">Repeat all</string>

@@ -89,6 +89,8 @@ fun ExpandablePlayer(
         val collapsedColor = MaterialTheme.colorScheme.surfaceContainerHigh
         val expandedColor = MaterialTheme.colorScheme.background
         val primary = MaterialTheme.colorScheme.primary
+        val artScale = animateArtworkScale(state.isPlaying)
+        val artShadow = animateArtworkShadow(state.isPlaying, FullArtShadow)
 
         val showMini by remember { derivedStateOf { progress() < 0.3f } }
         val prominentArt by remember { derivedStateOf { progress() > 0.5f } }
@@ -200,9 +202,12 @@ fun ExpandablePlayer(
                     }
                     .graphicsLayer {
                         val p = progress()
+                        val scale = lerp(1f, artScale.value, p)
+                        scaleX = scale
+                        scaleY = scale
                         shape = RoundedCornerShape(lerp(MiniArtCorner, FullArtCorner, p))
                         clip = true
-                        shadowElevation = lerp(0.dp, FullArtShadow, p).toPx()
+                        shadowElevation = lerp(0.dp, artShadow.value, p).toPx()
                         ambientShadowColor = primary
                         spotShadowColor = primary
                     },

@@ -83,6 +83,7 @@ fun PlaylistDetailScreen(
                     icon = Icons.AutoMirrored.Outlined.PlaylistAdd,
                     title = stringResource(R.string.playlist_empty_title),
                     message = stringResource(R.string.playlist_empty_message),
+                    animation = R.raw.anim_empty_playlist,
                 )
             }
         }

@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,8 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +46,7 @@ import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.ui.common.formatDuration
 import com.autoomstudio.mplay.ui.components.ArtworkImage
+import com.autoomstudio.mplay.ui.components.pressBounce
 import kotlinx.coroutines.flow.Flow
 
 private val ProgressLineHeight = 2.dp
@@ -135,17 +135,25 @@ fun MiniPlayerContent(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                IconButton(onClick = actions::playPause) {
-                    Icon(
-                        imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = stringResource(
-                            if (state.isPlaying) R.string.action_pause else R.string.action_play,
-                        ),
+                val playSource = remember { MutableInteractionSource() }
+                val nextSource = remember { MutableInteractionSource() }
+                IconButton(
+                    onClick = actions::playPause,
+                    interactionSource = playSource,
+                    modifier = Modifier.pressBounce(playSource),
+                ) {
+                    PlayPauseIcon(
+                        isPlaying = state.isPlaying,
                         tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(30.dp),
+                        modifier = Modifier.size(32.dp),
                     )
                 }
-                IconButton(onClick = actions::next, enabled = state.hasNext) {
+                IconButton(
+                    onClick = actions::next,
+                    enabled = state.hasNext,
+                    interactionSource = nextSource,
+                    modifier = Modifier.pressBounce(nextSource),
+                ) {
                     Icon(
                         imageVector = Icons.Filled.SkipNext,
                         contentDescription = stringResource(R.string.action_next),

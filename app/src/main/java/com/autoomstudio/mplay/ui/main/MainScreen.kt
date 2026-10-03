@@ -1,6 +1,7 @@
 package com.autoomstudio.mplay.ui.main
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -76,6 +77,7 @@ import com.autoomstudio.mplay.ui.playlist.AddToPlaylistSheet
 import com.autoomstudio.mplay.ui.playlist.PlaylistActions
 import com.autoomstudio.mplay.ui.playlist.PlaylistMessage
 import com.autoomstudio.mplay.ui.playlist.PlaylistNameDialog
+import com.autoomstudio.mplay.ui.theme.fadeThrough
 import com.autoomstudio.mplay.ui.playlist.PlaylistsScreen
 import com.autoomstudio.mplay.ui.settings.SettingsScreen
 import com.autoomstudio.mplay.ui.trim.TrimEditorActivity
@@ -258,42 +260,51 @@ fun MainScreen(
                 }
             },
         ) { innerPadding ->
-            val contentModifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-            when (destination) {
-                Destination.Library -> LibraryScreen(
-                    state = libraryState,
-                    currentSongId = nowPlaying?.songId,
-                    isPlaying = nowPlaying?.isPlaying == true,
-                    isRefreshing = isRefreshing,
-                    onRefresh = onRefresh,
-                    searchQuery = searchQuery,
-                    onPlay = onPlay,
-                    onShuffle = onShuffle,
-                    actions = songActions,
-                    modifier = contentModifier,
-                    backEnabled = contentBackEnabled,
-                )
+            val contentModifier = Modifier.fillMaxSize()
+            AnimatedContent(
+                targetState = destination,
+                transitionSpec = { fadeThrough() },
+                label = "destination",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+            ) { shown ->
+                // The outgoing screen stays composed during the transition and must not claim Back.
+                val screenBackEnabled = contentBackEnabled && shown == destination
+                when (shown) {
+                    Destination.Library -> LibraryScreen(
+                        state = libraryState,
+                        currentSongId = nowPlaying?.songId,
+                        isPlaying = nowPlaying?.isPlaying == true,
+                        isRefreshing = isRefreshing,
+                        onRefresh = onRefresh,
+                        searchQuery = searchQuery,
+                        onPlay = onPlay,
+                        onShuffle = onShuffle,
+                        actions = songActions,
+                        modifier = contentModifier,
+                        backEnabled = screenBackEnabled,
+                    )
 
-                Destination.Playlists -> PlaylistsScreen(
-                    playlists = playlists,
-                    currentSongId = nowPlaying?.songId,
-                    isPlaying = nowPlaying?.isPlaying == true,
-                    playlistActions = playlistActions,
-                    songActions = songActions,
-                    onPlay = onPlay,
-                    onShuffle = onShuffle,
-                    modifier = contentModifier,
-                    backEnabled = contentBackEnabled,
-                )
+                    Destination.Playlists -> PlaylistsScreen(
+                        playlists = playlists,
+                        currentSongId = nowPlaying?.songId,
+                        isPlaying = nowPlaying?.isPlaying == true,
+                        playlistActions = playlistActions,
+                        songActions = songActions,
+                        onPlay = onPlay,
+                        onShuffle = onShuffle,
+                        modifier = contentModifier,
+                        backEnabled = screenBackEnabled,
+                    )
 
-                Destination.Settings -> SettingsScreen(
-                    theme = themeSettings,
-                    onThemeModeChange = onThemeModeChange,
-                    onDynamicColorChange = onDynamicColorChange,
-                    modifier = contentModifier,
-                )
+                    Destination.Settings -> SettingsScreen(
+                        theme = themeSettings,
+                        onThemeModeChange = onThemeModeChange,
+                        onDynamicColorChange = onDynamicColorChange,
+                        modifier = contentModifier,
+                    )
+                }
             }
         }
 

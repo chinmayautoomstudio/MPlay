@@ -47,6 +47,7 @@ fun LibraryEmptyMessage(isFiltered: Boolean, searchQuery: String, modifier: Modi
             title = stringResource(R.string.search_no_results_title),
             message = stringResource(R.string.search_no_results_message, searchQuery.trim()),
             modifier = modifier,
+            animation = R.raw.anim_no_results,
         )
     } else {
         ComingSoon(
@@ -54,6 +55,7 @@ fun LibraryEmptyMessage(isFiltered: Boolean, searchQuery: String, modifier: Modi
             title = stringResource(R.string.library_empty_title),
             message = stringResource(R.string.library_empty_message),
             modifier = modifier,
+            animation = R.raw.anim_empty_library,
         )
     }
 }

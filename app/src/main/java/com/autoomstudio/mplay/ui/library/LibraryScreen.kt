@@ -2,10 +2,9 @@ package com.autoomstudio.mplay.ui.library
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
-import androidx.compose.foundation.layout.Box
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
@@ -21,7 +20,6 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.autoomstudio.mplay.R
@@ -29,6 +27,9 @@ import com.autoomstudio.mplay.data.library.LibraryQueries
 import com.autoomstudio.mplay.data.model.Album
 import com.autoomstudio.mplay.data.model.Artist
 import com.autoomstudio.mplay.data.model.Song
+import com.autoomstudio.mplay.ui.components.LoadingIndicator
+import com.autoomstudio.mplay.ui.theme.fadeThrough
+import com.autoomstudio.mplay.ui.theme.sharedAxisX
 
 private enum class LibraryTab(@StringRes val label: Int) {
     Songs(R.string.tab_songs),
@@ -88,18 +89,70 @@ fun LibraryScreen(
     val route = backStack.lastOrNull()
     BackHandler(enabled = backEnabled && route != null) { backStack.removeAt(backStack.lastIndex) }
 
-    if (state is LibraryUiState.Loading || state is LibraryUiState.NoPermission) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        return
+    val isLoading = state is LibraryUiState.Loading || state is LibraryUiState.NoPermission
+    AnimatedContent(
+        targetState = isLoading,
+        transitionSpec = { fadeThrough() },
+        label = "libraryLoading",
+        modifier = modifier,
+    ) { loading ->
+        if (loading) {
+            LoadingIndicator(modifier = Modifier.fillMaxSize())
+        } else {
+            AnimatedContent(
+                targetState = RouteEntry(route, backStack.size),
+                transitionSpec = { sharedAxisX(forward = targetState.depth > initialState.depth) },
+                label = "libraryRoute",
+            ) { entry ->
+                LibraryRouteContent(
+                    route = entry.route,
+                    state = state,
+                    selectedIndex = selectedIndex,
+                    onSelectTab = { selectedIndex = it },
+                    backStack = backStack,
+                    searchQuery = searchQuery,
+                    currentSongId = currentSongId,
+                    isPlaying = isPlaying,
+                    isRefreshing = isRefreshing,
+                    onRefresh = onRefresh,
+                    onPlay = onPlay,
+                    onShuffle = onShuffle,
+                    actions = actions,
+                )
+            }
+        }
     }
+}
+
+private data class RouteEntry(val route: LibraryRoute?, val depth: Int)
+
+@Composable
+private fun LibraryRouteContent(
+    route: LibraryRoute?,
+    state: LibraryUiState,
+    selectedIndex: Int,
+    onSelectTab: (Int) -> Unit,
+    backStack: SnapshotStateList<LibraryRoute>,
+    searchQuery: String,
+    currentSongId: Long?,
+    isPlaying: Boolean,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    onPlay: (songs: List<Song>, start: Song) -> Unit,
+    onShuffle: (songs: List<Song>) -> Unit,
+    actions: SongActions,
+) {
+    val modifier = Modifier.fillMaxSize()
     val content = state as? LibraryUiState.Content
     val allSongs = content?.allSongs.orEmpty()
-    val pop: () -> Unit = { if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex) }
+    val pop: () -> Unit = {
+        if (backStack.lastOrNull() == route && backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex)
+    }
 
     when (route) {
         null -> LibraryTabs(
             selectedIndex = selectedIndex,
-            onSelect = { selectedIndex = it },
+            onSelect = onSelectTab,
             content = content,
             searchQuery = searchQuery,
             currentSongId = currentSongId,
@@ -196,32 +249,38 @@ private fun LibraryTabs(
         }
 
         val contentModifier = Modifier.fillMaxSize()
-        when (LibraryTab.entries[selectedIndex]) {
-            LibraryTab.Songs -> SongsTab(
-                content = content,
-                searchQuery = searchQuery,
-                currentSongId = currentSongId,
-                isPlaying = isPlaying,
-                isRefreshing = isRefreshing,
-                onRefresh = onRefresh,
-                onPlay = onPlay,
-                actions = actions,
-                modifier = contentModifier,
-            )
+        AnimatedContent(
+            targetState = selectedIndex,
+            transitionSpec = { sharedAxisX(forward = targetState > initialState) },
+            label = "libraryTab",
+        ) { index ->
+            when (LibraryTab.entries[index]) {
+                LibraryTab.Songs -> SongsTab(
+                    content = content,
+                    searchQuery = searchQuery,
+                    currentSongId = currentSongId,
+                    isPlaying = isPlaying,
+                    isRefreshing = isRefreshing,
+                    onRefresh = onRefresh,
+                    onPlay = onPlay,
+                    actions = actions,
+                    modifier = contentModifier,
+                )
 
-            LibraryTab.Albums -> AlbumsTab(
-                content = content,
-                searchQuery = searchQuery,
-                onAlbumClick = onAlbumClick,
-                modifier = contentModifier,
-            )
+                LibraryTab.Albums -> AlbumsTab(
+                    content = content,
+                    searchQuery = searchQuery,
+                    onAlbumClick = onAlbumClick,
+                    modifier = contentModifier,
+                )
 
-            LibraryTab.Artists -> ArtistsTab(
-                content = content,
-                searchQuery = searchQuery,
-                onArtistClick = onArtistClick,
-                modifier = contentModifier,
-            )
+                LibraryTab.Artists -> ArtistsTab(
+                    content = content,
+                    searchQuery = searchQuery,
+                    onArtistClick = onArtistClick,
+                    modifier = contentModifier,
+                )
+            }
         }
     }
 }
