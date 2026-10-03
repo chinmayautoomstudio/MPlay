@@ -21,7 +21,8 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
         }
 
     suspend fun querySongs(): List<Song> = withContext(Dispatchers.IO) {
-        val projection = arrayOf(
+        val hasBitrate = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+        val projection = listOfNotNull(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
@@ -31,7 +32,11 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
             MediaStore.Audio.Media.DATE_ADDED,
             MediaStore.Audio.Media.DISPLAY_NAME,
             MediaStore.Audio.Media.TRACK,
-        )
+            MediaStore.Audio.Media.SIZE,
+            MediaStore.Audio.Media.DATE_MODIFIED,
+            MediaStore.Audio.Media.MIME_TYPE,
+            if (hasBitrate) MediaStore.Audio.Media.BITRATE else null,
+        ).toTypedArray()
         // Saved clips can be shorter than the minimum, so their folder skips the length check.
         @Suppress("DEPRECATION")
         val (pathColumn, clipsPattern) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -59,10 +64,16 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
                 val dateAddedCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
                 val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
                 val trackCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TRACK)
+                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.SIZE)
+                val modifiedCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_MODIFIED)
+                val mimeCol = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.MIME_TYPE)
+                val bitrateCol = if (hasBitrate) cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.BITRATE) else -1
 
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idCol)
                     val albumId = cursor.getLong(albumIdCol)
+                    val durationMs = cursor.getLong(durationCol)
+                    val sizeBytes = cursor.getLong(sizeCol)
                     songs += Song(
                         id = id,
                         uri = ContentUris.withAppendedId(collectionUri, id),
@@ -73,11 +84,19 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
                         artist = SongMapper.displayArtist(cursor.getString(artistCol)),
                         album = SongMapper.displayAlbum(cursor.getString(albumCol)),
                         albumId = albumId,
-                        durationMs = cursor.getLong(durationCol),
+                        durationMs = durationMs,
                         dateAdded = cursor.getLong(dateAddedCol),
                         albumArtUri = ContentUris.withAppendedId(ALBUM_ART_URI, albumId),
                         // MediaStore encodes disc and track as disc * 1000 + track.
                         trackNumber = cursor.getInt(trackCol) % 1000,
+                        sizeBytes = sizeBytes,
+                        dateModified = cursor.getLong(modifiedCol),
+                        mimeType = cursor.getString(mimeCol).orEmpty(),
+                        bitrate = SongMapper.bitrate(
+                            reported = if (bitrateCol >= 0) cursor.getInt(bitrateCol) else 0,
+                            sizeBytes = sizeBytes,
+                            durationMs = durationMs,
+                        ),
                     )
                 }
             }

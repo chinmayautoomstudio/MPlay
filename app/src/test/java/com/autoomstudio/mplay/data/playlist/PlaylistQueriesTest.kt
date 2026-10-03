@@ -43,6 +43,24 @@ class PlaylistQueriesTest {
     }
 
     @Test
+    fun `resolve plays the kept copy for a hidden duplicate`() {
+        val visible = library - 9L
+        val canonical = { id: Long -> if (id == 9L) 2L else id }
+        val playlist = PlaylistQueries.resolvePlaylist(StoredPlaylist(1, "Mix", listOf(9, 1)), visible, canonical)
+        assertEquals(listOf(2L, 1L), playlist.songs.map { it.id })
+        assertEquals(0, playlist.unavailableCount)
+        assertEquals(listOf(9L, 1L), playlist.storedIdsOf(playlist.songs))
+    }
+
+    @Test
+    fun `resolve shows a song once when both copies are in the playlist`() {
+        val canonical = { id: Long -> if (id == 9L) 2L else id }
+        val playlist = PlaylistQueries.resolvePlaylist(StoredPlaylist(1, "Mix", listOf(2, 3, 9)), library, canonical)
+        assertEquals(listOf(2L, 3L), playlist.songs.map { it.id })
+        assertEquals(listOf(2L, 9L), playlist.storedIdsOf(listOf(song(2))))
+    }
+
+    @Test
     fun `resolve empty playlist`() {
         val playlist = PlaylistQueries.resolvePlaylist(StoredPlaylist(1, "Empty", emptyList()), library)
         assertEquals(emptyList<Song>(), playlist.songs)

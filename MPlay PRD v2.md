@@ -36,7 +36,7 @@ Many music apps push streaming, accounts, ads and tracking, and are heavy on sto
 - Be fully offline and privacy-first (no INTERNET permission).
 - Handle libraries of 5,000+ songs smoothly.
 
-**Non-Goals (v1)**
+**Non-Goals (v2)**
 
 - Streaming, online radio, or any network feature.
 - Accounts, cloud sync, or social features.
@@ -57,17 +57,17 @@ Many music apps push streaming, accounts, ads and tracking, and are heavy on sto
 | Language / UI | Kotlin, Jetpack Compose, Material 3 |
 | Playback | AndroidX Media3 (ExoPlayer, MediaSessionService, MediaSession) |
 | Library source | MediaStore (Audio) |
-| Storage | Room (playlists), DataStore (settings, last session) |
-| minSdk / targetSdk | 26 / 35 |
+| Storage | Room (playlists, duplicate fingerprints and overrides; schema v2 with a migration from v1), DataStore (settings, last session) |
+| minSdk / targetSdk | 26 / 37 |
 | Network | None. The INTERNET permission must not be declared. |
 | Supported formats | MP3, FLAC, AAC/M4A, OGG (Vorbis/Opus), WAV, all decoded natively by Media3 ExoPlayer |
 | Widget | Jetpack Glance app widget |
 | Audio trimming | Media3 Transformer (clip and export to AAC/M4A); waveform drawn from decoded audio peaks |
 | Lofi effect | Custom Media3 AudioProcessor chain (low-pass filter, bit-crush, slight slowdown, vinyl crackle mix) plus light reverb |
 | Sleep timer | Timer inside MusicPlaybackService so it survives the app being closed |
-| Duplicate detection | Normalized title + artist + duration match, with content hash for exact copies |
+| Duplicate detection | Normalized title + artist + duration match, with a partial content fingerprint (file size + hash of the first and last 64 KB) for exact copies |
 | Distribution | Direct APK for now; Play Store deferred |
-| Permissions | READ_MEDIA_AUDIO (API 33+), READ_EXTERNAL_STORAGE (API 32 and below), POST_NOTIFICATIONS (API 33+), FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK, WRITE_SETTINGS (special permission, requested only when the user sets a ringtone), WRITE_EXTERNAL_STORAGE (maxSdkVersion 28, for saving clips on Android 9 and below) |
+| Permissions | READ_MEDIA_AUDIO (API 33+), READ_EXTERNAL_STORAGE (API 32 and below), POST_NOTIFICATIONS (API 33+), FOREGROUND_SERVICE, FOREGROUND_SERVICE_MEDIA_PLAYBACK, WAKE_LOCK (used by Media3 during playback), WRITE_SETTINGS (special permission, requested only when the user sets a ringtone), WRITE_EXTERNAL_STORAGE (maxSdkVersion 29 together with requestLegacyExternalStorage, for saving clips on Android 10 and below). ACCESS_NETWORK_STATE, merged in by WorkManager through Glance, is removed from the merged manifest |
 
 ## 6. Functional Requirements
 
@@ -79,25 +79,25 @@ Priority: **P0** = must ship, **P1** = should ship, **P2** = nice to have.
 | --- | --- | --- |
 | L1 | Request audio permission with a clear rationale screen and a settings fallback if permanently denied | P0 |
 | L2 | Read all device music via MediaStore, without restricting to the .mp3 extension | P0 |
-| L8 | Officially support MP3, FLAC, AAC/M4A, OGG and WAV; verify each plays, shows metadata and album art, and seeks correctly | P0 |
 | L3 | Show title, artist, album, duration and album art for each song | P0 |
 | L4 | Fall back to filename for missing title and "Unknown Artist" for missing artist | P0 |
 | L5 | Exclude audio under 30 seconds (ringtones, notification sounds) | P1 |
 | L6 | Auto-refresh the library when files are added or removed | P1 |
 | L7 | Browse by Songs, Albums and Artists tabs | P1 |
+| L8 | Officially support MP3, FLAC, AAC/M4A, OGG and WAV; verify each plays, shows metadata and album art, and seeks correctly | P0 |
 
 ### 6.2 Playback
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| P1 | Play, pause, next, previous and seek | P0 |
-| P2 | Tapping a song queues the current list and starts from that song | P0 |
-| P3 | Playback continues when the app is closed from recents or the screen is off | P0 |
-| P4 | Handle audio focus (pause or duck for calls and other apps, resume afterwards) | P0 |
-| P5 | Auto-pause when headphones are unplugged | P0 |
-| P6 | Gapless transition between tracks | P1 |
-| P7 | Play next and Add to queue actions | P1 |
-| P8 | Skip gracefully over files that were deleted or cannot be decoded | P0 |
+| PB1 | Play, pause, next, previous and seek | P0 |
+| PB2 | Tapping a song queues the current list and starts from that song | P0 |
+| PB3 | Playback continues when the app is closed from recents or the screen is off | P0 |
+| PB4 | Handle audio focus (pause or duck for calls and other apps, resume afterwards) | P0 |
+| PB5 | Auto-pause when headphones are unplugged | P0 |
+| PB6 | Gapless transition between tracks | P1 |
+| PB7 | Play next and Add to queue actions | P1 |
+| PB8 | Skip gracefully over files that were deleted or cannot be decoded | P0 |
 
 ### 6.3 Notification and System Controls
 
@@ -159,7 +159,7 @@ Priority: **P0** = must ship, **P1** = should ship, **P2** = nice to have.
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| T1 | The three-dot menu on every song row and on Now Playing contains: Add to playlist, Play next, Add to queue, Cut and save, Set as ringtone, Song info | P0 |
+| T1 | The three-dot menu on every song row and on Now Playing contains: Add to playlist, Play next, Add to queue, Cut and save, Set as ringtone, Song info, Delete from device (with the system confirmation dialog). The Now Playing menu additionally contains Sleep timer and Lofi mode | P0 |
 | T2 | "Cut and save" opens a trim editor with a waveform and draggable start and end handles | P0 |
 | T3 | Preview the selected range, with loop playback, before saving | P0 |
 | T4 | Fine-tune start and end with time fields or ±0.1 s buttons | P1 |
@@ -178,21 +178,21 @@ Trimming runs fully on-device and needs no network access.
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| ST1 | Sleep timer is available from the Now Playing screen (moon icon) and the three-dot menu | P0 |
+| ST1 | Sleep timer is available from the Now Playing screen (moon icon) and the Now Playing three-dot menu (not song rows) | P0 |
 | ST2 | Presets: 15, 30, 45 and 60 minutes, plus "End of current song" and a custom time (1 to 180 minutes) | P0 |
 | ST3 | Remaining time is visible on Now Playing while the timer runs, with options to cancel or extend | P0 |
 | ST4 | Volume fades out over the last 30 seconds, then playback pauses and the queue is kept | P0 |
 | ST5 | The timer runs in the playback service, so it still fires if the app is closed or the screen is off | P0 |
-| ST6 | The timer is cancelled if the user manually stops the player or starts a new timer | P1 |
+| ST6 | The timer is cancelled when playback is stopped or the queue is cleared, or when a new timer starts. A manual pause keeps it running | P1 |
 | ST7 | Remember the last used duration as the suggested default | P2 |
 
 ### 6.11 Duplicate Removal
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| D1 | Detect duplicates as songs with the same normalized title and artist and a duration within 2 seconds, or files with identical content hash | P0 |
+| D1 | Detect duplicates as songs with the same normalized title and artist and a duration within 2 seconds, or files with an identical partial fingerprint (same file size and same hash of the first and last 64 KB) | P0 |
 | D2 | Show only one copy of each duplicate group in the library, Albums, Artists and search results | P0 |
-| D3 | Choose which copy to keep: prefer higher quality (lossless, then higher bitrate), then the earliest added | P0 |
+| D3 | Choose which copy to keep: prefer higher quality (lossless, then higher bitrate), then the earliest added. Bitrate comes from MediaStore on Android 11+ and is estimated as size × 8 / duration on older versions | P0 |
 | D4 | Hiding is non-destructive: no files are deleted | P0 |
 | D5 | Settings toggle "Hide duplicate songs" (on by default) | P1 |
 | D6 | A "Review duplicates" screen lists the groups, lets the user switch which copy is kept, and restore hidden copies | P1 |
@@ -204,10 +204,10 @@ Trimming runs fully on-device and needs no network access.
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| LF1 | A "Lofi mode" toggle on the Now Playing screen, also available in its three-dot menu | P0 |
+| LF1 | A "Lofi mode" toggle on the Now Playing screen, also available in the Now Playing three-dot menu | P0 |
 | LF2 | When on, playback is processed live with a fixed preset: about 90% speed with lower pitch, low-pass filter near 4.5 kHz, light bit-crush, soft reverb and a quiet vinyl crackle layer | P0 |
 | LF3 | When off, playback returns to the original sound with no audible glitch (switch under 300 ms) | P0 |
-| LF4 | Lofi mode never modifies the audio files. It is not applied to saved clips or ringtones | P0 |
+| LF4 | Lofi mode never modifies the audio files. It is not applied to saved clips, ringtones or the trim editor preview | P0 |
 | LF5 | The toggle state persists across songs and app launches (off by default) | P1 |
 | LF6 | Seek bar, elapsed and total time stay correct while playback speed is changed | P0 |
 | LF7 | A short info text under the toggle explains that it adds a lofi sound effect and is not a remix | P1 |
@@ -221,7 +221,8 @@ Trimming runs fully on-device and needs no network access.
 - **Battery:** No wake locks beyond what Media3 requires during playback; no background work when idle.
 - **Privacy:** No network access, no analytics, no data leaves the device.
 - **Size:** Release APK under 20 MB with R8 enabled.
-- **Compatibility:** Android 8.0 (API 26) to Android 15 (API 35).
+- **Compatibility:** Android 8.0 (API 26) to Android 17 (API 37).
+- **Upgrades:** Updating from v1 keeps playlists, settings and the last session (Room migration from schema v1 to v2). The app version is 2.0.
 - **Accessibility:** Content descriptions on all controls, minimum 48dp touch targets, support for system font scaling.
 
 ## 8. User Flows
@@ -249,7 +250,7 @@ Trimming runs fully on-device and needs no network access.
 - Lofi mode toggle on Now Playing
 - Mini-player (persistent)
 - Permission rationale
-- Settings (theme; optional in v1)
+- Settings (theme, battery optimization tip, Hide duplicate songs, Review duplicates)
 
 ## 10. Success Metrics
 
@@ -257,7 +258,7 @@ Since MPlay collects no analytics, success is measured by testing and, if publis
 
 - Zero known crashes in a 50-scenario manual test pass across at least 3 device brands.
 - Background playback survives 60+ minutes of screen-off on Xiaomi, Samsung and Pixel devices.
-- Notification controls work on Android 12, 13, 14 and 15.
+- Notification controls work on Android 12 through 17.
 - A trimmed clip can be set as ringtone on Pixel, Samsung and Xiaomi devices (Android 10 to 15) and plays for incoming calls.
 - The sleep timer pauses playback within 2 seconds of the set time, including with the screen off for 60+ minutes.
 - Duplicate detection finds at least 95% of duplicates in a test library of 2,000 songs with under 1% false positives.
@@ -269,7 +270,7 @@ Since MPlay collects no analytics, success is measured by testing and, if publis
 | Risk | Mitigation |
 | --- | --- |
 | Aggressive background-kill by OEMs (Xiaomi, Oppo, Vivo) | Use a proper foreground media service; add an in-app tip on battery-optimization exemption |
-| Scoped storage and permission changes across Android versions | Use MediaStore only; version-specific permission handling; test on API 26, 29, 33 and 35 |
+| Scoped storage and permission changes across Android versions | Use MediaStore only; version-specific permission handling; test on API 26, 29, 33, 35 and 37 |
 | Missing or wrong ID3 tags | Filename fallback and "Unknown" defaults |
 | Large libraries slowing the UI | Stable LazyColumn keys, background queries, cached sorted lists |
 | Foreground-service rules tightening in newer Android versions | Follow current `mediaPlayback` type requirements; retest each target SDK bump |

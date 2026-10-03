@@ -1,27 +1,40 @@
 package com.autoomstudio.mplay.playback
 
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionError
+import androidx.media3.session.SessionResult
 import com.autoomstudio.mplay.MPlayApp
 import com.autoomstudio.mplay.MainActivity
 import com.autoomstudio.mplay.data.library.SongRepository
 import com.autoomstudio.mplay.data.model.Song
+import com.autoomstudio.mplay.data.settings.AppSettings
+import com.autoomstudio.mplay.playback.lofi.LofiAudioProcessor
 import com.autoomstudio.mplay.widget.WidgetStatePublisher
+import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -36,18 +49,25 @@ class PlaybackService : MediaSessionService() {
     private lateinit var saveScope: CoroutineScope
     private lateinit var widgetPublisher: WidgetStatePublisher
     private lateinit var songRepository: SongRepository
+    private lateinit var appSettings: AppSettings
+    private lateinit var sleepTimer: SleepTimerRunner
 
+    private val lofiProcessor = LofiAudioProcessor()
+    private var lofiEnabled = false
+
+    @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
         val container = (application as MPlayApp).container
         sessionStore = container.playbackSessionStore
         saveScope = container.applicationScope
+        appSettings = container.appSettings
 
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
-        val player = ExoPlayer.Builder(this)
+        val player = ExoPlayer.Builder(this, LofiRenderersFactory(this, lofiProcessor))
             .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
@@ -56,11 +76,14 @@ class PlaybackService : MediaSessionService() {
         player.addListener(SessionSaver())
         widgetPublisher = container.createWidgetStatePublisher().also(player::addListener)
         songRepository = container.songRepository
+        sleepTimer = SleepTimerRunner(player, serviceScope, onStatusChanged = { publishExtras() })
+            .also(player::addListener)
         serviceScope.launch {
             val modes = sessionStore.loadModes() ?: return@launch
             player.shuffleModeEnabled = modes.shuffleEnabled
             player.repeatMode = modes.repeatMode
         }
+        serviceScope.launch { applyLofi(player, appSettings.lofiEnabled.first(), persist = false) }
 
         val sessionActivity = PendingIntent.getActivity(
             this,
@@ -72,8 +95,21 @@ class PlaybackService : MediaSessionService() {
         )
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(sessionActivity)
-            .setCallback(ResumptionCallback())
+            .setCallback(SessionCallback())
+            .setSessionExtras(PlaybackCommands.extras(SleepTimerStatus.Off, lofiEnabled))
             .build()
+    }
+
+    private fun publishExtras() {
+        mediaSession?.setSessionExtras(PlaybackCommands.extras(sleepTimer.status, lofiEnabled))
+    }
+
+    private fun applyLofi(player: Player, enabled: Boolean, persist: Boolean) {
+        lofiEnabled = enabled
+        lofiProcessor.setEnabled(enabled)
+        player.playbackParameters = if (enabled) LOFI_PLAYBACK else PlaybackParameters.DEFAULT
+        publishExtras()
+        if (persist) saveScope.launch { appSettings.setLofiEnabled(enabled) }
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
@@ -151,11 +187,47 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    /**
-     * Rebuilds the last saved queue when play is requested with nothing loaded, for example from the
-     * widget, a headset button or the system's media resumption controls after the app was killed.
-     */
-    private inner class ResumptionCallback : MediaSession.Callback {
+    private inner class SessionCallback : MediaSession.Callback {
+
+        /** Only MPlay's own controllers may use the sleep timer and lofi commands. */
+        @OptIn(UnstableApi::class)
+        override fun onConnectAsync(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): ListenableFuture<MediaSession.ConnectionResult> {
+            val result = MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
+                .setSessionExtras(session.sessionExtras)
+            if (controller.packageName == packageName) {
+                val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                PlaybackCommands.all.forEach(commands::add)
+                result.setAvailableSessionCommands(commands.build())
+            }
+            return Futures.immediateFuture(result.build())
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle,
+        ): ListenableFuture<SessionResult> {
+            val minutes = args.getInt(PlaybackCommands.ARG_MINUTES, SleepTimer.DEFAULT_MINUTES)
+            when (customCommand.customAction) {
+                PlaybackCommands.setSleepTimer.customAction -> sleepTimer.start(minutes)
+                PlaybackCommands.setSleepTimerEndOfSong.customAction -> sleepTimer.startEndOfSong()
+                PlaybackCommands.extendSleepTimer.customAction -> sleepTimer.extend(minutes)
+                PlaybackCommands.cancelSleepTimer.customAction -> sleepTimer.cancel()
+                PlaybackCommands.setLofi.customAction ->
+                    applyLofi(session.player, args.getBoolean(PlaybackCommands.ARG_ENABLED), persist = true)
+                else -> return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
+            }
+            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+        }
+
+        /**
+         * Rebuilds the last saved queue when play is requested with nothing loaded, for example from the
+         * widget, a headset button or the system's media resumption controls after the app was killed.
+         */
         @OptIn(UnstableApi::class)
         override fun onPlaybackResumption(
             mediaSession: MediaSession,
@@ -186,7 +258,27 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
+    /** Builds the default audio sink with [lofi] ahead of Media3's own speed and pitch processing. */
+    @OptIn(UnstableApi::class)
+    private class LofiRenderersFactory(
+        context: Context,
+        private val lofi: LofiAudioProcessor,
+    ) : DefaultRenderersFactory(context) {
+        override fun buildAudioSink(
+            context: Context,
+            enableFloatOutput: Boolean,
+            enableAudioOutputPlaybackParams: Boolean,
+        ): AudioSink = DefaultAudioSink.Builder(context)
+            .setEnableFloatOutput(enableFloatOutput)
+            .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
+            .setAudioProcessors(arrayOf(lofi))
+            .build()
+    }
+
     private companion object {
         const val PERIODIC_SAVE_MS = 10_000L
+
+        /** About 90% speed with the pitch lowered to match, like a slowed-down record. */
+        val LOFI_PLAYBACK = PlaybackParameters(0.9f, 0.9f)
     }
 }

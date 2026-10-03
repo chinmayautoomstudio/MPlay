@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -54,9 +55,31 @@ class AppSettings(context: Context) {
         dataStore.edit { it[KEY_NOTIFICATION_PROMPT_SHOWN] = true }
     }
 
+    /** The last duration picked in the sleep timer sheet, suggested next time; null until one is picked. */
+    val lastSleepMinutes: Flow<Int?> = dataStore.data.map { it[KEY_LAST_SLEEP_MINUTES] }.distinctUntilChanged()
+
+    suspend fun setLastSleepMinutes(minutes: Int) {
+        dataStore.edit { it[KEY_LAST_SLEEP_MINUTES] = minutes }
+    }
+
+    val lofiEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_LOFI_ENABLED] ?: false }.distinctUntilChanged()
+
+    suspend fun setLofiEnabled(enabled: Boolean) {
+        dataStore.edit { it[KEY_LOFI_ENABLED] = enabled }
+    }
+
+    val hideDuplicates: Flow<Boolean> = dataStore.data.map { it[KEY_HIDE_DUPLICATES] ?: true }.distinctUntilChanged()
+
+    suspend fun setHideDuplicates(enabled: Boolean) {
+        dataStore.edit { it[KEY_HIDE_DUPLICATES] = enabled }
+    }
+
     private companion object {
         val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val KEY_NOTIFICATION_PROMPT_SHOWN = booleanPreferencesKey("notification_prompt_shown")
+        val KEY_LAST_SLEEP_MINUTES = intPreferencesKey("last_sleep_minutes")
+        val KEY_LOFI_ENABLED = booleanPreferencesKey("lofi_enabled")
+        val KEY_HIDE_DUPLICATES = booleanPreferencesKey("hide_duplicates")
     }
 }

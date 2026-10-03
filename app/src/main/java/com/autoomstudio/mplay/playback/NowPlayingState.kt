@@ -23,4 +23,6 @@ data class NowPlayingState(
     val repeatMode: RepeatMode,
     val hasPrevious: Boolean,
     val hasNext: Boolean,
+    val sleepTimer: SleepTimerStatus = SleepTimerStatus.Off,
+    val lofiEnabled: Boolean = false,
 )

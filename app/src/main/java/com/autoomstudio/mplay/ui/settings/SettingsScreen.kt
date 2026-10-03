@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -44,6 +46,10 @@ fun SettingsScreen(
     theme: ThemeSettings,
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
+    hideDuplicates: Boolean,
+    onHideDuplicatesChange: (Boolean) -> Unit,
+    duplicateGroupCount: Int,
+    onReviewDuplicates: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -66,6 +72,37 @@ fun SettingsScreen(
                 ),
             )
         }
+
+        SectionHeader(stringResource(R.string.settings_section_library))
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_hide_duplicates)) },
+            supportingContent = { Text(stringResource(R.string.settings_hide_duplicates_summary)) },
+            trailingContent = { Switch(checked = hideDuplicates, onCheckedChange = null) },
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+            modifier = Modifier.toggleable(
+                value = hideDuplicates,
+                role = Role.Switch,
+                onValueChange = onHideDuplicatesChange,
+            ),
+        )
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_review_duplicates)) },
+            supportingContent = {
+                Text(
+                    if (duplicateGroupCount == 0) {
+                        stringResource(R.string.settings_review_duplicates_none)
+                    } else {
+                        pluralStringResource(
+                            R.plurals.settings_review_duplicates_summary,
+                            duplicateGroupCount,
+                            duplicateGroupCount,
+                        )
+                    },
+                )
+            },
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+            modifier = Modifier.clickable(onClick = onReviewDuplicates),
+        )
 
         SectionHeader(stringResource(R.string.settings_section_playback))
         BatteryOptimizationItem()

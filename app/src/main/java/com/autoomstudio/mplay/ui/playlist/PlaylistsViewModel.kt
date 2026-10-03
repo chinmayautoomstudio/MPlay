@@ -43,14 +43,16 @@ sealed interface PlaylistMessage {
 
 class PlaylistsViewModel(private val repository: PlaylistRepository) : ViewModel(), PlaylistActions {
 
+    private class Library(val songs: List<Song>, val canonicalId: (Long) -> Long)
+
     /** Null until the library has loaded, so songs are not briefly reported as unavailable. */
-    private val librarySongs = MutableStateFlow<List<Song>?>(null)
+    private val library = MutableStateFlow<Library?>(null)
 
     /** Null while loading; otherwise playlists resolved against the current library. */
     val playlists: StateFlow<List<Playlist>?> =
-        combine(repository.playlists, librarySongs.filterNotNull()) { stored, songs ->
-            val songsById = songs.associateBy { it.id }
-            stored.map { PlaylistQueries.resolvePlaylist(it, songsById) }
+        combine(repository.playlists, library.filterNotNull()) { stored, library ->
+            val songsById = library.songs.associateBy { it.id }
+            stored.map { PlaylistQueries.resolvePlaylist(it, songsById, library.canonicalId) }
         }
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -58,8 +60,9 @@ class PlaylistsViewModel(private val repository: PlaylistRepository) : ViewModel
     private val _messages = Channel<PlaylistMessage>(Channel.BUFFERED)
     val messages: Flow<PlaylistMessage> = _messages.receiveAsFlow()
 
-    fun onLibraryChanged(songs: List<Song>) {
-        librarySongs.value = songs
+    /** [canonicalId] maps a hidden duplicate copy to the visible song that replaces it. */
+    fun onLibraryChanged(songs: List<Song>, canonicalId: (Long) -> Long = { it }) {
+        library.value = Library(songs, canonicalId)
     }
 
     override fun createPlaylist(name: String, firstSongs: List<Song>) {
@@ -100,7 +103,7 @@ class PlaylistsViewModel(private val repository: PlaylistRepository) : ViewModel
 
     override fun removeFromPlaylist(playlist: Playlist, songs: List<Song>) {
         if (songs.isEmpty()) return
-        viewModelScope.launch { repository.remove(playlist.id, songs) }
+        viewModelScope.launch { repository.remove(playlist.id, playlist.storedIdsOf(songs)) }
     }
 
     /** Forgets songs that were deleted from the device. */
@@ -110,7 +113,7 @@ class PlaylistsViewModel(private val repository: PlaylistRepository) : ViewModel
     }
 
     override fun reorderPlaylist(playlist: Playlist, songs: List<Song>) {
-        viewModelScope.launch { repository.reorder(playlist.id, songs) }
+        viewModelScope.launch { repository.reorder(playlist.id, playlist.storedIdsOf(songs)) }
     }
 
     companion object {

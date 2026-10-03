@@ -13,4 +13,9 @@ data class Playlist(
     val name: String,
     val songs: List<Song>,
     val unavailableCount: Int,
-)
+    /** Stored IDs behind each shown song, when they differ from its own ID (a hidden duplicate copy). */
+    val entryIds: Map<Long, List<Long>> = emptyMap(),
+) {
+    /** The stored IDs to change when editing [songs] in this playlist. */
+    fun storedIdsOf(songs: List<Song>): List<Long> = songs.flatMap { entryIds[it.id] ?: listOf(it.id) }
+}

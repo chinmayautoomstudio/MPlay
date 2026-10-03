@@ -224,6 +224,7 @@ fun SongMenuButton(
     modifier: Modifier = Modifier,
     onRemove: (() -> Unit)? = null,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    extraItems: (@Composable (onDismiss: () -> Unit) -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
@@ -239,6 +240,7 @@ fun SongMenuButton(
             onDismissRequest = { expanded = false },
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ) {
+            extraItems?.invoke { expanded = false }
             SongMenuItems(song = song, actions = actions, onRemove = onRemove, onDismiss = { expanded = false })
         }
     }

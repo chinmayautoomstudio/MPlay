@@ -31,12 +31,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -49,6 +56,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +69,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -69,6 +78,8 @@ import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.playback.RepeatMode
+import com.autoomstudio.mplay.playback.SleepTimer
+import com.autoomstudio.mplay.playback.SleepTimerStatus
 import com.autoomstudio.mplay.ui.common.formatDuration
 import com.autoomstudio.mplay.ui.components.ArtworkImage
 import com.autoomstudio.mplay.ui.components.popOnChange
@@ -92,8 +103,10 @@ fun NowPlayingContent(
     backEnabled: Boolean = true,
     song: Song? = null,
     songActions: SongActions? = null,
+    suggestedSleepMinutes: Int = SleepTimer.DEFAULT_MINUTES,
 ) {
     BackHandler(enabled = backEnabled, onBack = onCollapse)
+    var showSleepSheet by rememberSaveable { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -118,8 +131,36 @@ fun NowPlayingContent(
                     )
                 }
                 Spacer(Modifier.weight(1f))
+                SleepTimerButton(status = state.sleepTimer, onClick = { showSleepSheet = true })
                 if (song != null && songActions != null) {
-                    SongMenuButton(song = song, actions = songActions, tint = MaterialTheme.colorScheme.onSurface)
+                    SongMenuButton(
+                        song = song,
+                        actions = songActions,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        extraItems = { dismiss ->
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.menu_sleep_timer)) },
+                                onClick = {
+                                    dismiss()
+                                    showSleepSheet = true
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(
+                                            if (state.lofiEnabled) R.string.menu_lofi_off else R.string.menu_lofi_on,
+                                        ),
+                                    )
+                                },
+                                onClick = {
+                                    dismiss()
+                                    actions.setLofi(!state.lofiEnabled)
+                                },
+                            )
+                            HorizontalDivider()
+                        },
+                    )
                 }
             }
 
@@ -175,6 +216,12 @@ fun NowPlayingContent(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    SleepTimerChip(
+                        status = state.sleepTimer,
+                        onOpen = { showSleepSheet = true },
+                        onExtend = { actions.extendSleepTimer(SleepTimer.EXTEND_MINUTES) },
+                        onCancel = actions::cancelSleepTimer,
+                    )
                 }
 
                 Spacer(Modifier.height(20.dp))
@@ -182,9 +229,85 @@ fun NowPlayingContent(
 
                 Spacer(Modifier.height(12.dp))
                 TransportControls(state = state, actions = actions)
+
+                Spacer(Modifier.height(12.dp))
+                LofiToggle(enabled = state.lofiEnabled, onToggle = actions::setLofi)
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
         }
+    }
+
+    if (showSleepSheet) {
+        SleepTimerSheet(
+            status = state.sleepTimer,
+            suggestedMinutes = suggestedSleepMinutes,
+            onStart = {
+                actions.setSleepTimer(it)
+                showSleepSheet = false
+            },
+            onEndOfSong = {
+                actions.setSleepTimerEndOfSong()
+                showSleepSheet = false
+            },
+            onExtend = { actions.extendSleepTimer(SleepTimer.EXTEND_MINUTES) },
+            onCancel = {
+                actions.cancelSleepTimer()
+                showSleepSheet = false
+            },
+            onDismiss = { showSleepSheet = false },
+        )
+    }
+}
+
+@Composable
+private fun SleepTimerButton(status: SleepTimerStatus, onClick: () -> Unit) {
+    val remaining by rememberSleepRemainingMs(status)
+    val description = when (status) {
+        SleepTimerStatus.Off -> stringResource(R.string.sleep_timer_action)
+        SleepTimerStatus.EndOfSong -> stringResource(R.string.sleep_timer_action_end_of_song)
+        is SleepTimerStatus.Running ->
+            stringResource(R.string.sleep_timer_action_active, formatDuration(remaining ?: 0L))
+    }
+    val tint by animateColorAsState(
+        if (status == SleepTimerStatus.Off) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
+        tween(MotionMedium),
+        label = "sleepTint",
+    )
+    IconButton(onClick = onClick) {
+        Icon(
+            imageVector = if (status == SleepTimerStatus.Off) Icons.Outlined.Bedtime else Icons.Filled.Bedtime,
+            contentDescription = description,
+            tint = tint,
+        )
+    }
+}
+
+@Composable
+private fun LofiToggle(enabled: Boolean, onToggle: (Boolean) -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        FilterChip(
+            selected = enabled,
+            onClick = { onToggle(!enabled) },
+            label = { Text(stringResource(R.string.lofi_mode)) },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Filled.GraphicEq,
+                    contentDescription = null,
+                    modifier = Modifier.size(FilterChipDefaults.IconSize),
+                )
+            },
+        )
+        Text(
+            text = stringResource(R.string.lofi_info),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

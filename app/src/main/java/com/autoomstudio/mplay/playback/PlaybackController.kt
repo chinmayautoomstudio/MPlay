@@ -2,11 +2,14 @@ package com.autoomstudio.mplay.playback
 
 import android.content.ComponentName
 import android.content.Context
+import android.os.Bundle
 import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.core.os.bundleOf
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
 import com.autoomstudio.mplay.data.library.SongRepository
 import com.autoomstudio.mplay.data.model.Song
@@ -43,6 +46,10 @@ class PlaybackController(
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = sync(player)
+    }
+
+    private val sessionListener = object : MediaController.Listener {
+        override fun onExtrasChanged(controller: MediaController, extras: Bundle) = sync(controller)
     }
 
     /** Connects early so the UI reflects playback that is already running in the service. */
@@ -146,6 +153,23 @@ class PlaybackController(
         controller.repeatMode = nextRepeatMode(controller.repeatMode.toRepeatMode()).toPlayerRepeatMode()
     }
 
+    fun setSleepTimer(minutes: Int) =
+        sendCommand(PlaybackCommands.setSleepTimer, bundleOf(PlaybackCommands.ARG_MINUTES to minutes))
+
+    fun setSleepTimerEndOfSong() = sendCommand(PlaybackCommands.setSleepTimerEndOfSong)
+
+    fun extendSleepTimer(minutes: Int) =
+        sendCommand(PlaybackCommands.extendSleepTimer, bundleOf(PlaybackCommands.ARG_MINUTES to minutes))
+
+    fun cancelSleepTimer() = sendCommand(PlaybackCommands.cancelSleepTimer)
+
+    fun setLofi(enabled: Boolean) =
+        sendCommand(PlaybackCommands.setLofi, bundleOf(PlaybackCommands.ARG_ENABLED to enabled))
+
+    private fun sendCommand(command: SessionCommand, args: Bundle = Bundle.EMPTY) = withController { controller ->
+        controller.sendCustomCommand(command, args)
+    }
+
     fun release() {
         controllerFuture?.let(MediaController::releaseFuture)
         controllerFuture = null
@@ -175,7 +199,7 @@ class PlaybackController(
         controllerFuture ?: MediaController.Builder(
             context,
             SessionToken(context, ComponentName(context, PlaybackService::class.java)),
-        ).buildAsync().also { future ->
+        ).setListener(sessionListener).buildAsync().also { future ->
             controllerFuture = future
             future.addListener(
                 {
@@ -215,6 +239,7 @@ class PlaybackController(
             return
         }
         val metadata = player.mediaMetadata
+        val extras = (player as? MediaController)?.sessionExtras ?: Bundle.EMPTY
         _state.value = NowPlayingState(
             songId = player.currentMediaItem?.mediaId?.toLongOrNull(),
             title = metadata.title?.toString().orEmpty(),
@@ -226,6 +251,8 @@ class PlaybackController(
             repeatMode = player.repeatMode.toRepeatMode(),
             hasPrevious = player.hasPreviousMediaItem(),
             hasNext = player.hasNextMediaItem(),
+            sleepTimer = PlaybackCommands.sleepTimerOf(extras),
+            lofiEnabled = PlaybackCommands.lofiOf(extras),
         )
     }
 

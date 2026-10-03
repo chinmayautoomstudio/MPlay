@@ -5,6 +5,8 @@ import com.autoomstudio.mplay.data.clip.ClipExporter
 import com.autoomstudio.mplay.data.clip.ClipStore
 import com.autoomstudio.mplay.data.clip.RingtoneSetter
 import com.autoomstudio.mplay.data.clip.WaveformExtractor
+import com.autoomstudio.mplay.data.duplicates.DuplicateRepository
+import com.autoomstudio.mplay.data.duplicates.FileFingerprinter
 import com.autoomstudio.mplay.data.library.AudioFolderScanner
 import com.autoomstudio.mplay.data.library.AudioFolderWatcher
 import com.autoomstudio.mplay.data.library.LibraryPreferences
@@ -46,6 +48,10 @@ class AppContainer(context: Context) {
     private val database: MPlayDatabase by lazy { MPlayDatabase.create(appContext) }
 
     val playlistRepository: PlaylistRepository by lazy { PlaylistRepository(database.playlistDao()) }
+
+    val duplicateRepository: DuplicateRepository by lazy {
+        DuplicateRepository(database.duplicateDao(), FileFingerprinter(contentResolver), applicationScope)
+    }
 
     val clipStore: ClipStore by lazy { ClipStore(appContext) }
 

@@ -57,12 +57,15 @@ import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.library.SongSortOrder
 import com.autoomstudio.mplay.data.model.Playlist
 import com.autoomstudio.mplay.data.model.Song
+import com.autoomstudio.mplay.data.duplicates.DuplicateIndex
 import com.autoomstudio.mplay.data.settings.ThemeMode
 import com.autoomstudio.mplay.data.settings.ThemeSettings
 import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.data.library.SongDeleter
 import com.autoomstudio.mplay.ui.components.MPlayTopBar
 import com.autoomstudio.mplay.ui.components.SelectionTopBar
+import com.autoomstudio.mplay.ui.duplicates.DuplicateActions
+import com.autoomstudio.mplay.ui.duplicates.ReviewDuplicatesScreen
 import com.autoomstudio.mplay.ui.library.DeleteResult
 import com.autoomstudio.mplay.ui.library.DeleteSongsHost
 import com.autoomstudio.mplay.ui.library.LibraryScreen
@@ -112,6 +115,7 @@ fun MainScreen(
     nowPlaying: NowPlayingState?,
     position: Flow<Long>,
     playerActions: PlayerActions,
+    suggestedSleepMinutes: Int,
     showNowPlaying: Boolean,
     onShowNowPlayingChange: (Boolean) -> Unit,
     isRefreshing: Boolean,
@@ -134,10 +138,17 @@ fun MainScreen(
     themeSettings: ThemeSettings,
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
+    duplicateActions: DuplicateActions,
     modifier: Modifier = Modifier,
 ) {
     var destination by rememberSaveable { mutableStateOf(Destination.Library) }
     val allSongs = (libraryState as? LibraryUiState.Content)?.allSongs.orEmpty()
+    val duplicates = (libraryState as? LibraryUiState.Content)?.duplicates ?: DuplicateIndex.EMPTY
+    // Hidden duplicate copies can still be deleted from the review screen.
+    val deletableSongs = remember(allSongs, duplicates) {
+        (allSongs + duplicates.groups.flatMap { it.songs }).distinctBy { it.id }
+    }
+    var reviewingDuplicates by rememberSaveable { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -370,12 +381,33 @@ fun MainScreen(
                         backEnabled = screenBackEnabled,
                     )
 
-                    Destination.Settings -> SettingsScreen(
-                        theme = themeSettings,
-                        onThemeModeChange = onThemeModeChange,
-                        onDynamicColorChange = onDynamicColorChange,
-                        modifier = contentModifier,
-                    )
+                    Destination.Settings -> AnimatedContent(
+                        targetState = reviewingDuplicates,
+                        transitionSpec = { fadeThrough() },
+                        label = "settingsPage",
+                    ) { reviewing ->
+                        if (reviewing) {
+                            ReviewDuplicatesScreen(
+                                duplicates = duplicates,
+                                actions = duplicateActions,
+                                onDeleteHidden = { songs -> deleteSongIds = songs.map { it.id }.toLongArray() },
+                                onBack = { reviewingDuplicates = false },
+                                modifier = contentModifier,
+                                backEnabled = screenBackEnabled && reviewingDuplicates,
+                            )
+                        } else {
+                            SettingsScreen(
+                                theme = themeSettings,
+                                onThemeModeChange = onThemeModeChange,
+                                onDynamicColorChange = onDynamicColorChange,
+                                hideDuplicates = duplicateActions.hideDuplicates,
+                                onHideDuplicatesChange = duplicateActions.onHideDuplicatesChange,
+                                duplicateGroupCount = duplicates.groups.size,
+                                onReviewDuplicates = { reviewingDuplicates = true },
+                                modifier = contentModifier,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -393,6 +425,7 @@ fun MainScreen(
                 onCollapse = { onShowNowPlayingChange(false) },
                 song = allSongs.firstOrNull { it.id == state.songId },
                 songActions = songActions,
+                suggestedSleepMinutes = suggestedSleepMinutes,
             )
         }
     }
@@ -429,7 +462,7 @@ fun MainScreen(
     }
     DeleteSongsHost(
         request = deleteSongIds,
-        allSongs = allSongs,
+        allSongs = deletableSongs,
         deleter = songDeleter,
         onResult = { result ->
             deleteSongIds = null

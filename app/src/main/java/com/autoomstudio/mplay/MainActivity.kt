@@ -23,6 +23,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoomstudio.mplay.data.settings.ThemeSettings
+import com.autoomstudio.mplay.ui.duplicates.DuplicateActions
 import com.autoomstudio.mplay.ui.library.LibraryUiState
 import com.autoomstudio.mplay.ui.library.LibraryViewModel
 import com.autoomstudio.mplay.ui.main.MainScreen
@@ -112,15 +113,17 @@ private fun MPlayRoot(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
     val nowPlaying by playbackViewModel.state.collectAsStateWithLifecycle()
+    val suggestedSleepMinutes by playbackViewModel.suggestedSleepMinutes.collectAsStateWithLifecycle()
     val playlists by playlistsViewModel.playlists.collectAsStateWithLifecycle()
-    val librarySongs = when (val state = uiState) {
-        is LibraryUiState.Content -> state.allSongs
-        LibraryUiState.Empty -> emptyList()
-        else -> null
+    val content = uiState as? LibraryUiState.Content
+    LaunchedEffect(content?.allSongs, content?.duplicates, content?.hidingDuplicates, uiState is LibraryUiState.Empty) {
+        when (val state = uiState) {
+            is LibraryUiState.Content -> playlistsViewModel.onLibraryChanged(state.allSongs, state::canonicalId)
+            LibraryUiState.Empty -> playlistsViewModel.onLibraryChanged(emptyList())
+            else -> Unit
+        }
     }
-    LaunchedEffect(librarySongs) {
-        librarySongs?.let(playlistsViewModel::onLibraryChanged)
-    }
+    val hideDuplicates by viewModel.hideDuplicates.collectAsStateWithLifecycle()
     if (uiState is LibraryUiState.NoPermission) {
         PermissionRationaleScreen(
             permanentlyDenied = permission.isPermanentlyDenied,
@@ -133,6 +136,7 @@ private fun MPlayRoot(
             nowPlaying = nowPlaying,
             position = playbackViewModel.position,
             playerActions = playbackViewModel,
+            suggestedSleepMinutes = suggestedSleepMinutes,
             showNowPlaying = showNowPlaying,
             onShowNowPlayingChange = { showNowPlaying = it },
             isRefreshing = isRefreshing,
@@ -157,6 +161,13 @@ private fun MPlayRoot(
             themeSettings = themeSettings,
             onThemeModeChange = settingsViewModel::setThemeMode,
             onDynamicColorChange = settingsViewModel::setDynamicColor,
+            duplicateActions = DuplicateActions(
+                hideDuplicates = hideDuplicates,
+                onHideDuplicatesChange = viewModel::setHideDuplicates,
+                onKeep = viewModel::keepDuplicate,
+                onRestore = viewModel::restoreDuplicate,
+                onHideAgain = viewModel::hideDuplicateAgain,
+            ),
         )
     }
 }

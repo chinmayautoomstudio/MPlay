@@ -64,6 +64,7 @@ fun ExpandablePlayer(
     onCollapse: () -> Unit,
     song: Song?,
     songActions: SongActions,
+    suggestedSleepMinutes: Int,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -135,6 +136,7 @@ fun ExpandablePlayer(
                 backEnabled = backEnabled,
                 song = song,
                 songActions = songActions,
+                suggestedSleepMinutes = suggestedSleepMinutes,
                 onArtworkPositioned = {
                     positions.fullArt = it
                     updateFullArtRect()

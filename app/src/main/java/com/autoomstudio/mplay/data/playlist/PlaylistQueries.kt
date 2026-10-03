@@ -6,14 +6,33 @@ import com.autoomstudio.mplay.data.model.StoredPlaylist
 
 object PlaylistQueries {
 
-    /** Keeps the stored order and skips IDs missing from [songsById]. */
-    fun resolvePlaylist(stored: StoredPlaylist, songsById: Map<Long, Song>): Playlist {
-        val songs = stored.songIds.mapNotNull { songsById[it] }
+    /**
+     * Keeps the stored order and skips IDs missing from [songsById]. Each ID is first mapped through
+     * [canonicalId], so an entry for a hidden duplicate shows its kept copy, once.
+     */
+    fun resolvePlaylist(
+        stored: StoredPlaylist,
+        songsById: Map<Long, Song>,
+        canonicalId: (Long) -> Long = { it },
+    ): Playlist {
+        val songs = LinkedHashMap<Long, Song>()
+        val entryIds = mutableMapOf<Long, MutableList<Long>>()
+        var unavailable = 0
+        for (storedId in stored.songIds) {
+            val song = songsById[canonicalId(storedId)]
+            if (song == null) {
+                unavailable++
+                continue
+            }
+            songs.putIfAbsent(song.id, song)
+            entryIds.getOrPut(song.id) { mutableListOf() } += storedId
+        }
         return Playlist(
             id = stored.id,
             name = stored.name,
-            songs = songs,
-            unavailableCount = stored.songIds.size - songs.size,
+            songs = songs.values.toList(),
+            unavailableCount = unavailable,
+            entryIds = entryIds.filter { (songId, ids) -> ids != listOf(songId) },
         )
     }
 

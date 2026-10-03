@@ -6,6 +6,23 @@ import org.junit.Test
 class SongMapperTest {
 
     @Test
+    fun `reported bitrate wins`() {
+        assertEquals(320_000, SongMapper.bitrate(reported = 320_000, sizeBytes = 1, durationMs = 1))
+    }
+
+    @Test
+    fun `bitrate is estimated from size and length when unknown`() {
+        // 4,000,000 bytes over 200 s is 160 kbps.
+        assertEquals(160_000, SongMapper.bitrate(reported = 0, sizeBytes = 4_000_000, durationMs = 200_000))
+    }
+
+    @Test
+    fun `bitrate is zero without size or length`() {
+        assertEquals(0, SongMapper.bitrate(reported = 0, sizeBytes = 0, durationMs = 200_000))
+        assertEquals(0, SongMapper.bitrate(reported = 0, sizeBytes = 1_000, durationMs = 0))
+    }
+
+    @Test
     fun `title is used when present`() {
         assertEquals("Song", SongMapper.displayTitle("  Song ", "file.mp3"))
     }

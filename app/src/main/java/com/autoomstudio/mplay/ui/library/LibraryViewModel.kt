@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.autoomstudio.mplay.MPlayApp
+import com.autoomstudio.mplay.data.duplicates.DuplicateGroup
+import com.autoomstudio.mplay.data.duplicates.DuplicateIndex
+import com.autoomstudio.mplay.data.duplicates.DuplicateRepository
 import com.autoomstudio.mplay.data.library.LibraryPreferences
 import com.autoomstudio.mplay.data.library.LibraryQueries
 import com.autoomstudio.mplay.data.library.SongRepository
@@ -13,6 +16,7 @@ import com.autoomstudio.mplay.data.library.SongSortOrder
 import com.autoomstudio.mplay.data.model.Album
 import com.autoomstudio.mplay.data.model.Artist
 import com.autoomstudio.mplay.data.model.Song
+import com.autoomstudio.mplay.data.settings.AppSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -41,6 +45,7 @@ sealed interface LibraryUiState {
     /**
      * [songs] are filtered and sorted; [albums] and [artists] are grouped from the filtered songs.
      * [allSongs] is the unfiltered library, so album and artist screens stay complete during a search.
+     * While [hidingDuplicates], all of them leave out the extra copies listed in [duplicates].
      */
     data class Content(
         val songs: List<Song>,
@@ -48,13 +53,23 @@ sealed interface LibraryUiState {
         val artists: List<Artist>,
         val isFiltered: Boolean,
         val allSongs: List<Song>,
-    ) : LibraryUiState
+        val duplicates: DuplicateIndex = DuplicateIndex.EMPTY,
+        val hidingDuplicates: Boolean = false,
+    ) : LibraryUiState {
+        /** The visible song standing in for [songId], so playlist entries for a hidden copy play the kept one. */
+        fun canonicalId(songId: Long): Long = if (hidingDuplicates) duplicates.canonicalId(songId) else songId
+    }
 }
 
 class LibraryViewModel(
     private val songRepository: SongRepository,
     private val libraryPreferences: LibraryPreferences,
+    private val duplicateRepository: DuplicateRepository,
+    private val appSettings: AppSettings,
 ) : ViewModel() {
+
+    val hideDuplicates: StateFlow<Boolean> = appSettings.hideDuplicates
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     private val permissionGranted = MutableStateFlow<Boolean?>(null)
 
@@ -80,10 +95,15 @@ class LibraryViewModel(
                 null -> flowOf(LibraryUiState.Loading)
                 false -> flowOf(LibraryUiState.NoPermission)
                 true -> combine(
-                    songRepository.songs().onEach { _isRefreshing.value = false },
+                    songRepository.songs()
+                        .onEach { _isRefreshing.value = false }
+                        .flatMapLatest { songs ->
+                            duplicateRepository.index(songs).map { index -> songs to index }
+                        },
                     effectiveQuery,
                     libraryPreferences.sortOrder,
-                ) { songs, query, order -> buildState(songs, query, order) }
+                    appSettings.hideDuplicates,
+                ) { (songs, index), query, order, hide -> buildState(songs, index, hide, query, order) }
                     .flowOn(Dispatchers.Default)
                     .onStart { emit(LibraryUiState.Loading) }
                     // Access can be revoked between the resume check and the query.
@@ -125,15 +145,40 @@ class LibraryViewModel(
         viewModelScope.launch { libraryPreferences.setSortOrder(order) }
     }
 
-    private fun buildState(songs: List<Song>, query: String, order: SongSortOrder): LibraryUiState {
+    fun setHideDuplicates(enabled: Boolean) {
+        viewModelScope.launch { appSettings.setHideDuplicates(enabled) }
+    }
+
+    fun keepDuplicate(song: Song, group: DuplicateGroup) {
+        viewModelScope.launch { duplicateRepository.keep(song.id, group) }
+    }
+
+    fun restoreDuplicate(song: Song) {
+        viewModelScope.launch { duplicateRepository.restore(song.id) }
+    }
+
+    fun hideDuplicateAgain(song: Song) {
+        viewModelScope.launch { duplicateRepository.hideAgain(song.id) }
+    }
+
+    private fun buildState(
+        songs: List<Song>,
+        duplicates: DuplicateIndex,
+        hideDuplicates: Boolean,
+        query: String,
+        order: SongSortOrder,
+    ): LibraryUiState {
         if (songs.isEmpty()) return LibraryUiState.Empty
-        val filtered = LibraryQueries.filterSongs(songs, query)
+        val shown = if (hideDuplicates) duplicates.visible(songs) else songs
+        val filtered = LibraryQueries.filterSongs(shown, query)
         return LibraryUiState.Content(
             songs = LibraryQueries.sortSongs(filtered, order),
             albums = LibraryQueries.groupAlbums(filtered),
             artists = LibraryQueries.groupArtists(filtered),
             isFiltered = query.isNotEmpty(),
-            allSongs = songs,
+            allSongs = shown,
+            duplicates = duplicates,
+            hidingDuplicates = hideDuplicates,
         )
     }
 
@@ -144,7 +189,12 @@ class LibraryViewModel(
         val Factory = viewModelFactory {
             initializer {
                 val app = this[APPLICATION_KEY] as MPlayApp
-                LibraryViewModel(app.container.songRepository, app.container.libraryPreferences)
+                LibraryViewModel(
+                    app.container.songRepository,
+                    app.container.libraryPreferences,
+                    app.container.duplicateRepository,
+                    app.container.appSettings,
+                )
             }
         }
     }

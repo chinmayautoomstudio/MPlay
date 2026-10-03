@@ -35,8 +35,8 @@ class PlaylistRepository(
     /** Returns how many of [songs] were added; songs already in the playlist are skipped. */
     suspend fun addSongs(id: Long, songs: List<Song>): Int = dao.addSongs(id, songs.map { it.id }, clock())
 
-    suspend fun remove(id: Long, songs: List<Song>) {
-        songs.map { it.id }.chunked(SQL_BATCH).forEach { dao.removeSongs(id, it, clock()) }
+    suspend fun remove(id: Long, songIds: List<Long>) {
+        songIds.chunked(SQL_BATCH).forEach { dao.removeSongs(id, it, clock()) }
     }
 
     /** Forgets deleted songs in every playlist. */
@@ -49,5 +49,6 @@ class PlaylistRepository(
         const val SQL_BATCH = 500
     }
 
-    suspend fun reorder(id: Long, visibleOrder: List<Song>) = dao.reorder(id, visibleOrder.map { it.id }, clock())
+    /** [visibleOrder] holds stored song IDs, see [com.autoomstudio.mplay.data.model.Playlist.storedIdsOf]. */
+    suspend fun reorder(id: Long, visibleOrder: List<Long>) = dao.reorder(id, visibleOrder, clock())
 }

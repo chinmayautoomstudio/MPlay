@@ -72,6 +72,26 @@
     <string name="menu_song_info">Song info</string>
     <string name="menu_remove_from_playlist">Remove from playlist</string>
     <string name="menu_delete_from_device">Delete from device</string>
+    <string name="menu_sleep_timer">Sleep timer</string>
+    <string name="menu_lofi_on">Turn on lofi mode</string>
+    <string name="menu_lofi_off">Turn off lofi mode</string>
+
+    <string name="sleep_timer_title">Sleep timer</string>
+    <string name="sleep_timer_action">Sleep timer</string>
+    <string name="sleep_timer_action_active">Sleep timer, %1$s left</string>
+    <string name="sleep_timer_action_end_of_song">Sleep timer, stops after this song</string>
+    <string name="sleep_timer_minutes">%1$d min</string>
+    <string name="sleep_timer_end_of_song">End of current song</string>
+    <string name="sleep_timer_custom">Custom: %1$d min</string>
+    <string name="sleep_timer_start">Start</string>
+    <string name="sleep_timer_cancel">Cancel timer</string>
+    <string name="sleep_timer_extend">+%1$d min</string>
+    <string name="sleep_timer_remaining">Stops in %1$s</string>
+    <string name="sleep_timer_until_end_of_song">Stops after this song</string>
+    <string name="sleep_timer_fade_note">Music fades out over the last 30 seconds, then pauses.</string>
+
+    <string name="lofi_mode">Lofi mode</string>
+    <string name="lofi_info">Adds a lofi sound effect while playing. It\'s not a remix, and your files are never changed.</string>
 
     <string name="playlist_new">New playlist</string>
     <string name="playlist_name_label">Playlist name</string>
@@ -226,7 +246,30 @@
     <string name="settings_battery_restricted">Some phones stop music in the background to save battery. If playback stops when the screen is off, turn off battery optimization for MPlay.</string>
     <string name="settings_battery_unrestricted">MPlay is not battery optimized, so background playback won\'t be cut off.</string>
     <string name="settings_battery_open">Open battery settings</string>
+    <string name="settings_section_library">Library</string>
+    <string name="settings_hide_duplicates">Hide duplicate songs</string>
+    <string name="settings_hide_duplicates_summary">Show one copy of songs that appear more than once. No files are deleted.</string>
+    <string name="settings_review_duplicates">Review duplicates</string>
+    <plurals name="settings_review_duplicates_summary">
+        <item quantity="one">%d group of duplicates found</item>
+        <item quantity="other">%d groups of duplicates found</item>
+    </plurals>
+    <string name="settings_review_duplicates_none">No duplicates found</string>
     <string name="settings_section_about">About</string>
     <string name="settings_version">Version %1$s</string>
+
+    <string name="duplicates_title">Review duplicates</string>
+    <string name="duplicates_empty_title">No duplicates</string>
+    <string name="duplicates_empty_message">Every song in your library appears only once.</string>
+    <string name="duplicates_intro">MPlay shows one copy of each group. Pick which copy to keep, or show a hidden copy again. Nothing is deleted unless you choose Delete.</string>
+    <string name="duplicates_kept">Shown</string>
+    <string name="duplicates_hidden">Hidden</string>
+    <string name="duplicates_restored">Shown (restored)</string>
+    <string name="duplicates_restore">Show again</string>
+    <string name="duplicates_hide_again">Hide again</string>
+    <string name="duplicates_delete_extras">Delete hidden copies</string>
+    <string name="duplicates_copy_details">%1$s · %2$s · %3$s</string>
+    <string name="duplicates_bitrate">%1$d kbps</string>
+    <string name="duplicates_lossless">Lossless</string>
     <string name="settings_offline_note">Fully offline. MPlay has no internet permission, no ads and no analytics.</string>
 </resources>
