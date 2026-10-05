@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bedtime
@@ -52,6 +53,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
@@ -75,6 +77,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.model.Song
@@ -337,7 +340,19 @@ private fun StemModeSelector(mode: StemMode, onSelect: (StemMode) -> Unit) {
                 selected = entry == mode,
                 onClick = { if (entry != mode) onSelect(entry) },
                 shape = SegmentedButtonDefaults.itemShape(index, StemMode.entries.size),
-                label = { Text(labels.getValue(entry), maxLines = 1) },
+                // The fill already marks the selection; the default checkmark leaves "Instrumental" too little room.
+                icon = {},
+                label = {
+                    Text(
+                        text = labels.getValue(entry),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        autoSize = TextAutoSize.StepBased(
+                            minFontSize = 10.sp,
+                            maxFontSize = LocalTextStyle.current.fontSize,
+                        ),
+                    )
+                },
             )
         }
     }
