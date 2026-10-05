@@ -11,6 +11,7 @@ import com.autoomstudio.mplay.MPlayApp
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.data.settings.AppSettings
 import com.autoomstudio.mplay.data.settings.SeparationSettings
+import com.autoomstudio.mplay.data.stems.JobState
 import com.autoomstudio.mplay.data.stems.SeparationJobEntity
 import com.autoomstudio.mplay.data.stems.StemExporter
 import com.autoomstudio.mplay.data.stems.StemMode
@@ -18,7 +19,7 @@ import com.autoomstudio.mplay.data.stems.StemRepository
 import com.autoomstudio.mplay.data.stems.StemSetEntity
 import com.autoomstudio.mplay.separation.EnqueueResult
 import com.autoomstudio.mplay.separation.ModelImporter
-import com.autoomstudio.mplay.separation.SeparationAvailability
+import com.autoomstudio.mplay.separation.ModelState
 import com.autoomstudio.mplay.separation.SeparationController
 import com.autoomstudio.mplay.separation.UnsupportedReason
 import kotlinx.coroutines.CancellationException
@@ -34,14 +35,27 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class SeparationUiState(
-    val available: Boolean = false,
-    val unavailableReasons: List<UnsupportedReason> = emptyList(),
+    val deviceEligible: Boolean = false,
+    val unsupportedReasons: List<UnsupportedReason> = emptyList(),
+    val modelState: ModelState = ModelState.Installed,
     val readySongIds: Set<Long> = emptySet(),
     val stemSets: List<StemSetEntity> = emptyList(),
     val jobs: List<SeparationJobEntity> = emptyList(),
     val cacheBytes: Long = 0L,
     val settings: SeparationSettings = SeparationSettings(),
-)
+) {
+    /** The phone qualifies and the model is ready, so songs can be queued. */
+    val available: Boolean get() = deviceEligible && modelState == ModelState.Installed
+
+    /** The newest job for each song that is still waiting, running or failed. */
+    val activeJobs: Map<Long, SeparationJobEntity> by lazy {
+        jobs.filter { it.state == JobState.Queued.name || it.state == JobState.Running.name || it.state == JobState.Failed.name }
+            .groupBy { it.songId }
+            .mapValues { (_, songJobs) -> songJobs.maxBy { it.id } }
+    }
+
+    val runningJob: SeparationJobEntity? by lazy { jobs.firstOrNull { it.state == JobState.Running.name } }
+}
 
 sealed interface SeparationMessage {
     data class Queued(val count: Int) : SeparationMessage
@@ -53,6 +67,11 @@ sealed interface SeparationMessage {
     data object ExportFailed : SeparationMessage
     data object ModelImported : SeparationMessage
     data object ModelImportFailed : SeparationMessage
+
+    /** A song finished while the app was open; the snackbar offers to play it as instrumental. */
+    data class Ready(val songId: Long, val title: String) : SeparationMessage
+
+    data class Failed(val title: String, val error: String?) : SeparationMessage
 }
 
 class SeparationViewModel(
@@ -64,14 +83,15 @@ class SeparationViewModel(
 ) : ViewModel() {
 
     val state: StateFlow<SeparationUiState> = combine(
-        controller.availabilityFlow,
+        controller.modelState,
         repository.stemSets,
         repository.jobs,
         settings.separationSettings,
-    ) { availability, sets, jobs, separationSettings ->
+    ) { modelState, sets, jobs, separationSettings ->
         SeparationUiState(
-            available = availability is SeparationAvailability.Available,
-            unavailableReasons = (availability as? SeparationAvailability.Unavailable)?.reasons.orEmpty(),
+            deviceEligible = controller.deviceEligible,
+            unsupportedReasons = controller.deviceReasons,
+            modelState = modelState,
             readySongIds = sets.keys,
             stemSets = sets.values.sortedByDescending { it.createdAt },
             jobs = jobs,
@@ -81,7 +101,11 @@ class SeparationViewModel(
     }.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
-        SeparationUiState(available = controller.isAvailable),
+        SeparationUiState(
+            deviceEligible = controller.deviceEligible,
+            unsupportedReasons = controller.deviceReasons,
+            modelState = controller.modelState.value,
+        ),
     )
 
     private val _noticeRequest = MutableStateFlow<List<Song>?>(null)
@@ -89,11 +113,38 @@ class SeparationViewModel(
     /** Songs waiting for the one-time notice to be confirmed. */
     val noticeRequest: StateFlow<List<Song>?> = _noticeRequest.asStateFlow()
 
+    private val _modelRequest = MutableStateFlow<List<Song>?>(null)
+
+    /** Songs waiting for the model to be installed; the dialog explains what that takes. */
+    val modelRequest: StateFlow<List<Song>?> = _modelRequest.asStateFlow()
+
     private val _messages = Channel<SeparationMessage>(Channel.BUFFERED)
     val messages: Flow<SeparationMessage> = _messages.receiveAsFlow()
 
+    init {
+        viewModelScope.launch {
+            var watched = emptyMap<Long, String>()
+            state.collect { current ->
+                watched.forEach { (songId, title) ->
+                    val failed = current.activeJobs[songId]?.takeIf { it.state == JobState.Failed.name }
+                    when {
+                        songId in current.readySongIds -> _messages.send(SeparationMessage.Ready(songId, title))
+                        failed != null -> _messages.send(SeparationMessage.Failed(title, failed.error))
+                    }
+                }
+                watched = current.jobs
+                    .filter { it.state == JobState.Queued.name || it.state == JobState.Running.name }
+                    .associate { it.songId to it.title }
+            }
+        }
+    }
+
     fun requestSeparation(songs: List<Song>) {
         if (songs.isEmpty()) return
+        if (controller.modelState.value != ModelState.Installed) {
+            _modelRequest.value = songs
+            return
+        }
         viewModelScope.launch {
             if (settings.separationNoticeShown()) enqueue(songs) else _noticeRequest.value = songs
         }
@@ -112,12 +163,20 @@ class SeparationViewModel(
         _noticeRequest.value = null
     }
 
+    fun dismissModelRequest() {
+        _modelRequest.value = null
+    }
+
     private suspend fun enqueue(songs: List<Song>) {
         val message = when (val result = controller.enqueue(songs)) {
             is EnqueueResult.Queued -> SeparationMessage.Queued(result.count)
             EnqueueResult.NothingNew -> SeparationMessage.NothingNew
             is EnqueueResult.NotEnoughStorage -> SeparationMessage.NotEnoughStorage(result.requiredBytes)
-            is EnqueueResult.Unavailable -> SeparationMessage.Unavailable
+            is EnqueueResult.Unsupported -> SeparationMessage.Unavailable
+            EnqueueResult.ModelNotInstalled -> {
+                _modelRequest.value = songs
+                return
+            }
         }
         _messages.send(message)
     }
@@ -152,6 +211,16 @@ class SeparationViewModel(
         }
     }
 
+    /** Saves the song's vocals or instrumental to Music/MPlay Stems. */
+    fun export(songId: Long, mode: StemMode) {
+        val set = state.value.stemSets.firstOrNull { it.songId == songId }
+        if (set == null) {
+            viewModelScope.launch { _messages.send(SeparationMessage.ExportFailed) }
+            return
+        }
+        export(set, mode)
+    }
+
     fun export(set: StemSetEntity, mode: StemMode) {
         viewModelScope.launch {
             val message = try {
@@ -175,11 +244,12 @@ class SeparationViewModel(
         viewModelScope.launch { settings.setSeparationPauseOnLowBattery(enabled) }
     }
 
+    /** Copies a picked model file into app storage, then continues with any songs that were waiting for it. */
     fun importModel(uri: Uri) {
         viewModelScope.launch {
             val message = try {
                 modelImporter.import(uri)
-                controller.refreshAvailability()
+                controller.refreshModel()
                 SeparationMessage.ModelImported
             } catch (e: CancellationException) {
                 throw e
@@ -188,6 +258,9 @@ class SeparationViewModel(
                 SeparationMessage.ModelImportFailed
             }
             _messages.send(message)
+            val waiting = _modelRequest.value
+            _modelRequest.value = null
+            if (message == SeparationMessage.ModelImported && waiting != null) requestSeparation(waiting)
         }
     }
 

@@ -12,7 +12,6 @@ import com.autoomstudio.mplay.data.stems.SeparationJobEntity
 import com.autoomstudio.mplay.data.stems.StemDao
 import com.autoomstudio.mplay.data.stems.StemSetEntity
 
-/** Identical in both editions, so switching between standard MPlay and MPlay AI never needs a destructive migration. */
 @Database(
     entities = [
         PlaylistEntity::class,

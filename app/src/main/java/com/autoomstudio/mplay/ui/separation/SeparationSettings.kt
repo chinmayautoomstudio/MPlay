@@ -27,12 +27,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.autoomstudio.mplay.R
+import com.autoomstudio.mplay.separation.ModelState
 import com.autoomstudio.mplay.separation.UnsupportedReason
 
-/**
- * The Settings section (AI23, AI24). Hidden in standard MPlay unless MPlay AI left stems behind; on unsupported
- * phones it only explains why (AI2).
- */
+/** The Settings section (AI23, AI24); on unsupported phones it only explains why (AI2). */
 @Composable
 fun SeparationSettingsSection(
     state: SeparationUiState,
@@ -40,14 +38,16 @@ fun SeparationSettingsSection(
     onOpenQueue: () -> Unit,
     sectionHeader: @Composable (String) -> Unit,
 ) {
-    val notIncluded = UnsupportedReason.NotIncluded in state.unavailableReasons
     val hasContent = state.stemSets.isNotEmpty() || state.jobs.isNotEmpty()
-    if (notIncluded && !hasContent) return
     val context = LocalContext.current
     val listColors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background)
 
     sectionHeader(stringResource(R.string.settings_section_separation))
-    if (!state.available) UnavailableItem(state.unavailableReasons, viewModel)
+    if (!state.deviceEligible) {
+        UnsupportedItem(state.unsupportedReasons)
+    } else if (state.modelState is ModelState.NotInstalled) {
+        ModelMissingItem(viewModel)
+    }
     if (state.available || hasContent) {
         ListItem(
             headlineContent = { Text(stringResource(R.string.settings_separation_queue)) },
@@ -114,10 +114,7 @@ fun SeparationSettingsSection(
 }
 
 @Composable
-private fun UnavailableItem(reasons: List<UnsupportedReason>, viewModel: SeparationViewModel) {
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let(viewModel::importModel)
-    }
+private fun UnsupportedItem(reasons: List<UnsupportedReason>) {
     ListItem(
         headlineContent = { Text(stringResource(R.string.settings_separation_unsupported_title)) },
         supportingContent = {
@@ -126,24 +123,75 @@ private fun UnavailableItem(reasons: List<UnsupportedReason>, viewModel: Separat
                     Text(
                         stringResource(
                             when (reason) {
-                                UnsupportedReason.NotIncluded -> R.string.settings_separation_not_included
                                 UnsupportedReason.Architecture -> R.string.settings_separation_reason_architecture
                                 UnsupportedReason.Memory -> R.string.settings_separation_reason_memory
                                 UnsupportedReason.Storage -> R.string.settings_separation_reason_storage
-                                UnsupportedReason.ModelMissing -> R.string.settings_separation_reason_model
                             },
                         ),
                     )
                 }
-                if (reasons == listOf(UnsupportedReason.ModelMissing)) {
-                    OutlinedButton(
-                        onClick = { picker.launch(arrayOf("application/octet-stream", "*/*")) },
-                        modifier = Modifier.padding(top = 8.dp),
-                    ) { Text(stringResource(R.string.settings_separation_import_model)) }
-                }
             }
         },
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+    )
+}
+
+/** Only reachable in builds made without the bundled model. */
+@Composable
+private fun ModelMissingItem(viewModel: SeparationViewModel) {
+    val picker = rememberModelPicker(viewModel)
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.settings_separation_model_missing_title)) },
+        supportingContent = {
+            Column {
+                Text(stringResource(R.string.settings_separation_reason_model))
+                OutlinedButton(
+                    onClick = { picker.launch(MODEL_MIME_TYPES) },
+                    modifier = Modifier.padding(top = 8.dp),
+                ) { Text(stringResource(R.string.settings_separation_import_model)) }
+            }
+        },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+    )
+}
+
+@Composable
+private fun rememberModelPicker(viewModel: SeparationViewModel) =
+    rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::importModel)
+    }
+
+private val MODEL_MIME_TYPES = arrayOf("application/octet-stream", "*/*")
+
+/**
+ * Shown when the separator is tapped but the model isn't installed. Bundled builds only get here when built without
+ * the model; the on-demand download will offer to fetch the model from here instead.
+ */
+@Composable
+fun ModelMissingDialog(state: ModelState.NotInstalled, viewModel: SeparationViewModel) {
+    val context = LocalContext.current
+    val picker = rememberModelPicker(viewModel)
+    AlertDialog(
+        onDismissRequest = viewModel::dismissModelRequest,
+        title = { Text(stringResource(R.string.model_missing_title)) },
+        text = {
+            Text(
+                stringResource(
+                    R.string.model_missing_message,
+                    Formatter.formatShortFileSize(context, state.sizeBytes),
+                ),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { picker.launch(MODEL_MIME_TYPES) }) {
+                Text(stringResource(R.string.settings_separation_import_model))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = viewModel::dismissModelRequest) {
+                Text(stringResource(R.string.separation_notice_cancel))
+            }
+        },
     )
 }
 
@@ -191,5 +239,8 @@ fun separationMessageText(context: android.content.Context, message: SeparationM
         SeparationMessage.ExportFailed -> res.getString(R.string.message_stem_export_failed)
         SeparationMessage.ModelImported -> res.getString(R.string.message_model_imported)
         SeparationMessage.ModelImportFailed -> res.getString(R.string.message_model_import_failed)
+        is SeparationMessage.Ready -> res.getString(R.string.message_separation_ready, message.title)
+        is SeparationMessage.Failed ->
+            res.getString(R.string.message_separation_failed, message.title, res.getString(errorTextRes(message.error)))
     }
 }

@@ -8,7 +8,7 @@ import java.io.File
 import java.io.IOException
 
 /**
- * Copies a user-picked model into app storage (AI17), where MPlay AI's model lookup checks before the bundled
+ * Copies a user-picked model into app storage (AI17), where the model lookup checks before the bundled
  * asset. Written to a temporary name first so a cancelled copy never looks like a model.
  */
 class ModelImporter(private val context: Context) {

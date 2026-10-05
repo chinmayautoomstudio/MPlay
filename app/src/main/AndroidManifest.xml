@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission
         android:name="android.permission.WRITE_SETTINGS"
@@ -78,6 +80,23 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/mplay_widget_info" />
         </receiver>
+
+        <!-- WorkManager's foreground service runs SeparationWorker: mediaProcessing on Android 15+,
+             dataSync on Android 10 to 14, no type before that. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync|mediaProcessing"
+            tools:node="merge" />
+
+        <!-- The model runs here, so running out of memory never stops playback. -->
+        <service
+            android:name=".separation.worker.SeparatorService"
+            android:exported="false"
+            android:process=":separator" />
+
+        <receiver
+            android:name=".separation.worker.CancelSeparationReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

@@ -34,6 +34,7 @@ import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.ui.components.ArtworkImage
 import com.autoomstudio.mplay.ui.library.SongActions
+import com.autoomstudio.mplay.ui.separation.SeparatorUi
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.Flow
 
@@ -66,6 +67,7 @@ fun ExpandablePlayer(
     songActions: SongActions,
     suggestedSleepMinutes: Int,
     modifier: Modifier = Modifier,
+    separator: SeparatorUi? = null,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val fullWidth = constraints.maxWidth
@@ -137,6 +139,7 @@ fun ExpandablePlayer(
                 song = song,
                 songActions = songActions,
                 suggestedSleepMinutes = suggestedSleepMinutes,
+                separator = separator,
                 onArtworkPositioned = {
                     positions.fullArt = it
                     updateFullArtRect()

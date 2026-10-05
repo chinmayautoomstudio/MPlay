@@ -12,8 +12,10 @@ Sources are ordered drums, bass, other, vocals. Each stem is istft(spec) + wave.
 
 Usage (Python 3.10-3.12):
   pip install -r tools/requirements.txt
-  python tools/export_htdemucs.py --out build/model/htdemucs.onnx
-  python tools/export_htdemucs.py --out build/model/htdemucs_fp16.onnx --fp16
+  python tools/export_htdemucs.py --out models/htdemucs.onnx --fp16
+
+The app bundles models/htdemucs.onnx; after exporting a different model, update models/htdemucs.onnx.sha256.
+Without --fp16 the weights stay float32 and the file is about twice as large.
 
 --fp16 stores weights as float16 with a Cast back to float32 in front of each use, so the file is about
 half the size while every operator still runs in float32 on the CPU.

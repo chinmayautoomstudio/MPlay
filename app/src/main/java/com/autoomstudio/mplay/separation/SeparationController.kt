@@ -5,9 +5,7 @@ import com.autoomstudio.mplay.data.settings.AppSettings
 import com.autoomstudio.mplay.data.stems.JobError
 import com.autoomstudio.mplay.data.stems.StemRepository
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
@@ -19,27 +17,29 @@ sealed interface EnqueueResult {
 
     data class NotEnoughStorage(val requiredBytes: Long, val freeBytes: Long) : EnqueueResult
 
-    data class Unavailable(val reasons: List<UnsupportedReason>) : EnqueueResult
+    data class Unsupported(val reasons: List<UnsupportedReason>) : EnqueueResult
+
+    data object ModelNotInstalled : EnqueueResult
 }
 
-/** What the UI talks to; schedules the edition's backend whenever the queue or its settings change. */
+/** What the UI talks to; schedules the backend whenever the queue or its settings change. */
 class SeparationController(
     private val repository: StemRepository,
     private val backend: SeparationBackend,
+    private val modelProvider: ModelProvider,
     private val settings: AppSettings,
     private val scope: CoroutineScope,
 ) {
-    private val _availability = MutableStateFlow(backend.checkAvailability())
-    val availabilityFlow: StateFlow<SeparationAvailability> = _availability.asStateFlow()
+    val deviceReasons: List<UnsupportedReason> get() = backend.deviceReasons
 
-    val availability: SeparationAvailability get() = _availability.value
+    val deviceEligible: Boolean get() = deviceReasons.isEmpty()
 
-    val isAvailable: Boolean get() = availability is SeparationAvailability.Available
+    val modelState: StateFlow<ModelState> = modelProvider.state
+
+    val isAvailable: Boolean get() = deviceEligible && modelState.value == ModelState.Installed
 
     /** Re-checks after the model file changed. */
-    fun refreshAvailability() {
-        _availability.value = backend.checkAvailability()
-    }
+    fun refreshModel() = modelProvider.refresh()
 
     /** Resumes queued work after a restart and applies settings changes to waiting work. */
     fun start() {
@@ -56,7 +56,8 @@ class SeparationController(
     }
 
     suspend fun enqueue(songs: List<Song>): EnqueueResult {
-        (availability as? SeparationAvailability.Unavailable)?.let { return EnqueueResult.Unavailable(it.reasons) }
+        if (!deviceEligible) return EnqueueResult.Unsupported(deviceReasons)
+        if (modelState.value != ModelState.Installed) return EnqueueResult.ModelNotInstalled
         val required = StorageEstimate.requiredFreeBytes(songs.map { it.durationMs })
         val free = repository.freeBytes()
         if (free < required) return EnqueueResult.NotEnoughStorage(required, free)

@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.model.Song
+import com.autoomstudio.mplay.data.stems.StemMode
 import com.autoomstudio.mplay.ui.common.formatDuration
 import com.autoomstudio.mplay.ui.components.ArtworkImage
 import com.autoomstudio.mplay.ui.components.NowPlayingBars
@@ -62,8 +63,10 @@ data class SongActions(
     val onSetAsRingtone: (Song) -> Unit,
     val onShowInfo: (Song) -> Unit,
     val onDelete: (Song) -> Unit,
-    /** Null hides "Separate vocals", for example in standard MPlay or on unsupported phones. */
+    /** Null hides "Separate vocals", for example on unsupported phones. */
     val onSeparate: ((Song) -> Unit)? = null,
+    /** Saves a separated stem to shared storage; offered only for songs in [LocalSeparatedSongIds]. */
+    val onSaveStem: ((Song, StemMode) -> Unit)? = null,
 )
 
 /** Ids of songs with separated stems, for the badge on song rows. */
@@ -282,7 +285,14 @@ fun SongMenuItems(song: Song, actions: SongActions, onRemove: (() -> Unit)?, onD
     if (onRemove != null) item(R.string.menu_remove_from_playlist, onRemove)
     item(R.string.menu_cut_and_save) { actions.onCutAndSave(song) }
     item(R.string.menu_set_as_ringtone) { actions.onSetAsRingtone(song) }
-    actions.onSeparate?.let { separate -> item(R.string.separate_vocals) { separate(song) } }
+    if (song.id in LocalSeparatedSongIds.current) {
+        actions.onSaveStem?.let { save ->
+            item(R.string.menu_download_vocals) { save(song, StemMode.Vocals) }
+            item(R.string.menu_download_instrumental) { save(song, StemMode.Instrumental) }
+        }
+    } else {
+        actions.onSeparate?.let { separate -> item(R.string.separate_vocals) { separate(song) } }
+    }
     item(R.string.menu_song_info) { actions.onShowInfo(song) }
     item(R.string.menu_delete_from_device) { actions.onDelete(song) }
 }

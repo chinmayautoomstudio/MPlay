@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -46,6 +47,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -55,6 +57,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.library.SongSortOrder
@@ -62,6 +65,7 @@ import com.autoomstudio.mplay.data.model.Playlist
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.data.duplicates.DuplicateIndex
 import com.autoomstudio.mplay.data.settings.ThemeMode
+import com.autoomstudio.mplay.data.stems.StemMode
 import com.autoomstudio.mplay.data.settings.ThemeSettings
 import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.data.library.SongDeleter
@@ -91,12 +95,16 @@ import com.autoomstudio.mplay.ui.playlist.PlaylistMessage
 import com.autoomstudio.mplay.ui.playlist.PlaylistNameDialog
 import com.autoomstudio.mplay.ui.theme.fadeThrough
 import com.autoomstudio.mplay.ui.playlist.PlaylistsScreen
+import com.autoomstudio.mplay.separation.ModelState
+import com.autoomstudio.mplay.ui.separation.ModelMissingDialog
 import com.autoomstudio.mplay.ui.separation.SeparationMessage
 import com.autoomstudio.mplay.ui.separation.SeparationNoticeDialog
+import com.autoomstudio.mplay.ui.separation.SeparationProgressPill
 import com.autoomstudio.mplay.ui.separation.SeparationScreen
 import com.autoomstudio.mplay.ui.separation.SeparationSettingsSection
 import com.autoomstudio.mplay.ui.separation.SeparationUiState
 import com.autoomstudio.mplay.ui.separation.SeparationViewModel
+import com.autoomstudio.mplay.ui.separation.SeparatorUi
 import com.autoomstudio.mplay.ui.separation.separationMessageText
 import com.autoomstudio.mplay.ui.settings.SettingsScreen
 import com.autoomstudio.mplay.ui.trim.TrimEditorActivity
@@ -207,21 +215,25 @@ fun MainScreen(
         }
     }
     val context = LocalContext.current
+    val currentSongId by rememberUpdatedState(nowPlaying?.songId)
     LaunchedEffect(separationViewModel) {
         separationViewModel.messages.collect { message ->
             val text = separationMessageText(context, message)
+            val playInstrumental = message is SeparationMessage.Ready && message.songId == currentSongId
             scope.launch {
                 snackbarHostState.currentSnackbarData?.dismiss()
                 val result = snackbarHostState.showSnackbar(
                     message = text,
-                    actionLabel = if (message is SeparationMessage.Queued) {
-                        resources.getString(R.string.action_view_queue)
-                    } else {
-                        null
+                    actionLabel = when {
+                        message is SeparationMessage.Queued -> resources.getString(R.string.action_view_queue)
+                        playInstrumental -> resources.getString(R.string.message_separation_ready_action)
+                        else -> null
                     },
-                    duration = SnackbarDuration.Short,
+                    duration = if (message is SeparationMessage.Ready) SnackbarDuration.Long else SnackbarDuration.Short,
                 )
-                if (result == SnackbarResult.ActionPerformed) openSeparation()
+                if (result == SnackbarResult.ActionPerformed) {
+                    if (playInstrumental) playerActions.setStemMode(StemMode.Instrumental) else openSeparation()
+                }
             }
         }
     }
@@ -230,7 +242,8 @@ fun MainScreen(
     var addToPlaylistSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
     var newPlaylistSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
     var deleteSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
-    val canSeparate = separationState.available
+    // Offered whenever the phone qualifies; a missing model is explained when the action is picked.
+    val canSeparate = separationState.deviceEligible
     val songActions = remember(onPlayNext, onAddToQueue, resources, context, canSeparate) {
         SongActions(
             onAddToPlaylist = { addToPlaylistSongIds = longArrayOf(it.id) },
@@ -251,6 +264,7 @@ fun MainScreen(
             } else {
                 null
             },
+            onSaveStem = { song, mode -> separationViewModel.export(song.id, mode) },
         )
     }
 
@@ -299,7 +313,7 @@ fun MainScreen(
     Box(modifier = modifier) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
-            snackbarHost = { SnackbarHost(snackbarHostState) },
+            snackbarHost = { if (contentBackEnabled) SnackbarHost(snackbarHostState) },
             topBar = {
                 if (selection.isActive) {
                     val openPlaylist = selection.playlistId?.let { id -> playlists?.firstOrNull { it.id == id } }
@@ -398,94 +412,117 @@ fun MainScreen(
             },
         ) { innerPadding ->
             val contentModifier = Modifier.fillMaxSize()
-            AnimatedContent(
-                targetState = destination,
-                transitionSpec = { fadeThrough() },
-                label = "destination",
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
-            ) { shown ->
-                // The outgoing screen stays composed during the transition and must not claim Back.
-                // While selecting, Back clears the selection instead.
-                val screenBackEnabled = contentBackEnabled && shown == destination && !selection.isActive
-                when (shown) {
-                    Destination.Library -> LibraryScreen(
-                        state = libraryState,
-                        currentSongId = nowPlaying?.songId,
-                        isPlaying = nowPlaying?.isPlaying == true,
-                        isRefreshing = isRefreshing,
-                        onRefresh = onRefresh,
-                        searchQuery = searchQuery,
-                        onPlay = onPlay,
-                        onShuffle = onShuffle,
-                        actions = songActions,
-                        selection = selection,
-                        modifier = contentModifier,
-                        backEnabled = screenBackEnabled,
-                    )
+            ) {
+                AnimatedContent(
+                    targetState = destination,
+                    transitionSpec = { fadeThrough() },
+                    label = "destination",
+                    modifier = Modifier.fillMaxSize(),
+                ) { shown ->
+                    // The outgoing screen stays composed during the transition and must not claim Back.
+                    // While selecting, Back clears the selection instead.
+                    val screenBackEnabled = contentBackEnabled && shown == destination && !selection.isActive
+                    when (shown) {
+                        Destination.Library -> LibraryScreen(
+                            state = libraryState,
+                            currentSongId = nowPlaying?.songId,
+                            isPlaying = nowPlaying?.isPlaying == true,
+                            isRefreshing = isRefreshing,
+                            onRefresh = onRefresh,
+                            searchQuery = searchQuery,
+                            onPlay = onPlay,
+                            onShuffle = onShuffle,
+                            actions = songActions,
+                            selection = selection,
+                            modifier = contentModifier,
+                            backEnabled = screenBackEnabled,
+                        )
 
-                    Destination.Playlists -> PlaylistsScreen(
-                        playlists = playlists,
-                        currentSongId = nowPlaying?.songId,
-                        isPlaying = nowPlaying?.isPlaying == true,
-                        playlistActions = playlistActions,
-                        songActions = songActions,
-                        onPlay = onPlay,
-                        onShuffle = onShuffle,
-                        selection = selection,
-                        modifier = contentModifier,
-                        backEnabled = screenBackEnabled,
-                    )
+                        Destination.Playlists -> PlaylistsScreen(
+                            playlists = playlists,
+                            currentSongId = nowPlaying?.songId,
+                            isPlaying = nowPlaying?.isPlaying == true,
+                            playlistActions = playlistActions,
+                            songActions = songActions,
+                            onPlay = onPlay,
+                            onShuffle = onShuffle,
+                            selection = selection,
+                            modifier = contentModifier,
+                            backEnabled = screenBackEnabled,
+                        )
 
-                    Destination.Settings -> AnimatedContent(
-                        targetState = settingsPage,
-                        transitionSpec = { fadeThrough() },
-                        label = "settingsPage",
-                    ) { page ->
-                        val pageBackEnabled = screenBackEnabled && settingsPage == page
-                        when (page) {
-                            SettingsPage.Duplicates -> ReviewDuplicatesScreen(
-                                duplicates = duplicates,
-                                actions = duplicateActions,
-                                onDeleteHidden = { songs -> deleteSongIds = songs.map { it.id }.toLongArray() },
-                                onBack = { settingsPage = SettingsPage.Main },
-                                modifier = contentModifier,
-                                backEnabled = pageBackEnabled,
-                            )
-                            SettingsPage.Separation -> SeparationScreen(
-                                state = separationState,
-                                viewModel = separationViewModel,
-                                onBack = { settingsPage = SettingsPage.Main },
-                                modifier = contentModifier,
-                                backEnabled = pageBackEnabled,
-                            )
-                            SettingsPage.Main -> SettingsScreen(
-                                theme = themeSettings,
-                                onThemeModeChange = onThemeModeChange,
-                                onDynamicColorChange = onDynamicColorChange,
-                                hideDuplicates = duplicateActions.hideDuplicates,
-                                onHideDuplicatesChange = duplicateActions.onHideDuplicatesChange,
-                                duplicateGroupCount = duplicates.groups.size,
-                                onReviewDuplicates = { settingsPage = SettingsPage.Duplicates },
-                                modifier = contentModifier,
-                                separationSection = { header ->
-                                    SeparationSettingsSection(
-                                        state = separationState,
-                                        viewModel = separationViewModel,
-                                        onOpenQueue = { settingsPage = SettingsPage.Separation },
-                                        sectionHeader = header,
-                                    )
-                                },
-                            )
+                        Destination.Settings -> AnimatedContent(
+                            targetState = settingsPage,
+                            transitionSpec = { fadeThrough() },
+                            label = "settingsPage",
+                        ) { page ->
+                            val pageBackEnabled = screenBackEnabled && settingsPage == page
+                            when (page) {
+                                SettingsPage.Duplicates -> ReviewDuplicatesScreen(
+                                    duplicates = duplicates,
+                                    actions = duplicateActions,
+                                    onDeleteHidden = { songs -> deleteSongIds = songs.map { it.id }.toLongArray() },
+                                    onBack = { settingsPage = SettingsPage.Main },
+                                    modifier = contentModifier,
+                                    backEnabled = pageBackEnabled,
+                                )
+                                SettingsPage.Separation -> SeparationScreen(
+                                    state = separationState,
+                                    viewModel = separationViewModel,
+                                    onBack = { settingsPage = SettingsPage.Main },
+                                    modifier = contentModifier,
+                                    backEnabled = pageBackEnabled,
+                                )
+                                SettingsPage.Main -> SettingsScreen(
+                                    theme = themeSettings,
+                                    onThemeModeChange = onThemeModeChange,
+                                    onDynamicColorChange = onDynamicColorChange,
+                                    hideDuplicates = duplicateActions.hideDuplicates,
+                                    onHideDuplicatesChange = duplicateActions.onHideDuplicatesChange,
+                                    duplicateGroupCount = duplicates.groups.size,
+                                    onReviewDuplicates = { settingsPage = SettingsPage.Duplicates },
+                                    modifier = contentModifier,
+                                    separationSection = { header ->
+                                        SeparationSettingsSection(
+                                            state = separationState,
+                                            viewModel = separationViewModel,
+                                            onOpenQueue = { settingsPage = SettingsPage.Separation },
+                                            sectionHeader = header,
+                                        )
+                                    },
+                                )
+                            }
                         }
                     }
                 }
+                val onQueueScreen = destination == Destination.Settings && settingsPage == SettingsPage.Separation
+                SeparationProgressPill(
+                    job = separationState.runningJob.takeUnless { onQueueScreen },
+                    onClick = openSeparation,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                )
             }
         }
 
         val state = lastNowPlaying
         if (state != null && miniSlotAttached && !collapsedTop.isNaN()) {
+            val currentSong = allSongs.firstOrNull { it.id == state.songId }
+            val separator = if (canSeparate && currentSong != null) {
+                SeparatorUi(
+                    job = separationState.activeJobs[currentSong.id],
+                    onSeparate = { separationViewModel.requestSeparation(listOf(currentSong)) },
+                    onCancel = separationViewModel::cancel,
+                    onRetry = separationViewModel::retry,
+                )
+            } else {
+                null
+            }
             ExpandablePlayer(
                 state = state,
                 position = position,
@@ -495,9 +532,18 @@ fun MainScreen(
                 collapsedTop = { collapsedTop },
                 onExpand = { onShowNowPlayingChange(true) },
                 onCollapse = { onShowNowPlayingChange(false) },
-                song = allSongs.firstOrNull { it.id == state.songId },
+                song = currentSong,
                 songActions = songActions,
                 suggestedSleepMinutes = suggestedSleepMinutes,
+                separator = separator,
+            )
+        }
+        if (!contentBackEnabled) {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding(),
             )
         }
     }
@@ -564,6 +610,11 @@ fun MainScreen(
             onConfirm = separationViewModel::confirmNotice,
             onDismiss = separationViewModel::dismissNotice,
         )
+    }
+    val modelRequest by separationViewModel.modelRequest.collectAsStateWithLifecycle()
+    val missingModel = separationState.modelState as? ModelState.NotInstalled
+    if (modelRequest != null && missingModel != null) {
+        ModelMissingDialog(state = missingModel, viewModel = separationViewModel)
     }
 }
 

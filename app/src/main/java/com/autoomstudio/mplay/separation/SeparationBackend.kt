@@ -1,12 +1,9 @@
 package com.autoomstudio.mplay.separation
 
-/**
- * The edition-specific half of vocal separation. Standard MPlay ships a stub; MPlay AI runs the model.
- * Everything else (cache, playback modes, settings) lives in the shared code so both editions read the same data.
- */
+/** Runs queued separations in the background. Everything else (cache, playback modes, settings) lives in shared code. */
 interface SeparationBackend {
-    /** Device limits are read once; the model check runs on every call so an imported model is picked up. */
-    fun checkAvailability(): SeparationAvailability
+    /** What keeps this phone from separating, whatever the model; read once. Empty when the phone qualifies. */
+    val deviceReasons: List<UnsupportedReason>
 
     /**
      * Makes sure queued jobs get processed with the current charging and battery settings.

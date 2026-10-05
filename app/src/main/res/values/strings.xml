@@ -367,12 +367,31 @@
     <string name="settings_separation_delete_all_message">Separated vocals and instrumentals are removed. Your original songs stay untouched.</string>
     <string name="settings_separation_delete_confirm">Delete</string>
     <string name="settings_separation_unsupported_title">Not available on this phone</string>
-    <string name="settings_separation_not_included">Vocal separation is part of MPlay AI. Stems made with MPlay AI still play here.</string>
     <string name="settings_separation_reason_architecture">Needs a 64-bit ARM processor.</string>
     <string name="settings_separation_reason_memory">Needs at least 6 GB of memory.</string>
     <string name="settings_separation_reason_storage">Needs at least 1 GB of free storage.</string>
     <string name="settings_separation_reason_model">The separation model isn\'t installed. Import a model file to use this feature.</string>
     <string name="settings_separation_import_model">Import model file</string>
-    <string name="message_model_imported">Model imported. Restart MPlay to use it.</string>
+    <string name="message_model_imported">Model imported</string>
     <string name="message_model_import_failed">Couldn\'t import the model file</string>
+    <string name="settings_separation_model_missing_title">AI model not installed</string>
+    <string name="model_missing_title">AI model needed</string>
+    <string name="model_missing_message">The AI Vocal Separator needs its model (%1$s), which isn\'t included in this build. Import the model file to continue.</string>
+
+    <string name="separator_chip">AI Vocal Separator</string>
+    <string name="separator_chip_waiting">Waiting</string>
+    <string name="separator_chip_preparing">Preparing…</string>
+    <string name="separator_chip_running">Separating %1$d%%</string>
+    <string name="separator_chip_retry">Retry separation</string>
+    <string name="separator_cancel_title">Stop separating?</string>
+    <string name="separator_cancel_message">\"%1$s\" is being split into vocals and instrumental. Stopping discards the progress.</string>
+    <string name="separator_cancel_confirm">Stop</string>
+    <string name="separator_cancel_keep">Keep going</string>
+    <string name="separation_pill">Separating \"%1$s\"</string>
+    <string name="separation_pill_description">Vocal separation in progress. Open the queue.</string>
+    <string name="message_separation_ready">\"%1$s\" is ready as vocals and instrumental</string>
+    <string name="message_separation_ready_action">Play instrumental</string>
+    <string name="message_separation_failed">Couldn\'t separate \"%1$s\". %2$s</string>
+    <string name="menu_download_vocals">Download vocals</string>
+    <string name="menu_download_instrumental">Download instrumental</string>
 </resources>

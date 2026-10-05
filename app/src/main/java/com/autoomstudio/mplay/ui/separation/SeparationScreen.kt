@@ -2,6 +2,7 @@ package com.autoomstudio.mplay.ui.separation
 
 import android.text.format.Formatter
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -250,7 +251,7 @@ private fun SongTitle(title: String) {
 }
 
 @Composable
-private fun pauseText(reason: String?): String = stringResource(
+internal fun pauseText(reason: String?): String = stringResource(
     when (PauseReason.entries.firstOrNull { it.name == reason }) {
         null -> R.string.separation_state_waiting
         PauseReason.Charging -> R.string.separation_paused_charging
@@ -263,21 +264,22 @@ private fun pauseText(reason: String?): String = stringResource(
 )
 
 @Composable
-fun errorText(error: String?): String = stringResource(
-    when (JobError.entries.firstOrNull { it.name == error }) {
-        JobError.SourceMissing -> R.string.separation_error_source_missing
-        JobError.UnsupportedFormat -> R.string.separation_error_unsupported
-        JobError.CorruptFile -> R.string.separation_error_corrupt
-        JobError.OutOfMemory -> R.string.separation_error_memory
-        JobError.LowStorage -> R.string.separation_error_storage
-        JobError.ModelUnavailable -> R.string.separation_error_model
-        JobError.ModelFailed -> R.string.separation_error_model_failed
-        JobError.Unknown, null -> R.string.separation_error_unknown
-    },
-)
+fun errorText(error: String?): String = stringResource(errorTextRes(error))
+
+@StringRes
+fun errorTextRes(error: String?): Int = when (JobError.entries.firstOrNull { it.name == error }) {
+    JobError.SourceMissing -> R.string.separation_error_source_missing
+    JobError.UnsupportedFormat -> R.string.separation_error_unsupported
+    JobError.CorruptFile -> R.string.separation_error_corrupt
+    JobError.OutOfMemory -> R.string.separation_error_memory
+    JobError.LowStorage -> R.string.separation_error_storage
+    JobError.ModelUnavailable -> R.string.separation_error_model
+    JobError.ModelFailed -> R.string.separation_error_model_failed
+    JobError.Unknown, null -> R.string.separation_error_unknown
+}
 
 @Composable
-private fun remainingText(ms: Long): String {
+internal fun remainingText(ms: Long): String {
     val minutes = ((ms + 30_000) / 60_000).toInt()
     return if (minutes < 1) {
         stringResource(R.string.duration_under_minute)

@@ -12,7 +12,7 @@ class MPlayApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
-        // MPlay AI runs the separation model in a ":separator" process, which needs none of this.
+        // The separation model runs in a ":separator" process, which needs none of this.
         if (isMainProcess()) container.separationController.start()
     }
 

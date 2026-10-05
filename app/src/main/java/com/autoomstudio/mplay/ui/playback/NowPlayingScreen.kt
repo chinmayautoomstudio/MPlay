@@ -93,6 +93,8 @@ import com.autoomstudio.mplay.ui.theme.MotionShort
 import com.autoomstudio.mplay.ui.library.LocalSeparatedSongIds
 import com.autoomstudio.mplay.ui.library.SongActions
 import com.autoomstudio.mplay.ui.library.SongMenuButton
+import com.autoomstudio.mplay.ui.separation.SeparatorChip
+import com.autoomstudio.mplay.ui.separation.SeparatorUi
 import kotlinx.coroutines.flow.Flow
 
 /** Full player layout without its own background; the surrounding card draws it. */
@@ -109,6 +111,7 @@ fun NowPlayingContent(
     song: Song? = null,
     songActions: SongActions? = null,
     suggestedSleepMinutes: Int = SleepTimer.DEFAULT_MINUTES,
+    separator: SeparatorUi? = null,
 ) {
     BackHandler(enabled = backEnabled, onBack = onCollapse)
     var showSleepSheet by rememberSaveable { mutableStateOf(false) }
@@ -235,13 +238,36 @@ fun NowPlayingContent(
                 Spacer(Modifier.height(12.dp))
                 TransportControls(state = state, actions = actions)
 
-                if (state.songId != null && state.songId in LocalSeparatedSongIds.current) {
+                val separated = state.songId != null && state.songId in LocalSeparatedSongIds.current
+                if (separated) {
                     Spacer(Modifier.height(12.dp))
                     StemModeSelector(mode = state.stemMode, onSelect = actions::setStemMode)
                 }
 
                 Spacer(Modifier.height(12.dp))
-                LofiToggle(enabled = state.lofiEnabled, isPlaying = state.isPlaying, onToggle = actions::setLofi)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        LofiChip(enabled = state.lofiEnabled, isPlaying = state.isPlaying, onToggle = actions::setLofi)
+                        if (separator != null && !separated) {
+                            SeparatorChip(ui = separator, title = state.title, modifier = Modifier.weight(1f, fill = false))
+                        }
+                    }
+                    Text(
+                        text = stringResource(R.string.lofi_info),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -318,33 +344,20 @@ private fun StemModeSelector(mode: StemMode, onSelect: (StemMode) -> Unit) {
 }
 
 @Composable
-private fun LofiToggle(enabled: Boolean, isPlaying: Boolean, onToggle: (Boolean) -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        FilterChip(
-            selected = enabled,
-            onClick = { onToggle(!enabled) },
-            label = { Text(stringResource(R.string.lofi_mode)) },
-            leadingIcon = {
-                LofiWaveIcon(
-                    active = enabled && isPlaying,
-                    modifier = Modifier
-                        .size(FilterChipDefaults.IconSize)
-                        .popOnChange(enabled, enabled = enabled),
-                )
-            },
-        )
-        Text(
-            text = stringResource(R.string.lofi_info),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
+private fun LofiChip(enabled: Boolean, isPlaying: Boolean, onToggle: (Boolean) -> Unit) {
+    FilterChip(
+        selected = enabled,
+        onClick = { onToggle(!enabled) },
+        label = { Text(stringResource(R.string.lofi_mode)) },
+        leadingIcon = {
+            LofiWaveIcon(
+                active = enabled && isPlaying,
+                modifier = Modifier
+                    .size(FilterChipDefaults.IconSize)
+                    .popOnChange(enabled, enabled = enabled),
+            )
+        },
+    )
 }
 
 private val ArtworkSpring = spring<Float>(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow)

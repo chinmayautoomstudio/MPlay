@@ -9,24 +9,19 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.autoomstudio.mplay.BuildConfig
 import com.autoomstudio.mplay.data.settings.AppSettings
-import com.autoomstudio.mplay.separation.android.ModelSource
 import com.autoomstudio.mplay.separation.worker.SeparationWorker
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.await
 import java.util.concurrent.TimeUnit
 
-object FlavorSeparation {
-    fun createBackend(context: Context, settings: AppSettings): SeparationBackend =
-        AiSeparationBackend(context.applicationContext, settings)
-}
-
-private class AiSeparationBackend(
+class WorkManagerSeparationBackend(
     private val context: Context,
     private val settings: AppSettings,
 ) : SeparationBackend {
 
-    private val deviceReasons: List<UnsupportedReason> by lazy {
+    override val deviceReasons: List<UnsupportedReason> by lazy {
         val activityManager = context.getSystemService(ActivityManager::class.java)
         val memory = ActivityManager.MemoryInfo().also { activityManager.getMemoryInfo(it) }
         val specs = DeviceSpecs(
@@ -35,13 +30,7 @@ private class AiSeparationBackend(
             isLowRamDevice = activityManager.isLowRamDevice,
             freeStorageBytes = context.filesDir.usableSpace,
         )
-        DeviceEligibility.check(specs)
-    }
-
-    override fun checkAvailability(): SeparationAvailability {
-        val reasons = deviceReasons.toMutableList()
-        if (ModelSource.find(context) == null) reasons += UnsupportedReason.ModelMissing
-        return if (reasons.isEmpty()) SeparationAvailability.Available else SeparationAvailability.Unavailable(reasons)
+        DeviceEligibility.check(specs, BuildConfig.SEPARATION_ABIS.split(',').toSet())
     }
 
     /**

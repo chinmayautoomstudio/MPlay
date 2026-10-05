@@ -1,4 +1,5 @@
 import com.android.build.api.artifact.SingleArtifact
+import java.security.MessageDigest
 import java.util.Properties
 
 plugins {
@@ -9,7 +10,6 @@ plugins {
 }
 
 // Release signing comes from an uncommitted keystore.properties (storeFile, storePassword, keyAlias, keyPassword).
-// Both editions use the same key, so MPlay AI can replace standard MPlay in place.
 val keystoreProperties = Properties().apply {
     val file = rootProject.file("keystore.properties")
     if (file.isFile) file.inputStream().use(::load)
@@ -25,7 +25,6 @@ android {
         applicationId = "com.autoomstudio.mplay"
         minSdk = 26
         targetSdk = 37
-        // Shared by both editions: Android refuses to install a lower version code over a higher one.
         versionCode = 3
         versionName = "3.0"
 
@@ -43,19 +42,13 @@ android {
         }
     }
 
-    flavorDimensions += "edition"
-    productFlavors {
-        create("standard") {
-            dimension = "edition"
-        }
-        create("ai") {
-            dimension = "edition"
-            ndk { abiFilters += "arm64-v8a" }
-        }
-    }
-
     buildTypes {
+        // ABIs that get ONNX Runtime, read by DeviceEligibility. Debug adds x86_64 so the emulator separates natively.
+        debug {
+            buildConfigField("String", "SEPARATION_ABIS", "\"${separationAbis(debug = true).joinToString(",")}\"")
+        }
         release {
+            buildConfigField("String", "SEPARATION_ABIS", "\"${separationAbis(debug = false).joinToString(",")}\"")
             signingConfig = signingConfigs.findByName("release")
             optimization {
                 enable = true
@@ -78,9 +71,21 @@ android {
 }
 
 androidComponents {
-    // Debug AI builds install next to standard MPlay; release AI builds replace it.
-    onVariants(selector().withFlavor("edition" to "ai").withBuildType("debug")) { variant ->
-        variant.applicationId.set("com.autoomstudio.mplay.ai")
+    // The app installs on every ABI, but ONNX Runtime (17 MB per ABI) only ships where separation can run.
+    onVariants { variant ->
+        val keep = separationAbis(debug = variant.buildType == "debug")
+        (ALL_ABIS - keep).forEach { abi -> variant.packaging.jniLibs.excludes.add("lib/$abi/libonnxruntime*.so") }
+    }
+    // The model stays out of git: it is read from models/, checked against the committed hash and bundled.
+    onVariants { variant ->
+        val name = variant.name.replaceFirstChar(Char::uppercase)
+        val prepare = tasks.register<PrepareModelAssets>("prepare${name}ModelAssets") {
+            model.from(rootProject.file("models/htdemucs.onnx"))
+            expectedHash.set(rootProject.file("models/htdemucs.onnx.sha256"))
+            required.set(variant.buildType == "release")
+            outputDir.set(layout.buildDirectory.dir("generated/modelAssets/${variant.name}"))
+        }
+        variant.sources.assets?.addGeneratedSourceDirectory(prepare, PrepareModelAssets::outputDir)
     }
     onVariants { variant ->
         val name = variant.name.replaceFirstChar(Char::uppercase)
@@ -91,6 +96,63 @@ androidComponents {
         tasks.configureEach {
             if (this.name == "assemble$name" || this.name == "bundle$name") dependsOn(check)
         }
+    }
+}
+
+val ALL_ABIS = setOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+
+fun separationAbis(debug: Boolean): Set<String> = if (debug) setOf("arm64-v8a", "x86_64") else setOf("arm64-v8a")
+
+/**
+ * Copies the separation model into the variant's assets after checking its SHA-256. Release builds fail without a
+ * matching model; debug builds only warn, and run without one until a model file is imported in the app.
+ */
+abstract class PrepareModelAssets : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract val model: ConfigurableFileCollection
+
+    @get:InputFile
+    abstract val expectedHash: RegularFileProperty
+
+    @get:Input
+    abstract val required: Property<Boolean>
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun prepare() {
+        val out = outputDir.get().asFile.apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val expected = expectedHash.get().asFile.readText().trim().substringBefore(' ').lowercase()
+        val file = model.files.firstOrNull { it.isFile }
+        val problem = when {
+            file == null -> "models/htdemucs.onnx is missing; run tools/export_htdemucs.py --out models/htdemucs.onnx --fp16"
+            sha256(file) != expected -> "models/htdemucs.onnx does not match models/htdemucs.onnx.sha256"
+            else -> null
+        }
+        if (problem != null) {
+            if (required.get()) throw GradleException(problem)
+            logger.warn("Warning: $problem. This build has no separation model.")
+            return
+        }
+        file!!.copyTo(File(out, file.name))
+    }
+
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(1 shl 20)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 }
 
@@ -141,8 +203,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
-    "aiImplementation"(project(":separation"))
-    "aiImplementation"(libs.androidx.work.runtime.ktx)
+    implementation(project(":separation"))
+    implementation(libs.androidx.work.runtime.ktx)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.mockito.core)

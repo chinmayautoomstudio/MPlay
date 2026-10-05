@@ -22,8 +22,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Separated stems in `filesDir/stems/<songId>/` and the processing queue. Shared by both editions: standard MPlay
- * plays and deletes stems an MPlay AI install left behind, but never creates them.
+ * Separated stems in `filesDir/stems/<songId>/` and the processing queue. Stems stay playable and deletable on
+ * phones that can't make new ones.
  */
 class StemRepository(
     context: Context,
@@ -95,7 +95,7 @@ class StemRepository(
 
     suspend fun queuedCount(): Int = dao.queuedCount()
 
-    /** For a build that can't separate, for example standard MPlay installed over MPlay AI with jobs waiting. */
+    /** For when separation became unavailable with jobs waiting, for example a model that is no longer installed. */
     suspend fun failQueued(error: JobError) = dao.failAllActive(error.name, clock())
 
     /** Removes the database row first, so playback stops picking the files before they disappear. */

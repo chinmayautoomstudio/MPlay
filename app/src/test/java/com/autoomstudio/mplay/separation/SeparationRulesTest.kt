@@ -8,6 +8,7 @@ import org.junit.Test
 class SeparationRulesTest {
 
     private val gib = 1024L * 1024 * 1024
+    private val releaseAbis = setOf("arm64-v8a")
     private val capable = DeviceSpecs(
         supportedAbis = listOf("arm64-v8a", "armeabi-v7a"),
         totalRamBytes = (5.6 * gib).toLong(),
@@ -17,34 +18,45 @@ class SeparationRulesTest {
 
     @Test
     fun sixGigabytePhoneIsEligible() {
-        assertTrue(DeviceEligibility.check(capable).isEmpty())
+        assertTrue(DeviceEligibility.check(capable, releaseAbis).isEmpty())
     }
 
     @Test
     fun thirtyTwoBitOrX86IsNotEligible() {
         assertEquals(
             listOf(UnsupportedReason.Architecture),
-            DeviceEligibility.check(capable.copy(supportedAbis = listOf("x86_64", "armeabi-v7a"))),
+            DeviceEligibility.check(capable.copy(supportedAbis = listOf("armeabi-v7a", "armeabi")), releaseAbis),
         )
+    }
+
+    @Test
+    fun x86WithArmTranslationNeedsTheRuntimeForItsPrimaryAbi() {
+        val emulator = capable.copy(supportedAbis = listOf("x86_64", "arm64-v8a"))
+        assertEquals(listOf(UnsupportedReason.Architecture), DeviceEligibility.check(emulator, releaseAbis))
+        assertTrue(DeviceEligibility.check(emulator, releaseAbis + "x86_64").isEmpty())
     }
 
     @Test
     fun fourGigabytePhoneIsNotEligible() {
         assertEquals(
             listOf(UnsupportedReason.Memory),
-            DeviceEligibility.check(capable.copy(totalRamBytes = (3.7 * gib).toLong())),
+            DeviceEligibility.check(capable.copy(totalRamBytes = (3.7 * gib).toLong()), releaseAbis),
         )
     }
 
     @Test
     fun lowRamDeviceIsNotEligibleWhateverItReports() {
-        assertEquals(listOf(UnsupportedReason.Memory), DeviceEligibility.check(capable.copy(isLowRamDevice = true)))
+        assertEquals(
+            listOf(UnsupportedReason.Memory),
+            DeviceEligibility.check(capable.copy(isLowRamDevice = true), releaseAbis),
+        )
     }
 
     @Test
     fun allReasonsAreReported() {
         val reasons = DeviceEligibility.check(
             DeviceSpecs(listOf("x86"), gib, isLowRamDevice = false, freeStorageBytes = 100L * 1024 * 1024),
+            releaseAbis,
         )
         assertEquals(
             listOf(UnsupportedReason.Architecture, UnsupportedReason.Memory, UnsupportedReason.Storage),
