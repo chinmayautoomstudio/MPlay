@@ -1,0 +1,8 @@
+# Python 3.10-3.12; PyTorch has no wheels for newer interpreters at the time of writing.
+torch>=2.2,<2.6
+torchaudio>=2.2,<2.6
+demucs==4.0.1
+onnx>=1.16
+onnxruntime>=1.18
+numpy<2
+soundfile>=0.12

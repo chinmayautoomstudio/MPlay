@@ -51,6 +51,7 @@ fun SettingsScreen(
     duplicateGroupCount: Int,
     onReviewDuplicates: () -> Unit,
     modifier: Modifier = Modifier,
+    separationSection: @Composable (sectionHeader: @Composable (String) -> Unit) -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -103,6 +104,8 @@ fun SettingsScreen(
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
             modifier = Modifier.clickable(onClick = onReviewDuplicates),
         )
+
+        separationSection { SectionHeader(it) }
 
         SectionHeader(stringResource(R.string.settings_section_playback))
         BatteryOptimizationItem()

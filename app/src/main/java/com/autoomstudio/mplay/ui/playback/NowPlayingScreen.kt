@@ -47,6 +47,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -75,6 +78,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.model.Song
+import com.autoomstudio.mplay.data.stems.StemMode
 import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.playback.RepeatMode
 import com.autoomstudio.mplay.playback.SleepTimer
@@ -86,6 +90,7 @@ import com.autoomstudio.mplay.ui.components.popOnChange
 import com.autoomstudio.mplay.ui.components.pressBounce
 import com.autoomstudio.mplay.ui.theme.MotionMedium
 import com.autoomstudio.mplay.ui.theme.MotionShort
+import com.autoomstudio.mplay.ui.library.LocalSeparatedSongIds
 import com.autoomstudio.mplay.ui.library.SongActions
 import com.autoomstudio.mplay.ui.library.SongMenuButton
 import kotlinx.coroutines.flow.Flow
@@ -230,6 +235,11 @@ fun NowPlayingContent(
                 Spacer(Modifier.height(12.dp))
                 TransportControls(state = state, actions = actions)
 
+                if (state.songId != null && state.songId in LocalSeparatedSongIds.current) {
+                    Spacer(Modifier.height(12.dp))
+                    StemModeSelector(mode = state.stemMode, onSelect = actions::setStemMode)
+                }
+
                 Spacer(Modifier.height(12.dp))
                 LofiToggle(enabled = state.lofiEnabled, isPlaying = state.isPlaying, onToggle = actions::setLofi)
             }
@@ -279,6 +289,31 @@ private fun SleepTimerButton(status: SleepTimerStatus, onClick: () -> Unit) {
             contentDescription = description,
             tint = tint,
         )
+    }
+}
+
+/** Original, instrumental or vocals; the choice carries over to the next separated songs. */
+@Composable
+private fun StemModeSelector(mode: StemMode, onSelect: (StemMode) -> Unit) {
+    val labels = mapOf(
+        StemMode.Original to stringResource(R.string.stem_mode_original),
+        StemMode.Instrumental to stringResource(R.string.stem_mode_instrumental),
+        StemMode.Vocals to stringResource(R.string.stem_mode_vocals),
+    )
+    val groupLabel = stringResource(R.string.stem_mode_label)
+    SingleChoiceSegmentedButtonRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { contentDescription = groupLabel },
+    ) {
+        StemMode.entries.forEachIndexed { index, entry ->
+            SegmentedButton(
+                selected = entry == mode,
+                onClick = { if (entry != mode) onSelect(entry) },
+                shape = SegmentedButtonDefaults.itemShape(index, StemMode.entries.size),
+                label = { Text(labels.getValue(entry), maxLines = 1) },
+            )
+        }
     }
 }
 

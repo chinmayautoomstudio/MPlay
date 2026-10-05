@@ -13,6 +13,7 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionToken
 import com.autoomstudio.mplay.data.library.SongRepository
 import com.autoomstudio.mplay.data.model.Song
+import com.autoomstudio.mplay.data.stems.StemMode
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -166,6 +167,9 @@ class PlaybackController(
     fun setLofi(enabled: Boolean) =
         sendCommand(PlaybackCommands.setLofi, bundleOf(PlaybackCommands.ARG_ENABLED to enabled))
 
+    fun setStemMode(mode: StemMode) =
+        sendCommand(PlaybackCommands.setStemMode, bundleOf(PlaybackCommands.ARG_STEM_MODE to mode.name))
+
     private fun sendCommand(command: SessionCommand, args: Bundle = Bundle.EMPTY) = withController { controller ->
         controller.sendCustomCommand(command, args)
     }
@@ -253,6 +257,7 @@ class PlaybackController(
             hasNext = player.hasNextMediaItem(),
             sleepTimer = PlaybackCommands.sleepTimerOf(extras),
             lofiEnabled = PlaybackCommands.lofiOf(extras),
+            stemMode = PlaybackCommands.stemModeOf(extras),
         )
     }
 

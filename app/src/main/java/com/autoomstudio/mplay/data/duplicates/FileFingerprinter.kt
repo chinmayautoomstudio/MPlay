@@ -1,6 +1,7 @@
 package com.autoomstudio.mplay.data.duplicates
 
 import android.content.ContentResolver
+import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.autoomstudio.mplay.data.model.Song
@@ -15,12 +16,15 @@ import java.security.MessageDigest
 class FileFingerprinter(private val contentResolver: ContentResolver) {
 
     /** Null when the file can't be read. */
-    fun fingerprint(song: Song): String? = try {
-        contentResolver.openFileDescriptor(song.uri, "r")?.let { pfd ->
+    fun fingerprint(song: Song): String? = fingerprint(song.uri)
+
+    /** Null when the file can't be read. */
+    fun fingerprint(uri: Uri): String? = try {
+        contentResolver.openFileDescriptor(uri, "r")?.let { pfd ->
             ParcelFileDescriptor.AutoCloseInputStream(pfd).use { stream -> hash(stream.channel) }
         }
     } catch (e: Exception) {
-        Log.w(TAG, "Could not fingerprint ${song.uri}", e)
+        Log.w(TAG, "Could not fingerprint $uri", e)
         null
     }
 

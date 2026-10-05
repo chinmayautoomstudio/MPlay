@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.autoomstudio.mplay.MPlayApp
 import com.autoomstudio.mplay.data.model.Song
+import com.autoomstudio.mplay.data.stems.StemMode
 import com.autoomstudio.mplay.di.AppContainer
 import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.playback.SleepTimer
@@ -62,6 +63,7 @@ class PlaybackViewModel(container: AppContainer) : ViewModel(), PlayerActions {
     override fun extendSleepTimer(minutes: Int) = controller.extendSleepTimer(minutes)
     override fun cancelSleepTimer() = controller.cancelSleepTimer()
     override fun setLofi(enabled: Boolean) = controller.setLofi(enabled)
+    override fun setStemMode(mode: StemMode) = controller.setStemMode(mode)
 
     override fun onCleared() {
         controller.release()

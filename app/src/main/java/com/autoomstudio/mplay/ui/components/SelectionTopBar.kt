@@ -45,6 +45,7 @@ fun SelectionTopBar(
     onDelete: () -> Unit,
     onRemoveFromPlaylist: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    onSeparate: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -89,6 +90,7 @@ fun SelectionTopBar(
             onPlayNext = onPlayNext,
             onAddToQueue = onAddToQueue,
             onRemoveFromPlaylist = onRemoveFromPlaylist,
+            onSeparate = onSeparate,
         )
     }
 }
@@ -98,6 +100,7 @@ private fun SelectionOverflowMenu(
     onPlayNext: () -> Unit,
     onAddToQueue: () -> Unit,
     onRemoveFromPlaylist: (() -> Unit)?,
+    onSeparate: (() -> Unit)?,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -125,6 +128,7 @@ private fun SelectionOverflowMenu(
             item(R.string.menu_play_next, onPlayNext)
             item(R.string.menu_add_to_queue, onAddToQueue)
             if (onRemoveFromPlaylist != null) item(R.string.menu_remove_from_playlist, onRemoveFromPlaylist)
+            if (onSeparate != null) item(R.string.separate_vocals, onSeparate)
         }
     }
 }

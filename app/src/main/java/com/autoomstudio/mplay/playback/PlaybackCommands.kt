@@ -2,6 +2,7 @@ package com.autoomstudio.mplay.playback
 
 import android.os.Bundle
 import androidx.media3.session.SessionCommand
+import com.autoomstudio.mplay.data.stems.StemMode
 
 /**
  * Custom commands the app's own [androidx.media3.session.MediaController] sends to [PlaybackService],
@@ -15,25 +16,37 @@ internal object PlaybackCommands {
     val extendSleepTimer = SessionCommand("${PREFIX}EXTEND_SLEEP_TIMER", Bundle.EMPTY)
     val cancelSleepTimer = SessionCommand("${PREFIX}CANCEL_SLEEP_TIMER", Bundle.EMPTY)
     val setLofi = SessionCommand("${PREFIX}SET_LOFI", Bundle.EMPTY)
+    val setStemMode = SessionCommand("${PREFIX}SET_STEM_MODE", Bundle.EMPTY)
 
-    val all = listOf(setSleepTimer, setSleepTimerEndOfSong, extendSleepTimer, cancelSleepTimer, setLofi)
+    val all = listOf(setSleepTimer, setSleepTimerEndOfSong, extendSleepTimer, cancelSleepTimer, setLofi, setStemMode)
 
     const val ARG_MINUTES = "minutes"
     const val ARG_ENABLED = "enabled"
+
+    /** A [StemMode] name. */
+    const val ARG_STEM_MODE = "stem_mode"
 
     /** `SystemClock.elapsedRealtime()` at which the timer fires; absent when no timed timer runs. */
     private const val EXTRA_SLEEP_END_ELAPSED = "sleep_end_elapsed"
     private const val EXTRA_SLEEP_END_OF_SONG = "sleep_end_of_song"
     private const val EXTRA_LOFI = "lofi"
+    private const val EXTRA_STEM_MODE = "stem_mode"
 
-    fun extras(sleepTimer: SleepTimerStatus, lofiEnabled: Boolean): Bundle = Bundle().apply {
+    fun extras(
+        sleepTimer: SleepTimerStatus,
+        lofiEnabled: Boolean,
+        stemMode: StemMode = StemMode.Original,
+    ): Bundle = Bundle().apply {
         when (sleepTimer) {
             SleepTimerStatus.Off -> Unit
             SleepTimerStatus.EndOfSong -> putBoolean(EXTRA_SLEEP_END_OF_SONG, true)
             is SleepTimerStatus.Running -> putLong(EXTRA_SLEEP_END_ELAPSED, sleepTimer.endElapsedMs)
         }
         putBoolean(EXTRA_LOFI, lofiEnabled)
+        putString(EXTRA_STEM_MODE, stemMode.name)
     }
+
+    fun stemModeOf(extras: Bundle): StemMode = StemMode.fromName(extras.getString(EXTRA_STEM_MODE))
 
     fun sleepTimerOf(extras: Bundle): SleepTimerStatus = when {
         extras.getBoolean(EXTRA_SLEEP_END_OF_SONG) -> SleepTimerStatus.EndOfSong

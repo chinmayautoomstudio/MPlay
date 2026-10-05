@@ -24,3 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "MPlay"
 include(":app")
+include(":separation")
+include(":spike")

@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +27,9 @@ import com.autoomstudio.mplay.data.settings.ThemeSettings
 import com.autoomstudio.mplay.ui.duplicates.DuplicateActions
 import com.autoomstudio.mplay.ui.library.LibraryUiState
 import com.autoomstudio.mplay.ui.library.LibraryViewModel
+import com.autoomstudio.mplay.ui.library.LocalSeparatedSongIds
+import com.autoomstudio.mplay.separation.SeparationLinks
+import com.autoomstudio.mplay.ui.separation.SeparationViewModel
 import com.autoomstudio.mplay.ui.main.MainScreen
 import com.autoomstudio.mplay.ui.permission.PermissionRationaleScreen
 import com.autoomstudio.mplay.ui.permission.rememberAudioPermissionState
@@ -38,6 +42,9 @@ class MainActivity : ComponentActivity() {
 
     /** Set when launched from the media notification; consumed once by the UI. */
     private var openNowPlayingRequest by mutableStateOf(false)
+
+    /** Set when launched from the vocal separation notification; consumed once by the UI. */
+    private var openSeparationRequest by mutableStateOf(false)
 
     private val settingsViewModel: SettingsViewModel by viewModels { SettingsViewModel.Factory }
 
@@ -53,6 +60,8 @@ class MainActivity : ComponentActivity() {
                 MPlayRoot(
                     openNowPlayingRequest = openNowPlayingRequest,
                     onOpenNowPlayingHandled = { openNowPlayingRequest = false },
+                    openSeparationRequest = openSeparationRequest,
+                    onOpenSeparationHandled = { openSeparationRequest = false },
                     themeSettings = theme,
                     settingsViewModel = settingsViewModel,
                 )
@@ -69,6 +78,7 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra(EXTRA_OPEN_NOW_PLAYING, false) == true) {
             openNowPlayingRequest = true
         }
+        if (intent?.action == SeparationLinks.ACTION_OPEN_QUEUE) openSeparationRequest = true
     }
 
     companion object {
@@ -80,11 +90,14 @@ class MainActivity : ComponentActivity() {
 private fun MPlayRoot(
     openNowPlayingRequest: Boolean,
     onOpenNowPlayingHandled: () -> Unit,
+    openSeparationRequest: Boolean,
+    onOpenSeparationHandled: () -> Unit,
     themeSettings: ThemeSettings,
     settingsViewModel: SettingsViewModel,
     viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
     playbackViewModel: PlaybackViewModel = viewModel(factory = PlaybackViewModel.Factory),
     playlistsViewModel: PlaylistsViewModel = viewModel(factory = PlaylistsViewModel.Factory),
+    separationViewModel: SeparationViewModel = viewModel(factory = SeparationViewModel.Factory),
 ) {
     val songDeleter = (LocalContext.current.applicationContext as MPlayApp).container.songDeleter
     val permission = rememberAudioPermissionState()
@@ -124,13 +137,14 @@ private fun MPlayRoot(
         }
     }
     val hideDuplicates by viewModel.hideDuplicates.collectAsStateWithLifecycle()
+    val separationState by separationViewModel.state.collectAsStateWithLifecycle()
     if (uiState is LibraryUiState.NoPermission) {
         PermissionRationaleScreen(
             permanentlyDenied = permission.isPermanentlyDenied,
             onGrant = permission::request,
             onOpenSettings = permission::openSettings,
         )
-    } else {
+    } else CompositionLocalProvider(LocalSeparatedSongIds provides separationState.readySongIds) {
         MainScreen(
             libraryState = uiState,
             nowPlaying = nowPlaying,
@@ -168,6 +182,10 @@ private fun MPlayRoot(
                 onRestore = viewModel::restoreDuplicate,
                 onHideAgain = viewModel::hideDuplicateAgain,
             ),
+            separationState = separationState,
+            separationViewModel = separationViewModel,
+            openSeparationRequest = openSeparationRequest,
+            onOpenSeparationHandled = onOpenSeparationHandled,
         )
     }
 }

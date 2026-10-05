@@ -17,7 +17,11 @@ import com.autoomstudio.mplay.data.playlist.MPlayDatabase
 import com.autoomstudio.mplay.data.playlist.PlaylistRepository
 import com.autoomstudio.mplay.playback.PlaybackController
 import com.autoomstudio.mplay.data.settings.AppSettings
+import com.autoomstudio.mplay.data.stems.StemRepository
 import com.autoomstudio.mplay.playback.PlaybackSessionStore
+import com.autoomstudio.mplay.separation.FlavorSeparation
+import com.autoomstudio.mplay.separation.SeparationBackend
+import com.autoomstudio.mplay.separation.SeparationController
 import com.autoomstudio.mplay.widget.WidgetStatePublisher
 import com.autoomstudio.mplay.widget.WidgetStateStore
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +55,16 @@ class AppContainer(context: Context) {
 
     val duplicateRepository: DuplicateRepository by lazy {
         DuplicateRepository(database.duplicateDao(), FileFingerprinter(contentResolver), applicationScope)
+    }
+
+    val stemRepository: StemRepository by lazy {
+        StemRepository(appContext, database.stemDao(), FileFingerprinter(contentResolver), applicationScope)
+    }
+
+    val separationBackend: SeparationBackend by lazy { FlavorSeparation.createBackend(appContext, appSettings) }
+
+    val separationController: SeparationController by lazy {
+        SeparationController(stemRepository, separationBackend, appSettings, applicationScope)
     }
 
     val clipStore: ClipStore by lazy { ClipStore(appContext) }

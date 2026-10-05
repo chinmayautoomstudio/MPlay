@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.autoomstudio.mplay.data.stems.StemMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -19,6 +20,11 @@ data class ThemeSettings(
     val mode: ThemeMode = ThemeMode.System,
     /** Wallpaper-based colors on Android 12+; off by default so the MPlay palette is the baseline. */
     val dynamicColor: Boolean = false,
+)
+
+data class SeparationSettings(
+    val chargingOnly: Boolean = false,
+    val pauseOnLowBattery: Boolean = true,
 )
 
 /** Unknown or missing stored values fall back to the defaults instead of failing. */
@@ -74,7 +80,43 @@ class AppSettings(context: Context) {
         dataStore.edit { it[KEY_HIDE_DUPLICATES] = enabled }
     }
 
+    val stemMode: Flow<StemMode> =
+        dataStore.data.map { StemMode.fromName(it[KEY_STEM_MODE]) }.distinctUntilChanged()
+
+    suspend fun setStemMode(mode: StemMode) {
+        dataStore.edit { it[KEY_STEM_MODE] = mode.name }
+    }
+
+    val separationSettings: Flow<SeparationSettings> = dataStore.data
+        .map { prefs ->
+            val defaults = SeparationSettings()
+            SeparationSettings(
+                chargingOnly = prefs[KEY_SEPARATION_CHARGING_ONLY] ?: defaults.chargingOnly,
+                pauseOnLowBattery = prefs[KEY_SEPARATION_PAUSE_LOW_BATTERY] ?: defaults.pauseOnLowBattery,
+            )
+        }
+        .distinctUntilChanged()
+
+    suspend fun setSeparationChargingOnly(enabled: Boolean) {
+        dataStore.edit { it[KEY_SEPARATION_CHARGING_ONLY] = enabled }
+    }
+
+    suspend fun setSeparationPauseOnLowBattery(enabled: Boolean) {
+        dataStore.edit { it[KEY_SEPARATION_PAUSE_LOW_BATTERY] = enabled }
+    }
+
+    /** The one-time explanation shown before the first separation. */
+    suspend fun separationNoticeShown(): Boolean = dataStore.data.first()[KEY_SEPARATION_NOTICE_SHOWN] ?: false
+
+    suspend fun setSeparationNoticeShown() {
+        dataStore.edit { it[KEY_SEPARATION_NOTICE_SHOWN] = true }
+    }
+
     private companion object {
+        val KEY_STEM_MODE = stringPreferencesKey("stem_mode")
+        val KEY_SEPARATION_CHARGING_ONLY = booleanPreferencesKey("separation_charging_only")
+        val KEY_SEPARATION_PAUSE_LOW_BATTERY = booleanPreferencesKey("separation_pause_low_battery")
+        val KEY_SEPARATION_NOTICE_SHOWN = booleanPreferencesKey("separation_notice_shown")
         val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val KEY_NOTIFICATION_PROMPT_SHOWN = booleanPreferencesKey("notification_prompt_shown")

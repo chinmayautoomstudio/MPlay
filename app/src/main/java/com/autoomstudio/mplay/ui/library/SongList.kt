@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.DropdownMenu
@@ -28,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,7 +62,12 @@ data class SongActions(
     val onSetAsRingtone: (Song) -> Unit,
     val onShowInfo: (Song) -> Unit,
     val onDelete: (Song) -> Unit,
+    /** Null hides "Separate vocals", for example in standard MPlay or on unsupported phones. */
+    val onSeparate: ((Song) -> Unit)? = null,
 )
+
+/** Ids of songs with separated stems, for the badge on song rows. */
+val LocalSeparatedSongIds = compositionLocalOf<Set<Long>> { emptySet() }
 
 /** Song rows shared by the Songs tab and the album and artist screens. */
 fun LazyListScope.songItems(
@@ -186,13 +193,25 @@ fun SongRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = song.artist,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (song.id in LocalSeparatedSongIds.current) {
+                    Icon(
+                        imageVector = Icons.Filled.GraphicEq,
+                        contentDescription = stringResource(R.string.stem_badge_description),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .size(16.dp),
+                    )
+                }
+                Text(
+                    text = song.artist,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         Spacer(Modifier.width(12.dp))
         if (isCurrent) {
@@ -263,6 +282,7 @@ fun SongMenuItems(song: Song, actions: SongActions, onRemove: (() -> Unit)?, onD
     if (onRemove != null) item(R.string.menu_remove_from_playlist, onRemove)
     item(R.string.menu_cut_and_save) { actions.onCutAndSave(song) }
     item(R.string.menu_set_as_ringtone) { actions.onSetAsRingtone(song) }
+    actions.onSeparate?.let { separate -> item(R.string.separate_vocals) { separate(song) } }
     item(R.string.menu_song_info) { actions.onShowInfo(song) }
     item(R.string.menu_delete_from_device) { actions.onDelete(song) }
 }

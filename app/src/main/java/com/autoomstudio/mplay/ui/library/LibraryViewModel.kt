@@ -17,6 +17,7 @@ import com.autoomstudio.mplay.data.model.Album
 import com.autoomstudio.mplay.data.model.Artist
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.data.settings.AppSettings
+import com.autoomstudio.mplay.data.stems.StemRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -66,6 +67,7 @@ class LibraryViewModel(
     private val libraryPreferences: LibraryPreferences,
     private val duplicateRepository: DuplicateRepository,
     private val appSettings: AppSettings,
+    private val stemRepository: StemRepository,
 ) : ViewModel() {
 
     val hideDuplicates: StateFlow<Boolean> = appSettings.hideDuplicates
@@ -96,7 +98,10 @@ class LibraryViewModel(
                 false -> flowOf(LibraryUiState.NoPermission)
                 true -> combine(
                     songRepository.songs()
-                        .onEach { _isRefreshing.value = false }
+                        .onEach { songs ->
+                            _isRefreshing.value = false
+                            stemRepository.onLibraryChanged(songs)
+                        }
                         .flatMapLatest { songs ->
                             duplicateRepository.index(songs).map { index -> songs to index }
                         },
@@ -194,6 +199,7 @@ class LibraryViewModel(
                     app.container.libraryPreferences,
                     app.container.duplicateRepository,
                     app.container.appSettings,
+                    app.container.stemRepository,
                 )
             }
         }

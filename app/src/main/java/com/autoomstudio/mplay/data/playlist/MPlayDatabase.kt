@@ -8,23 +8,31 @@ import androidx.room.RoomDatabase
 import com.autoomstudio.mplay.data.duplicates.DuplicateDao
 import com.autoomstudio.mplay.data.duplicates.DuplicateOverrideEntity
 import com.autoomstudio.mplay.data.duplicates.SongFingerprintEntity
+import com.autoomstudio.mplay.data.stems.SeparationJobEntity
+import com.autoomstudio.mplay.data.stems.StemDao
+import com.autoomstudio.mplay.data.stems.StemSetEntity
 
+/** Identical in both editions, so switching between standard MPlay and MPlay AI never needs a destructive migration. */
 @Database(
     entities = [
         PlaylistEntity::class,
         PlaylistSongEntity::class,
         SongFingerprintEntity::class,
         DuplicateOverrideEntity::class,
+        StemSetEntity::class,
+        SeparationJobEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
 )
 abstract class MPlayDatabase : RoomDatabase() {
 
     abstract fun playlistDao(): PlaylistDao
 
     abstract fun duplicateDao(): DuplicateDao
+
+    abstract fun stemDao(): StemDao
 
     companion object {
         fun create(context: Context): MPlayDatabase =

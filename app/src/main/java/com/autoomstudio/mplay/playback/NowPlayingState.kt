@@ -1,6 +1,7 @@
 package com.autoomstudio.mplay.playback
 
 import android.net.Uri
+import com.autoomstudio.mplay.data.stems.StemMode
 
 enum class RepeatMode { Off, All, One }
 
@@ -25,4 +26,6 @@ data class NowPlayingState(
     val hasNext: Boolean,
     val sleepTimer: SleepTimerStatus = SleepTimerStatus.Off,
     val lofiEnabled: Boolean = false,
+    /** Session-wide; songs without stems play the original whatever this says. */
+    val stemMode: StemMode = StemMode.Original,
 )

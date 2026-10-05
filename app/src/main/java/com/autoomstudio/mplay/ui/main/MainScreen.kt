@@ -29,8 +29,10 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -53,6 +55,7 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.library.SongSortOrder
 import com.autoomstudio.mplay.data.model.Playlist
@@ -88,6 +91,13 @@ import com.autoomstudio.mplay.ui.playlist.PlaylistMessage
 import com.autoomstudio.mplay.ui.playlist.PlaylistNameDialog
 import com.autoomstudio.mplay.ui.theme.fadeThrough
 import com.autoomstudio.mplay.ui.playlist.PlaylistsScreen
+import com.autoomstudio.mplay.ui.separation.SeparationMessage
+import com.autoomstudio.mplay.ui.separation.SeparationNoticeDialog
+import com.autoomstudio.mplay.ui.separation.SeparationScreen
+import com.autoomstudio.mplay.ui.separation.SeparationSettingsSection
+import com.autoomstudio.mplay.ui.separation.SeparationUiState
+import com.autoomstudio.mplay.ui.separation.SeparationViewModel
+import com.autoomstudio.mplay.ui.separation.separationMessageText
 import com.autoomstudio.mplay.ui.settings.SettingsScreen
 import com.autoomstudio.mplay.ui.trim.TrimEditorActivity
 import com.autoomstudio.mplay.ui.trim.TrimMode
@@ -139,6 +149,10 @@ fun MainScreen(
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     duplicateActions: DuplicateActions,
+    separationState: SeparationUiState,
+    separationViewModel: SeparationViewModel,
+    openSeparationRequest: Boolean,
+    onOpenSeparationHandled: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var destination by rememberSaveable { mutableStateOf(Destination.Library) }
@@ -148,7 +162,18 @@ fun MainScreen(
     val deletableSongs = remember(allSongs, duplicates) {
         (allSongs + duplicates.groups.flatMap { it.songs }).distinctBy { it.id }
     }
-    var reviewingDuplicates by rememberSaveable { mutableStateOf(false) }
+    var settingsPage by rememberSaveable { mutableStateOf(SettingsPage.Main) }
+    val openSeparation = {
+        destination = Destination.Settings
+        settingsPage = SettingsPage.Separation
+    }
+    LaunchedEffect(openSeparationRequest) {
+        if (openSeparationRequest) {
+            openSeparation()
+            onShowNowPlayingChange(false)
+            onOpenSeparationHandled()
+        }
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -181,13 +206,32 @@ fun MainScreen(
             )
         }
     }
+    val context = LocalContext.current
+    LaunchedEffect(separationViewModel) {
+        separationViewModel.messages.collect { message ->
+            val text = separationMessageText(context, message)
+            scope.launch {
+                snackbarHostState.currentSnackbarData?.dismiss()
+                val result = snackbarHostState.showSnackbar(
+                    message = text,
+                    actionLabel = if (message is SeparationMessage.Queued) {
+                        resources.getString(R.string.action_view_queue)
+                    } else {
+                        null
+                    },
+                    duration = SnackbarDuration.Short,
+                )
+                if (result == SnackbarResult.ActionPerformed) openSeparation()
+            }
+        }
+    }
 
     var infoSongId by rememberSaveable { mutableStateOf<Long?>(null) }
     var addToPlaylistSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
     var newPlaylistSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
     var deleteSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
-    val context = LocalContext.current
-    val songActions = remember(onPlayNext, onAddToQueue, resources, context) {
+    val canSeparate = separationState.available
+    val songActions = remember(onPlayNext, onAddToQueue, resources, context, canSeparate) {
         SongActions(
             onAddToPlaylist = { addToPlaylistSongIds = longArrayOf(it.id) },
             onPlayNext = {
@@ -202,6 +246,11 @@ fun MainScreen(
             onSetAsRingtone = { context.startActivity(TrimEditorActivity.intent(context, it, TrimMode.Ringtone)) },
             onShowInfo = { infoSongId = it.id },
             onDelete = { deleteSongIds = longArrayOf(it.id) },
+            onSeparate = if (canSeparate) {
+                { song -> separationViewModel.requestSeparation(listOf(song)) }
+            } else {
+                null
+            },
         )
     }
 
@@ -275,6 +324,14 @@ fun MainScreen(
                             )
                         },
                         onDelete = { deleteSongIds = selection.selectedIds.toLongArray() },
+                        onSeparate = if (canSeparate) {
+                            {
+                                separationViewModel.requestSeparation(selectedSongs())
+                                selection.clear()
+                            }
+                        } else {
+                            null
+                        },
                         onRemoveFromPlaylist = openPlaylist?.let { playlist ->
                             {
                                 val songs = selectedSongs()
@@ -382,29 +439,44 @@ fun MainScreen(
                     )
 
                     Destination.Settings -> AnimatedContent(
-                        targetState = reviewingDuplicates,
+                        targetState = settingsPage,
                         transitionSpec = { fadeThrough() },
                         label = "settingsPage",
-                    ) { reviewing ->
-                        if (reviewing) {
-                            ReviewDuplicatesScreen(
+                    ) { page ->
+                        val pageBackEnabled = screenBackEnabled && settingsPage == page
+                        when (page) {
+                            SettingsPage.Duplicates -> ReviewDuplicatesScreen(
                                 duplicates = duplicates,
                                 actions = duplicateActions,
                                 onDeleteHidden = { songs -> deleteSongIds = songs.map { it.id }.toLongArray() },
-                                onBack = { reviewingDuplicates = false },
+                                onBack = { settingsPage = SettingsPage.Main },
                                 modifier = contentModifier,
-                                backEnabled = screenBackEnabled && reviewingDuplicates,
+                                backEnabled = pageBackEnabled,
                             )
-                        } else {
-                            SettingsScreen(
+                            SettingsPage.Separation -> SeparationScreen(
+                                state = separationState,
+                                viewModel = separationViewModel,
+                                onBack = { settingsPage = SettingsPage.Main },
+                                modifier = contentModifier,
+                                backEnabled = pageBackEnabled,
+                            )
+                            SettingsPage.Main -> SettingsScreen(
                                 theme = themeSettings,
                                 onThemeModeChange = onThemeModeChange,
                                 onDynamicColorChange = onDynamicColorChange,
                                 hideDuplicates = duplicateActions.hideDuplicates,
                                 onHideDuplicatesChange = duplicateActions.onHideDuplicatesChange,
                                 duplicateGroupCount = duplicates.groups.size,
-                                onReviewDuplicates = { reviewingDuplicates = true },
+                                onReviewDuplicates = { settingsPage = SettingsPage.Duplicates },
                                 modifier = contentModifier,
+                                separationSection = { header ->
+                                    SeparationSettingsSection(
+                                        state = separationState,
+                                        viewModel = separationViewModel,
+                                        onOpenQueue = { settingsPage = SettingsPage.Separation },
+                                        sectionHeader = header,
+                                    )
+                                },
                             )
                         }
                     }
@@ -486,7 +558,16 @@ fun MainScreen(
         },
     )
     SongInfoHost(songs = allSongs, songId = infoSongId, onDismiss = { infoSongId = null })
+    val noticeRequest by separationViewModel.noticeRequest.collectAsStateWithLifecycle()
+    if (noticeRequest != null) {
+        SeparationNoticeDialog(
+            onConfirm = separationViewModel::confirmNotice,
+            onDismiss = separationViewModel::dismissNotice,
+        )
+    }
 }
+
+private enum class SettingsPage { Main, Duplicates, Separation }
 
 @Composable
 private fun MPlayNavigationBar(

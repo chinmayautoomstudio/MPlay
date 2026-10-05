@@ -4,17 +4,22 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
+import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
@@ -25,6 +30,8 @@ import com.autoomstudio.mplay.MainActivity
 import com.autoomstudio.mplay.data.library.SongRepository
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.data.settings.AppSettings
+import com.autoomstudio.mplay.data.stems.StemMode
+import com.autoomstudio.mplay.data.stems.StemRepository
 import com.autoomstudio.mplay.playback.lofi.LofiAudioProcessor
 import com.autoomstudio.mplay.widget.WidgetStatePublisher
 import com.google.common.util.concurrent.Futures
@@ -38,6 +45,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.io.File
 
 class PlaybackService : MediaSessionService() {
 
@@ -54,6 +62,9 @@ class PlaybackService : MediaSessionService() {
 
     private val lofiProcessor = LofiAudioProcessor()
     private var lofiEnabled = false
+
+    private lateinit var stemRepository: StemRepository
+    private var stemMode = StemMode.Original
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
@@ -72,6 +83,7 @@ class PlaybackService : MediaSessionService() {
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .build()
+        stemRepository = container.stemRepository
         player.addListener(SkipUnplayableListener(player))
         player.addListener(SessionSaver())
         widgetPublisher = container.createWidgetStatePublisher().also(player::addListener)
@@ -84,6 +96,12 @@ class PlaybackService : MediaSessionService() {
             player.repeatMode = modes.repeatMode
         }
         serviceScope.launch { applyLofi(player, appSettings.lofiEnabled.first(), persist = false) }
+        serviceScope.launch {
+            stemMode = appSettings.stemMode.first()
+            publishExtras()
+            // Also covers stems finishing or being deleted while their song is queued.
+            stemRepository.stemSets.collect { refreshStemUris(player) }
+        }
 
         val sessionActivity = PendingIntent.getActivity(
             this,
@@ -101,7 +119,80 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun publishExtras() {
-        mediaSession?.setSessionExtras(PlaybackCommands.extras(sleepTimer.status, lofiEnabled))
+        mediaSession?.setSessionExtras(PlaybackCommands.extras(sleepTimer.status, lofiEnabled, stemMode))
+    }
+
+    private fun applyStemMode(player: ExoPlayer, mode: StemMode) {
+        stemMode = mode
+        publishExtras()
+        saveScope.launch { appSettings.setStemMode(mode) }
+        refreshStemUris(player)
+    }
+
+    /** The file [item] should play in the current mode: its stem when one exists, otherwise the original. */
+    private fun resolve(item: MediaItem): MediaItem {
+        val original = item.originalUri ?: return item
+        val songId = item.mediaId.toLongOrNull() ?: return item
+        val stem = stemRepository.stemUri(songId, stemMode)?.takeIf { uri -> uri.path?.let { File(it).isFile } == true }
+        return item.withPlaybackUri(stem ?: original) ?: item
+    }
+
+    /**
+     * Repoints queued items after a mode or cache change. The current item goes first and resumes at the same
+     * position; ExoPlayer replaces items by inserting and removing, so the shuffle order is put back afterwards.
+     */
+    @OptIn(UnstableApi::class)
+    private fun refreshStemUris(player: ExoPlayer) {
+        val count = player.mediaItemCount
+        if (count == 0) return
+        val shuffleOrder = shuffleOrderOf(player.currentTimeline)
+        val current = player.currentMediaItemIndex
+        var changed = false
+        player.getMediaItemAt(current).let { item ->
+            resolve(item).takeIf { it !== item }?.let { replacement ->
+                val started = SystemClock.elapsedRealtime()
+                val position = player.currentPosition
+                player.replaceMediaItem(current, replacement)
+                player.seekTo(current, position)
+                logSwitchLatency(player, started)
+                changed = true
+            }
+        }
+        for (index in 0 until count) {
+            if (index == current) continue
+            val item = player.getMediaItemAt(index)
+            resolve(item).takeIf { it !== item }?.let {
+                player.replaceMediaItem(index, it)
+                changed = true
+            }
+        }
+        if (changed && shuffleOrder != null && shuffleOrder.size == player.mediaItemCount) {
+            player.setShuffleOrder(DefaultShuffleOrder(shuffleOrder, SystemClock.elapsedRealtime()))
+        }
+    }
+
+    private fun shuffleOrderOf(timeline: Timeline): IntArray? {
+        if (timeline.isEmpty) return null
+        val order = ArrayList<Int>(timeline.windowCount)
+        var index = timeline.getFirstWindowIndex(true)
+        while (index != C.INDEX_UNSET && order.size < timeline.windowCount) {
+            order += index
+            index = timeline.getNextWindowIndex(index, Player.REPEAT_MODE_OFF, true)
+        }
+        return order.toIntArray()
+    }
+
+    /** Measured for the PRD's switching target; read with `adb logcat -s StemSwitch`. */
+    private fun logSwitchLatency(player: Player, startedElapsed: Long) {
+        player.addListener(
+            object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState != Player.STATE_READY) return
+                    Log.i(SWITCH_TAG, "Ready after ${SystemClock.elapsedRealtime() - startedElapsed} ms")
+                    player.removeListener(this)
+                }
+            },
+        )
     }
 
     private fun applyLofi(player: Player, enabled: Boolean, persist: Boolean) {
@@ -219,6 +310,9 @@ class PlaybackService : MediaSessionService() {
                 PlaybackCommands.cancelSleepTimer.customAction -> sleepTimer.cancel()
                 PlaybackCommands.setLofi.customAction ->
                     applyLofi(session.player, args.getBoolean(PlaybackCommands.ARG_ENABLED), persist = true)
+                PlaybackCommands.setStemMode.customAction -> (session.player as? ExoPlayer)?.let { player ->
+                    applyStemMode(player, StemMode.fromName(args.getString(PlaybackCommands.ARG_STEM_MODE)))
+                }
                 else -> return Futures.immediateFuture(SessionResult(SessionError.ERROR_NOT_SUPPORTED))
             }
             return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -238,16 +332,39 @@ class PlaybackService : MediaSessionService() {
             val restored = restoreQueue(saved, songRepository.loadSongs(), Song::id)
                 ?: throw UnsupportedOperationException("Saved songs are no longer in the library")
             MediaSession.MediaItemsWithStartPosition(
-                restored.items.map { it.toMediaItem() },
+                restored.items.map { resolve(it.toMediaItem()) },
                 restored.index,
                 restored.positionMs,
             )
         }
+
+        /** Every item added by any controller plays the version matching the current mode. */
+        override fun onAddMediaItems(
+            mediaSession: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            mediaItems: MutableList<MediaItem>,
+        ): ListenableFuture<MutableList<MediaItem>> =
+            Futures.immediateFuture(mediaItems.mapTo(ArrayList(mediaItems.size), ::resolve))
     }
 
-    /** Drops a song that failed to load or decode and moves on, so one bad file never stops the queue. */
+    /**
+     * Falls back to the original when a stem can't be played, otherwise drops a song that failed to load or decode
+     * and moves on, so one bad file never stops the queue.
+     */
     private class SkipUnplayableListener(private val player: ExoPlayer) : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
+            val item = player.currentMediaItem
+            val original = item?.originalUri
+            if (item != null && original != null) {
+                item.withPlaybackUri(original)?.let { fallback ->
+                    val index = player.currentMediaItemIndex
+                    val position = player.currentPosition
+                    player.replaceMediaItem(index, fallback)
+                    player.seekTo(index, position)
+                    player.prepare()
+                    return
+                }
+            }
             if (player.hasNextMediaItem()) {
                 player.removeMediaItem(player.currentMediaItemIndex)
                 player.prepare()
@@ -277,6 +394,7 @@ class PlaybackService : MediaSessionService() {
 
     private companion object {
         const val PERIODIC_SAVE_MS = 10_000L
+        const val SWITCH_TAG = "StemSwitch"
 
         /** About 90% speed with the pitch lowered to match, like a slowed-down record. */
         val LOFI_PLAYBACK = PlaybackParameters(0.9f, 0.9f)

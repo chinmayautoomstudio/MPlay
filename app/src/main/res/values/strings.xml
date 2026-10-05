@@ -272,4 +272,106 @@
     <string name="duplicates_bitrate">%1$d kbps</string>
     <string name="duplicates_lossless">Lossless</string>
     <string name="settings_offline_note">Fully offline. MPlay has no internet permission, no ads and no analytics.</string>
+
+    <string name="separate_vocals">Separate vocals</string>
+    <string name="stem_mode_label">Version</string>
+    <string name="stem_mode_original">Original</string>
+    <string name="stem_mode_instrumental">Instrumental</string>
+    <string name="stem_mode_vocals">Vocals</string>
+    <string name="stem_badge_description">Vocals separated</string>
+    <string name="separation_notice_title">Separate vocals?</string>
+    <string name="separation_notice_message">MPlay splits the song into vocals and instrumental on your phone. Nothing is uploaded.\n\nEach song takes a few minutes and uses a lot of battery, so it works best while charging. You can keep using your phone meanwhile.\n\nResults aren\'t perfect: faint traces of the removed part may remain.\n\nFor personal use only. Don\'t share separated tracks of music you don\'t own.</string>
+    <string name="separation_notice_confirm">Separate</string>
+    <string name="separation_notice_cancel">Cancel</string>
+    <plurals name="message_separation_queued">
+        <item quantity="one">Separating vocals. You can follow progress in the notification.</item>
+        <item quantity="other">%d songs queued for separation</item>
+    </plurals>
+    <string name="message_separation_nothing_new">Already separated or waiting</string>
+    <string name="message_separation_no_storage">Not enough storage. About %1$s free space is needed.</string>
+    <string name="message_separation_unavailable">Vocal separation isn\'t available on this phone</string>
+    <string name="action_view_queue">View</string>
+
+    <string name="separation_channel_name">Vocal separation</string>
+    <string name="separation_channel_description">Progress while songs are split into vocals and instrumental</string>
+    <string name="separation_notification_title">Separating \"%1$s\"</string>
+    <string name="separation_notification_preparing">Preparing…</string>
+    <string name="separation_notification_percent">%1$d%%</string>
+    <string name="separation_notification_percent_eta">%1$d%% · about %2$s left</string>
+    <plurals name="separation_notification_queued">
+        <item quantity="one">%d more song waiting</item>
+        <item quantity="other">%d more songs waiting</item>
+    </plurals>
+    <string name="separation_notification_cancel">Cancel</string>
+    <string name="separation_needs_app_title">Vocal separation paused</string>
+    <string name="separation_needs_app_message">Open MPlay to continue</string>
+    <string name="separation_finished_title">Vocals separated</string>
+    <plurals name="separation_finished_message">
+        <item quantity="one">%d song is ready to play as instrumental or vocals</item>
+        <item quantity="other">%d songs are ready to play as instrumental or vocals</item>
+    </plurals>
+    <plurals name="separation_failed_message">
+        <item quantity="one">%d song couldn\'t be separated</item>
+        <item quantity="other">%d songs couldn\'t be separated</item>
+    </plurals>
+    <string name="duration_minutes_short">%1$d min</string>
+    <string name="duration_under_minute">under a minute</string>
+
+    <string name="separation_queue_title">Vocal separation</string>
+    <string name="separation_section_processing">Processing</string>
+    <string name="separation_section_waiting">Waiting</string>
+    <string name="separation_section_finished">Recently finished</string>
+    <string name="separation_section_ready">Separated songs</string>
+    <string name="separation_empty_title">No separated songs</string>
+    <string name="separation_empty_message">Pick Separate vocals in a song\'s menu to make an instrumental or vocals-only version.</string>
+    <string name="separation_state_waiting">Waiting</string>
+    <string name="separation_state_done">Done</string>
+    <string name="separation_state_cancelled">Cancelled</string>
+    <string name="separation_paused_charging">Waiting for charging</string>
+    <string name="separation_paused_battery">Paused: battery low</string>
+    <string name="separation_paused_heat">Paused: phone is hot</string>
+    <string name="separation_paused_time_limit">Paused by the system; resumes later</string>
+    <string name="separation_paused_interrupted">Interrupted; starts again from the beginning</string>
+    <string name="separation_paused_needs_app">Paused until MPlay is opened</string>
+    <string name="separation_error_source_missing">The song file is gone</string>
+    <string name="separation_error_unsupported">This format can\'t be decoded on this phone</string>
+    <string name="separation_error_corrupt">The file is damaged</string>
+    <string name="separation_error_memory">Not enough memory. Close other apps and try again.</string>
+    <string name="separation_error_storage">Not enough storage</string>
+    <string name="separation_error_model">The separation model is missing</string>
+    <string name="separation_error_model_failed">Separation failed</string>
+    <string name="separation_error_unknown">Something went wrong</string>
+    <string name="separation_retry">Retry</string>
+    <string name="separation_cancel">Cancel</string>
+    <string name="separation_remove">Remove</string>
+    <string name="separation_clear_finished">Clear finished</string>
+    <string name="separation_delete">Delete stems</string>
+    <string name="separation_export_instrumental">Save instrumental to Music</string>
+    <string name="separation_export_vocals">Save vocals to Music</string>
+    <string name="separation_size">%1$s · %2$s</string>
+    <string name="message_stems_deleted">Stems deleted</string>
+    <string name="message_stem_exported">Saved to Music/MPlay Stems</string>
+    <string name="message_stem_export_failed">Couldn\'t save to Music/MPlay Stems</string>
+
+    <string name="settings_section_separation">Vocal separation</string>
+    <string name="settings_separation_queue">Separated songs and queue</string>
+    <string name="settings_separation_cache">Stems use %1$s</string>
+    <string name="settings_separation_cache_empty">No separated songs</string>
+    <string name="settings_separation_charging">Only while charging</string>
+    <string name="settings_separation_charging_summary">Wait for a charger before separating</string>
+    <string name="settings_separation_battery">Pause when battery is low</string>
+    <string name="settings_separation_battery_summary">Stop separating below 15% battery</string>
+    <string name="settings_separation_delete_all">Delete all stems</string>
+    <string name="settings_separation_delete_all_title">Delete all stems?</string>
+    <string name="settings_separation_delete_all_message">Separated vocals and instrumentals are removed. Your original songs stay untouched.</string>
+    <string name="settings_separation_delete_confirm">Delete</string>
+    <string name="settings_separation_unsupported_title">Not available on this phone</string>
+    <string name="settings_separation_not_included">Vocal separation is part of MPlay AI. Stems made with MPlay AI still play here.</string>
+    <string name="settings_separation_reason_architecture">Needs a 64-bit ARM processor.</string>
+    <string name="settings_separation_reason_memory">Needs at least 6 GB of memory.</string>
+    <string name="settings_separation_reason_storage">Needs at least 1 GB of free storage.</string>
+    <string name="settings_separation_reason_model">The separation model isn\'t installed. Import a model file to use this feature.</string>
+    <string name="settings_separation_import_model">Import model file</string>
+    <string name="message_model_imported">Model imported. Restart MPlay to use it.</string>
+    <string name="message_model_import_failed">Couldn\'t import the model file</string>
 </resources>
