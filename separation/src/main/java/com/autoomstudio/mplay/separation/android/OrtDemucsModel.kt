@@ -70,7 +70,9 @@ class OrtDemucsModel private constructor(
             try {
                 val sessionOptions = OrtSession.SessionOptions().apply {
                     setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT)
-                    setMemoryPatternOptimization(true)
+                    // Measured on one segment: pattern planning plus the arena peak near 3.9 GB, without them 2.4 GB.
+                    setMemoryPatternOptimization(false)
+                    setCPUArenaAllocator(false)
                     when (options.accelerator) {
                         Accelerator.Cpu -> setIntraOpNumThreads(options.threads)
                         Accelerator.Xnnpack -> {

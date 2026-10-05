@@ -7,7 +7,7 @@ import com.autoomstudio.mplay.data.settings.AppSettings
 object FlavorSeparation {
     @Suppress("UNUSED_PARAMETER")
     fun createBackend(context: Context, settings: AppSettings): SeparationBackend = object : SeparationBackend {
-        override val availability = SeparationAvailability.Unavailable(listOf(UnsupportedReason.NotIncluded))
+        override fun checkAvailability() = SeparationAvailability.Unavailable(listOf(UnsupportedReason.NotIncluded))
 
         override suspend fun schedule() = Unit
     }

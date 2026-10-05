@@ -306,6 +306,7 @@
     <string name="separation_needs_app_title">Vocal separation paused</string>
     <string name="separation_needs_app_message">Open MPlay to continue</string>
     <string name="separation_finished_title">Vocals separated</string>
+    <string name="separation_all_failed_title">Separation failed</string>
     <plurals name="separation_finished_message">
         <item quantity="one">%d song is ready to play as instrumental or vocals</item>
         <item quantity="other">%d songs are ready to play as instrumental or vocals</item>

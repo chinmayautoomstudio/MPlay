@@ -26,7 +26,7 @@ private class AiSeparationBackend(
     private val settings: AppSettings,
 ) : SeparationBackend {
 
-    override val availability: SeparationAvailability by lazy {
+    private val deviceReasons: List<UnsupportedReason> by lazy {
         val activityManager = context.getSystemService(ActivityManager::class.java)
         val memory = ActivityManager.MemoryInfo().also { activityManager.getMemoryInfo(it) }
         val specs = DeviceSpecs(
@@ -35,9 +35,13 @@ private class AiSeparationBackend(
             isLowRamDevice = activityManager.isLowRamDevice,
             freeStorageBytes = context.filesDir.usableSpace,
         )
-        val reasons = DeviceEligibility.check(specs).toMutableList()
+        DeviceEligibility.check(specs)
+    }
+
+    override fun checkAvailability(): SeparationAvailability {
+        val reasons = deviceReasons.toMutableList()
         if (ModelSource.find(context) == null) reasons += UnsupportedReason.ModelMissing
-        if (reasons.isEmpty()) SeparationAvailability.Available else SeparationAvailability.Unavailable(reasons)
+        return if (reasons.isEmpty()) SeparationAvailability.Available else SeparationAvailability.Unavailable(reasons)
     }
 
     /**

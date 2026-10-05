@@ -5,8 +5,8 @@ package com.autoomstudio.mplay.separation
  * Everything else (cache, playback modes, settings) lives in the shared code so both editions read the same data.
  */
 interface SeparationBackend {
-    /** Computed once; cheap to call repeatedly. */
-    val availability: SeparationAvailability
+    /** Device limits are read once; the model check runs on every call so an imported model is picked up. */
+    fun checkAvailability(): SeparationAvailability
 
     /**
      * Makes sure queued jobs get processed with the current charging and battery settings.

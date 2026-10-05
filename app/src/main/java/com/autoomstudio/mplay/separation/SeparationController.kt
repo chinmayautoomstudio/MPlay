@@ -5,6 +5,9 @@ import com.autoomstudio.mplay.data.settings.AppSettings
 import com.autoomstudio.mplay.data.stems.JobError
 import com.autoomstudio.mplay.data.stems.StemRepository
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
@@ -26,18 +29,30 @@ class SeparationController(
     private val settings: AppSettings,
     private val scope: CoroutineScope,
 ) {
-    val availability: SeparationAvailability get() = backend.availability
+    private val _availability = MutableStateFlow(backend.checkAvailability())
+    val availabilityFlow: StateFlow<SeparationAvailability> = _availability.asStateFlow()
+
+    val availability: SeparationAvailability get() = _availability.value
 
     val isAvailable: Boolean get() = availability is SeparationAvailability.Available
 
+    /** Re-checks after the model file changed. */
+    fun refreshAvailability() {
+        _availability.value = backend.checkAvailability()
+    }
+
     /** Resumes queued work after a restart and applies settings changes to waiting work. */
     fun start() {
-        if (!isAvailable) {
+        if (isAvailable) {
+            scope.launch { if (repository.hasQueued()) backend.schedule() }
+        } else {
             scope.launch { repository.failQueued(JobError.ModelUnavailable) }
-            return
         }
-        scope.launch { if (repository.hasQueued()) backend.schedule() }
-        scope.launch { settings.separationSettings.drop(1).collect { if (repository.hasQueued()) backend.schedule() } }
+        scope.launch {
+            settings.separationSettings.drop(1).collect {
+                if (isAvailable && repository.hasQueued()) backend.schedule()
+            }
+        }
     }
 
     suspend fun enqueue(songs: List<Song>): EnqueueResult {

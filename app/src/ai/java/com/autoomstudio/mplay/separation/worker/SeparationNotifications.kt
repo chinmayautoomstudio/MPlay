@@ -82,7 +82,11 @@ internal class SeparationNotifications(private val context: Context) {
             RESULT_ID,
             NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification_separation)
-                .setContentTitle(context.getString(R.string.separation_finished_title))
+                .setContentTitle(
+                    context.getString(
+                        if (done == 0) R.string.separation_all_failed_title else R.string.separation_finished_title,
+                    ),
+                )
                 .setContentText(text)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                 .setContentIntent(openQueue())

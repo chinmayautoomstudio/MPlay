@@ -63,13 +63,12 @@ class SeparationViewModel(
     private val modelImporter: ModelImporter,
 ) : ViewModel() {
 
-    private val availability = controller.availability
-
     val state: StateFlow<SeparationUiState> = combine(
+        controller.availabilityFlow,
         repository.stemSets,
         repository.jobs,
         settings.separationSettings,
-    ) { sets, jobs, separationSettings ->
+    ) { availability, sets, jobs, separationSettings ->
         SeparationUiState(
             available = availability is SeparationAvailability.Available,
             unavailableReasons = (availability as? SeparationAvailability.Unavailable)?.reasons.orEmpty(),
@@ -82,7 +81,7 @@ class SeparationViewModel(
     }.stateIn(
         viewModelScope,
         SharingStarted.Eagerly,
-        SeparationUiState(available = availability is SeparationAvailability.Available),
+        SeparationUiState(available = controller.isAvailable),
     )
 
     private val _noticeRequest = MutableStateFlow<List<Song>?>(null)
@@ -180,6 +179,7 @@ class SeparationViewModel(
         viewModelScope.launch {
             val message = try {
                 modelImporter.import(uri)
+                controller.refreshAvailability()
                 SeparationMessage.ModelImported
             } catch (e: CancellationException) {
                 throw e
