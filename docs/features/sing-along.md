@@ -1,6 +1,6 @@
 # Sing-along recording
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-06 (`e13b2f7`)
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-06
 
 ## Summary
 
@@ -24,6 +24,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
 | `ui/singalong/SingAlongSheet.kt` | `SingAlongChip` and setup sheet. |
 | `ui/singalong/SingAlongDevices.kt` | Mic permission state and audio routing (headphones, Bluetooth mic). |
 | `ui/singalong/SingAlongOverlay.kt` | Full-screen dialog for all session states. |
+| `ui/singalong/SingAlongAnimations.kt` | Overlay animations: `PulsingDot`, `VoiceRings`, `LiveWaveform`, `RollingTimer`, `SavingRing`, `SavedCheck`, `StaggeredIn`, `ShakeOnEnter`. |
 | `ui/singalong/SingAlongViewModel.kt` | Session wrapper plus `singAlongNoteSeen`. |
 | `app/src/main/res/drawable/ic_notification_mic.xml` | Notification icon. |
 
@@ -85,6 +86,14 @@ Mono 16-bit at 44.1 kHz, 1024-frame reads, on an urgent-audio thread. Sources tr
 
 The sheet warns when no headphones are connected (music will leak into the mic) and when only a Bluetooth mic is available. Recording is never blocked. There is no measured latency compensation beyond the timestamp-based lead; the Sync slider handles the rest.
 
+### Animations
+
+- Overlay states cross-fade with a slight scale (`AnimatedContent` keyed on the state class, so count-in ticks and progress updates don't re-trigger it).
+- Recording: the "Recording" dot blinks; the timer digits roll; `LiveWaveform` scrolls the last 48 smoothed mic levels (red above `CLIP_LEVEL`) in place of the old level bar; `VoiceRings` expand from behind Stop with a halo that grows with the voice level.
+- Saving: `SavingRing` shows the progress as a gradient arc with the percent inside and a bobbing mic above.
+- Saved: `SavedCheck` springs in a circle, draws the check and fires a burst of dots; the message and Done button slide up after it. Failed shakes its icon once.
+- With system animations off (`rememberAnimationsEnabled()`), the dot is solid, rings, rolling digits and burst are skipped, progress and the check show their final state, and states switch without a transition.
+
 ### Failure reasons
 
 `Microphone`, `NoStems`, `Playback`, `TooShort`. Save errors return to Review with `saveFailed = true`.
@@ -105,7 +114,7 @@ The sheet warns when no headphones are connected (music will leak into the mic) 
 
 - `singalong/RecordingNamesTest.kt`: suggestion, sanitising, length, collision suffix.
 - `singalong/SingAlongMixerTest.kt`: limiter, gains, centring, muting, offset, `VoiceFile` padding.
-- No tests for the session, recorder, store, renderer, preview, service or UI.
+- No tests for the session, recorder, store, renderer, preview, service or UI (animations were checked by hand on an emulator).
 
 ## Known limitations and TODOs
 
@@ -122,3 +131,4 @@ The sheet warns when no headphones are connected (music will leak into the mic) 
 | Date | Commit | Change |
 |---|---|---|
 | 2026-10-06 | `e13b2f7` | Sing-along recording added: session, recorder, mixer, preview, export, `RecordingService`, Now Playing chip and sheet, overlay. |
+| 2026-10-06 | - | Recording and saving animations (`SingAlongAnimations.kt`): state transitions, blinking dot, voice rings, scrolling waveform, rolling timer, saving ring, animated saved check; off with system animations. |

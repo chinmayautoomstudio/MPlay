@@ -3,18 +3,19 @@ package com.autoomstudio.mplay.ui.singalong
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,15 +23,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
@@ -39,7 +37,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -52,6 +49,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -59,9 +57,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -81,6 +76,7 @@ import com.autoomstudio.mplay.singalong.SingAlongMixer
 import com.autoomstudio.mplay.singalong.SingAlongState
 import com.autoomstudio.mplay.singalong.TakePreview
 import com.autoomstudio.mplay.ui.common.formatDuration
+import com.autoomstudio.mplay.ui.components.rememberAnimationsEnabled
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -105,25 +101,49 @@ fun SingAlongOverlay(viewModel: SingAlongViewModel = viewModel(factory = SingAlo
                     .safeDrawingPadding()
                     .padding(24.dp),
             ) {
-                when (val current = state) {
-                    SingAlongState.Idle -> Unit
-                    is SingAlongState.Preparing -> Preparing(current.title, null, viewModel::cancel)
-                    is SingAlongState.CountIn -> Preparing(current.title, current.count, viewModel::cancel)
-                    is SingAlongState.Recording -> Recording(current, viewModel)
-                    is SingAlongState.Review -> Review(current, viewModel)
-                    is SingAlongState.Saving -> Saving(current.progress)
-                    is SingAlongState.Saved -> Outcome(
-                        icon = Icons.Outlined.CheckCircle,
-                        text = stringResource(R.string.singalong_saved, current.name),
-                        button = stringResource(R.string.singalong_done),
-                        onClose = viewModel::close,
-                    )
-                    is SingAlongState.Failed -> Outcome(
-                        icon = Icons.Outlined.ErrorOutline,
-                        text = stringResource(current.reason.message()),
-                        button = stringResource(R.string.singalong_close),
-                        onClose = viewModel::close,
-                    )
+                val animate = rememberAnimationsEnabled()
+                AnimatedContent(
+                    targetState = state,
+                    contentKey = { it::class },
+                    transitionSpec = {
+                        if (animate) {
+                            (fadeIn(tween(300)) + scaleIn(tween(300), initialScale = 0.96f)) togetherWith fadeOut(tween(200))
+                        } else {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        }
+                    },
+                    label = "singAlongState",
+                    modifier = Modifier.fillMaxSize(),
+                ) { current ->
+                    when (current) {
+                        SingAlongState.Idle -> Unit
+                        is SingAlongState.Preparing -> Preparing(current.title, null, viewModel::cancel)
+                        is SingAlongState.CountIn -> Preparing(current.title, current.count, viewModel::cancel)
+                        is SingAlongState.Recording -> Recording(current, viewModel, animate)
+                        is SingAlongState.Review -> Review(current, viewModel)
+                        is SingAlongState.Saving -> Saving(current.progress, animate)
+                        is SingAlongState.Saved -> Outcome(
+                            text = stringResource(R.string.singalong_saved, current.name),
+                            button = stringResource(R.string.singalong_done),
+                            onClose = viewModel::close,
+                            animate = animate,
+                        ) { SavedCheck(animate) }
+                        is SingAlongState.Failed -> Outcome(
+                            text = stringResource(current.reason.message()),
+                            button = stringResource(R.string.singalong_close),
+                            onClose = viewModel::close,
+                            animate = animate,
+                        ) {
+                            ShakeOnEnter(animate) {
+                                Icon(
+                                    Icons.Outlined.ErrorOutline,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(64.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -168,16 +188,21 @@ private fun Preparing(title: String, count: Int?, onCancel: () -> Unit) {
 }
 
 @Composable
-private fun Recording(state: SingAlongState.Recording, viewModel: SingAlongViewModel) {
+private fun Recording(state: SingAlongState.Recording, viewModel: SingAlongViewModel, animate: Boolean) {
     BackHandler(onBack = viewModel::stop)
     var elapsedMs by remember { mutableLongStateOf(0L) }
     var level by remember { mutableFloatStateOf(0f) }
+    val history = remember { mutableStateListOf<Float>() }
+    var samples by remember { mutableLongStateOf(0L) }
     LaunchedEffect(state.startedAtMs) {
         while (isActive) {
             elapsedMs = (SystemClock.elapsedRealtime() - state.startedAtMs).coerceAtLeast(0L)
             // Fast attack, slow release, so peaks stay readable.
             val input = viewModel.level()
             level = if (input > level) input else level * LEVEL_RELEASE + input * (1 - LEVEL_RELEASE)
+            history.add(level)
+            if (history.size > WAVE_BARS + 1) history.removeAt(0)
+            samples++
             delay(LEVEL_POLL_MS)
         }
     }
@@ -187,11 +212,7 @@ private fun Recording(state: SingAlongState.Recording, viewModel: SingAlongViewM
         verticalArrangement = Arrangement.Center,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(12.dp)
-                    .background(MaterialTheme.colorScheme.error, CircleShape),
-            )
+            PulsingDot(MaterialTheme.colorScheme.error, animate)
             Text(
                 stringResource(R.string.singalong_recording_label),
                 color = MaterialTheme.colorScheme.error,
@@ -202,48 +223,43 @@ private fun Recording(state: SingAlongState.Recording, viewModel: SingAlongViewM
         Spacer(Modifier.height(8.dp))
         Text(state.title, style = MaterialTheme.typography.titleLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(32.dp))
-        Text(formatDuration(elapsedMs), fontSize = 64.sp, fontWeight = FontWeight.Light)
+        RollingTimer(formatDuration(elapsedMs), animate)
         Spacer(Modifier.height(32.dp))
-        LevelMeter(level)
-        Spacer(Modifier.height(48.dp))
-        FilledIconButton(
-            onClick = viewModel::stop,
-            modifier = Modifier.size(88.dp),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-                contentColor = MaterialTheme.colorScheme.onError,
-            ),
-        ) {
-            Icon(
-                Icons.Filled.Stop,
-                contentDescription = stringResource(R.string.singalong_stop),
-                modifier = Modifier.size(44.dp),
-            )
-        }
-        Spacer(Modifier.height(24.dp))
-        OutlinedButton(onClick = viewModel::retake) { Text(stringResource(R.string.singalong_retake)) }
-    }
-}
-
-@Composable
-private fun LevelMeter(level: Float) {
-    val description = stringResource(R.string.singalong_level_description)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(12.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
-            .semantics { contentDescription = description },
-    ) {
-        Box(
-            Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(level.coerceIn(0f, 1f))
-                .background(
-                    if (level > CLIP_LEVEL) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    RoundedCornerShape(6.dp),
-                ),
+        LiveWaveform(
+            levels = history,
+            sampleCount = samples,
+            clipLevel = CLIP_LEVEL,
+            animate = animate,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp),
         )
+        Spacer(Modifier.height(8.dp))
+        Box(modifier = Modifier.size(STOP_AREA), contentAlignment = Alignment.Center) {
+            VoiceRings(
+                level = level,
+                color = MaterialTheme.colorScheme.error,
+                buttonSize = STOP_SIZE,
+                animate = animate,
+                modifier = Modifier.fillMaxSize(),
+            )
+            FilledIconButton(
+                onClick = viewModel::stop,
+                modifier = Modifier.size(STOP_SIZE),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                ),
+            ) {
+                Icon(
+                    Icons.Filled.Stop,
+                    contentDescription = stringResource(R.string.singalong_stop),
+                    modifier = Modifier.size(44.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = viewModel::retake) { Text(stringResource(R.string.singalong_retake)) }
     }
 }
 
@@ -407,34 +423,42 @@ private fun MixSlider(
 }
 
 @Composable
-private fun Saving(progress: Float) {
+private fun Saving(progress: Float, animate: Boolean) {
     BackHandler {}
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Text(stringResource(R.string.singalong_saving), style = MaterialTheme.typography.titleLarge)
+        SavingRing(progress, animate)
         Spacer(Modifier.height(24.dp))
-        LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(8.dp))
-        Text("${(progress * 100).toInt()}%", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.singalong_saving), style = MaterialTheme.typography.titleLarge)
     }
 }
 
 @Composable
-private fun Outcome(icon: ImageVector, text: String, button: String, onClose: () -> Unit) {
+private fun Outcome(
+    text: String,
+    button: String,
+    onClose: () -> Unit,
+    animate: Boolean,
+    icon: @Composable () -> Unit,
+) {
     BackHandler(onBack = onClose)
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
+        icon()
         Spacer(Modifier.height(24.dp))
-        Text(text, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        StaggeredIn(delayMs = 450, animate = animate) {
+            Text(text, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+        }
         Spacer(Modifier.height(32.dp))
-        Button(onClick = onClose) { Text(button) }
+        StaggeredIn(delayMs = 600, animate = animate) {
+            Button(onClick = onClose) { Text(button) }
+        }
     }
 }
 
@@ -445,7 +469,9 @@ private fun FailReason.message(): Int = when (this) {
     FailReason.TooShort -> R.string.singalong_fail_short
 }
 
-private const val LEVEL_POLL_MS = 50L
+private const val LEVEL_POLL_MS = WAVE_STEP_MS.toLong()
+private val STOP_SIZE = 88.dp
+private val STOP_AREA = 200.dp
 private const val LEVEL_RELEASE = 0.85f
 /** About -2 dBFS on the meter's -60 dB scale. */
 private const val CLIP_LEVEL = 0.97f

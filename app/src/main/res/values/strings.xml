@@ -369,6 +369,7 @@
     <string name="singalong_discard_confirm_text">Your recording will be deleted.</string>
     <string name="singalong_cancel">Cancel</string>
     <string name="singalong_saving">Saving…</string>
+    <string name="singalong_saving_progress">Saving, %d%%</string>
     <string name="singalong_save_failed">Couldn\'t save the recording. Check your free storage and try again.</string>
     <string name="singalong_saved">Saved \"%s\" to Music/MPlay Recordings</string>
     <string name="singalong_done">Done</string>
