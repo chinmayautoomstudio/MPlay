@@ -5,9 +5,6 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import kotlin.math.PI
-import kotlin.math.exp
-import kotlin.math.sin
 import kotlin.random.Random
 
 class TempoDetectorTest {
@@ -15,36 +12,13 @@ class TempoDetectorTest {
     private val rate = TempoDetector.ANALYSIS_RATE
     private val detector = TempoDetector(rate)
 
-    /** Decaying tone bursts on every beat; [offbeatGain] adds quieter eighth notes in between. */
     private fun clicks(
         bpm: Double,
         seconds: Int = 30,
         offbeatGain: Float = 0f,
         noise: Float = 0f,
         accentEvery: Int = 0,
-        seed: Int = 1,
-    ): FloatArray {
-        val out = FloatArray(rate * seconds)
-        val random = Random(seed)
-        if (noise > 0) for (i in out.indices) out[i] = (random.nextFloat() * 2 - 1) * noise
-        val beat = rate * 60.0 / bpm
-        fun burst(at: Double, gain: Float, freq: Double) {
-            val start = at.toInt()
-            for (i in 0 until (rate * 0.05).toInt()) {
-                val index = start + i
-                if (index >= out.size) return
-                out[index] += (gain * exp(-i / (rate * 0.01)) * sin(2 * PI * freq * i / rate)).toFloat()
-            }
-        }
-        var n = 0
-        while (n * beat < out.size) {
-            val accent = accentEvery > 0 && n % accentEvery == 0
-            burst(n * beat, if (accent) 1f else 0.7f, if (accent) 1500.0 else 1000.0)
-            if (offbeatGain > 0) burst(n * beat + beat / 2, offbeatGain, 3000.0)
-            n++
-        }
-        return out
-    }
+    ): FloatArray = SyntheticAudio.clicks(bpm, seconds, offbeatGain, noise, accentEvery)
 
     private fun assertBpm(expected: Double, samples: FloatArray, tolerance: Double = 1.0) {
         val estimate = detector.detect(samples)

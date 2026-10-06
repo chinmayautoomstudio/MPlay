@@ -1,5 +1,6 @@
 package com.autoomstudio.mplay.data.tempo
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Insert
@@ -7,7 +8,10 @@ import androidx.room.OnConflictStrategy
 import androidx.room.PrimaryKey
 import androidx.room.Query
 
-/** A song's detected tempo (MT10); the size and date of the analyzed file tell when it has changed. */
+/**
+ * A song's detected tempo (MT10) and time signature (MT20); the size and date of the analyzed file tell when it
+ * has changed. Rows written before the time signature existed have a null [meterConfidence].
+ */
 @Entity(tableName = "song_tempos")
 data class SongTempoEntity(
     @PrimaryKey val songId: Long,
@@ -16,6 +20,12 @@ data class SongTempoEntity(
     val bpm: Double,
     /** A [com.autoomstudio.mplay.metronome.TempoConfidence] name. */
     val confidence: String,
+    @ColumnInfo(defaultValue = "NULL") val beatsPerBar: Int? = null,
+    @ColumnInfo(defaultValue = "NULL") val beatUnit: Int? = null,
+    /** A TempoConfidence name, [TempoCache.NO_METER] when the meter couldn't be told, null when never analyzed. */
+    @ColumnInfo(defaultValue = "NULL") val meterConfidence: String? = null,
+    /** The BPM the metronome clicks with this meter; for 6/8 that is the eighth-note rate. */
+    @ColumnInfo(defaultValue = "NULL") val meterBpm: Int? = null,
 )
 
 @Dao

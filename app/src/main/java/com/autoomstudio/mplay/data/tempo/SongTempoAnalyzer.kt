@@ -5,9 +5,8 @@ import android.util.Log
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.data.stems.StemMode
 import com.autoomstudio.mplay.data.stems.StemRepository
-import com.autoomstudio.mplay.metronome.TempoConfidence
+import com.autoomstudio.mplay.metronome.RhythmEstimate
 import com.autoomstudio.mplay.metronome.TempoDetector
-import com.autoomstudio.mplay.metronome.TempoEstimate
 import com.autoomstudio.mplay.separation.android.MediaPcmSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -16,42 +15,35 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 
 /**
- * Detects a song's tempo from a slice of its middle (MT9), preferring the instrumental stem when the song has been
- * separated, since the drums are clearer without vocals (MT11). Results are cached per song (MT10).
+ * Detects a song's tempo and time signature from a slice of its middle (MT9, MT18), preferring the instrumental
+ * stem when the song has been separated, since the drums are clearer without vocals (MT11). Results are cached per
+ * song (MT10, MT20).
  */
 class SongTempoAnalyzer(
     private val context: Context,
     private val dao: TempoDao,
     private val stemRepository: StemRepository,
 ) {
-    /** The stored result, if the song's file hasn't changed since it was analyzed. */
-    suspend fun cached(song: Song): TempoEstimate? {
-        val entry = dao.tempo(song.id) ?: return null
-        if (entry.sizeBytes != song.sizeBytes || entry.dateModified != song.dateModified) {
-            dao.delete(song.id)
-            return null
+    /** The stored result, if the song's file hasn't changed since it was analyzed with meter detection. */
+    suspend fun cached(song: Song): RhythmEstimate? =
+        when (val lookup = TempoCache.lookup(dao.tempo(song.id), song.sizeBytes, song.dateModified)) {
+            is TempoLookup.Hit -> lookup.rhythm
+            TempoLookup.Stale -> {
+                dao.delete(song.id)
+                null
+            }
+            TempoLookup.Empty, TempoLookup.MissingMeter -> null
         }
-        val confidence = TempoConfidence.entries.firstOrNull { it.name == entry.confidence } ?: TempoConfidence.Low
-        return TempoEstimate(entry.bpm, confidence, 0f)
-    }
 
     /** Returns null when the file can't be decoded or has no clear beat. */
-    suspend fun detect(song: Song, onProgress: (Float) -> Unit): TempoEstimate? {
+    suspend fun detect(song: Song, onProgress: (Float) -> Unit): RhythmEstimate? {
         cached(song)?.let { return it }
-        val estimate = withContext(Dispatchers.Default) { analyze(song, onProgress) } ?: return null
-        dao.upsert(
-            SongTempoEntity(
-                songId = song.id,
-                sizeBytes = song.sizeBytes,
-                dateModified = song.dateModified,
-                bpm = estimate.bpm,
-                confidence = estimate.confidence.name,
-            ),
-        )
-        return estimate
+        val rhythm = withContext(Dispatchers.Default) { analyze(song, onProgress) } ?: return null
+        dao.upsert(TempoCache.entry(song.id, song.sizeBytes, song.dateModified, rhythm))
+        return rhythm
     }
 
-    private suspend fun analyze(song: Song, onProgress: (Float) -> Unit): TempoEstimate? {
+    private suspend fun analyze(song: Song, onProgress: (Float) -> Unit): RhythmEstimate? {
         val uri = stemRepository.stemUri(song.id, StemMode.Instrumental) ?: song.uri
         val startMs = ((song.durationMs - WINDOW_MS) / 2).coerceIn(0, MAX_START_MS)
         val windowFrames = WINDOW_MS * MediaPcmSource.TARGET_RATE / 1000
@@ -82,7 +74,7 @@ class SongTempoAnalyzer(
             Log.w(TAG, "Could not decode ${song.id} for tempo detection", e)
             return null
         }
-        return TempoDetector(TempoDetector.ANALYSIS_RATE).detect(mono, written)
+        return TempoDetector(TempoDetector.ANALYSIS_RATE).detectRhythm(mono, written)
     }
 
     /** Not a CancellationException, which the decoder would report as a corrupt file. */

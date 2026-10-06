@@ -10,15 +10,21 @@ import com.autoomstudio.mplay.MPlayApp
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.data.tempo.SongTempoAnalyzer
 import com.autoomstudio.mplay.metronome.BeatTick
+import com.autoomstudio.mplay.metronome.MeterEstimate
 import com.autoomstudio.mplay.metronome.MetronomeController
 import com.autoomstudio.mplay.metronome.MetronomeSettings
 import com.autoomstudio.mplay.metronome.MetronomeState
 import com.autoomstudio.mplay.metronome.TapTempo
+import com.autoomstudio.mplay.metronome.TempoConfidence
 import com.autoomstudio.mplay.metronome.TempoEstimate
+import com.autoomstudio.mplay.metronome.TimeSignature
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -33,10 +39,27 @@ sealed interface TempoDetection {
 
     data class Running(override val songId: Long, val progress: Float) : TempoDetection
 
-    data class Done(override val songId: Long, val estimate: TempoEstimate) : TempoDetection
+    /**
+     * [meter] is null when the time signature couldn't be told (MT19). [applied] says whether the metronome took
+     * it; when false the sheet offers it as a suggestion.
+     */
+    data class Done(
+        override val songId: Long,
+        val estimate: TempoEstimate,
+        val meter: MeterEstimate? = null,
+        val applied: Boolean = false,
+    ) : TempoDetection
 
     data class Failed(override val songId: Long) : TempoDetection
 }
+
+/** A detected time signature was applied (MT19); [previous] and [tempoBpm] are what Undo puts back. */
+data class MeterApplied(
+    val songId: Long,
+    val timeSignature: TimeSignature,
+    val previous: TimeSignature,
+    val tempoBpm: Int,
+)
 
 class MetronomeViewModel(
     private val controller: MetronomeController,
@@ -54,6 +77,11 @@ class MetronomeViewModel(
 
     private val _detection = MutableStateFlow<TempoDetection>(TempoDetection.Idle)
     val detection: StateFlow<TempoDetection> = _detection.asStateFlow()
+
+    private val _meterApplied = MutableSharedFlow<MeterApplied>(extraBufferCapacity = 1)
+
+    /** One-shot events for the "Time signature set to …" snackbar. */
+    val meterApplied: SharedFlow<MeterApplied> = _meterApplied.asSharedFlow()
 
     private var tapReset: Job? = null
     private var detectJob: Job? = null
@@ -74,26 +102,61 @@ class MetronomeViewModel(
         }
     }
 
-    /** Fills in the BPM from [song], instantly when it was detected before. */
+    /**
+     * Fills in the BPM from [song], instantly when it was detected before, and the time signature when it is at
+     * least fairly sure of it (MT18, MT19).
+     */
     fun detect(song: Song) {
         if ((_detection.value as? TempoDetection.Running)?.songId == song.id) return
         detectJob?.cancel()
         _detection.value = TempoDetection.Running(song.id, 0f)
         detectJob = viewModelScope.launch {
             var shown = 0f
-            val estimate = tempoAnalyzer.detect(song) { progress ->
+            val rhythm = tempoAnalyzer.detect(song) { progress ->
                 if (progress - shown >= 0.01f) {
                     shown = progress
                     _detection.value = TempoDetection.Running(song.id, progress)
                 }
             }
-            _detection.value = if (estimate != null) {
-                controller.update { it.copy(bpm = estimate.bpm.roundToInt()) }
-                TempoDetection.Done(song.id, estimate)
+            if (rhythm == null) {
+                _detection.value = TempoDetection.Failed(song.id)
+                return@launch
+            }
+            val meter = rhythm.meter
+            val done = TempoDetection.Done(song.id, rhythm.tempo, meter)
+            if (meter != null && meter.confidence != TempoConfidence.Low) {
+                applyMeter(done)
             } else {
-                TempoDetection.Failed(song.id)
+                controller.update { it.copy(bpm = rhythm.tempo.bpm.roundToInt()) }
+                _detection.value = done
             }
         }
+    }
+
+    /** Takes the suggested time signature (and its BPM) from the last detection, for the Low-confidence chip. */
+    fun applyMeter() {
+        val done = _detection.value as? TempoDetection.Done ?: return
+        if (done.meter == null || done.applied) return
+        applyMeter(done)
+    }
+
+    private fun applyMeter(done: TempoDetection.Done) {
+        val meter = done.meter ?: return
+        val previous = controller.state.value.settings.timeSignature
+        controller.update {
+            it.copy(bpm = meter.clickBpm, beatsPerBar = meter.beatsPerBar, beatUnit = meter.beatUnit)
+        }
+        _detection.value = done.copy(applied = true)
+        _meterApplied.tryEmit(MeterApplied(done.songId, meter.timeSignature, previous, done.estimate.bpm.roundToInt()))
+    }
+
+    /** Puts back the time signature from before [event] and the plain detected BPM. */
+    fun undoMeter(event: MeterApplied) {
+        controller.update {
+            it.copy(bpm = event.tempoBpm, beatsPerBar = event.previous.beats, beatUnit = event.previous.unit)
+        }
+        val done = _detection.value as? TempoDetection.Done ?: return
+        if (done.songId == event.songId) _detection.value = done.copy(applied = false)
     }
 
     /** Doubles or halves the BPM, for detections that landed on half or double time. */

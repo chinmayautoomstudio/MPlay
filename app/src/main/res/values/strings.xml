@@ -371,6 +371,17 @@
     <string name="metronome_confidence_medium">Fairly sure. If it feels half or double speed, use ÷2 or ×2.</string>
     <string name="metronome_confidence_low">Not sure about this one. Check it by ear, or use Tap tempo.</string>
     <string name="metronome_detect_failed">Couldn\'t find a clear beat. Try Tap tempo.</string>
+    <string name="metronome_detected_with_meter">%1$d BPM, %2$s</string>
+    <string name="metronome_detected_with_meter_felt">%1$d BPM, %2$s (felt as %3$d)</string>
+    <string name="metronome_meter_confidence_high">Time signature: clear accent pattern.</string>
+    <string name="metronome_meter_confidence_medium">Time signature: fairly sure. Change it below if it feels wrong.</string>
+    <string name="metronome_meter_confidence_low">Time signature: just a guess.</string>
+    <string name="metronome_meter_unknown">Couldn\'t tell the time signature</string>
+    <string name="metronome_meter_suggestion">Looks like %s. Use it?</string>
+    <string name="metronome_meter_suggestion_description">Use the suggested %s time signature</string>
+    <string name="metronome_meter_set">Time signature set to %s</string>
+    <string name="metronome_meter_undo">Undo</string>
+    <string name="metronome_meter_undo_description">Undo the time signature change</string>
     <string name="metronome_halve">÷2</string>
     <string name="metronome_double">×2</string>
     <string name="metronome_halve_description">Halve the tempo</string>

@@ -4,10 +4,10 @@ MPlay is an offline, local-music player for Android (package `com.autoomstudio.m
 
 | Item | Value |
 |---|---|
-| Version | 3.1 (`versionCode = 4`), see [`app/build.gradle.kts`](../app/build.gradle.kts) |
+| Version | 3.1 (`versionCode = 5`), see [`app/build.gradle.kts`](../app/build.gradle.kts) |
 | minSdk / targetSdk / compileSdk | 26 / 37 / 37 |
 | Modules | `:app`, `:separation` (DSP + ONNX pipeline), `:spike` (feasibility test app) |
-| Database | Room `mplay.db`, schema version 4 |
+| Database | Room `mplay.db`, schema version 5 |
 | Network | None. The build fails if `INTERNET` is merged into the manifest. |
 
 ## How these docs are organised

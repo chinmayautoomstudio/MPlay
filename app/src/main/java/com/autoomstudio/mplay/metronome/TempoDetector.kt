@@ -13,6 +13,9 @@ enum class TempoConfidence { Low, Medium, High }
 
 data class TempoEstimate(val bpm: Double, val confidence: TempoConfidence, val score: Float)
 
+/** The tempo and, when there is enough of a pattern to judge, the time signature from one analysis (MT18). */
+data class RhythmEstimate(val tempo: TempoEstimate, val meter: MeterEstimate?)
+
 /**
  * Estimates a song's tempo from mono audio (MT9). It builds an onset envelope from spectral flux, finds the beat
  * period by autocorrelation, and picks between half and double tempo with a comb score and a mild preference
@@ -24,8 +27,33 @@ class TempoDetector(private val sampleRate: Int) {
     private val framesPerSecond = sampleRate.toDouble() / HOP
 
     /** Returns null when the audio is too short or too quiet to say anything. */
-    fun detect(samples: FloatArray, length: Int = samples.size): TempoEstimate? {
-        val envelope = onsetEnvelope(samples, length) ?: return null
+    fun detect(samples: FloatArray, length: Int = samples.size): TempoEstimate? = analyze(samples, length)?.tempo
+
+    /** Tempo plus a time signature estimate from the same envelopes (MT18); null when [detect] would be. */
+    fun detectRhythm(samples: FloatArray, length: Int = samples.size): RhythmEstimate? {
+        val analysis = analyze(samples, length) ?: return null
+        val meter = MeterDetector().detect(
+            accents = analysis.envelopes.accents,
+            low = analysis.envelopes.low,
+            beatPeriod = analysis.beatPeriod,
+            tempo = analysis.tempo,
+        )
+        return RhythmEstimate(analysis.tempo, meter)
+    }
+
+    /** [beatPeriod] is in envelope frames and matches the reported (folded) BPM. */
+    private class Analysis(val envelopes: Envelopes, val beatPeriod: Double, val tempo: TempoEstimate)
+
+    /**
+     * [full] is the log-magnitude onset envelope the tempo comes from. [accents] and [low] use linear magnitude,
+     * over the whole spectrum and below [LOW_BAND_HZ], so a louder hit gives a larger onset; the log envelope
+     * barely tells loud from soft.
+     */
+    private class Envelopes(val full: DoubleArray, val accents: DoubleArray, val low: DoubleArray)
+
+    private fun analyze(samples: FloatArray, length: Int): Analysis? {
+        val envelopes = onsetEnvelopes(samples, length) ?: return null
+        val envelope = envelopes.full
         val acf = autocorrelation(envelope, lagFor(SEARCH_MIN_BPM) * 2 + 2) ?: return null
 
         val shortest = lagFor(SEARCH_MAX_BPM)
@@ -53,19 +81,25 @@ class TempoDetector(private val sampleRate: Int) {
             strength >= MEDIUM_CONFIDENCE -> TempoConfidence.Medium
             else -> TempoConfidence.Low
         }
-        return TempoEstimate((bpm * 10).roundToInt() / 10.0, confidence, strength)
+        val estimate = TempoEstimate((bpm * 10).roundToInt() / 10.0, confidence, strength)
+        return Analysis(envelopes, 60 * framesPerSecond / bpm, estimate)
     }
 
-    /** Positive spectral flux on a log-magnitude spectrum, with the slow trend removed. */
-    private fun onsetEnvelope(samples: FloatArray, length: Int): DoubleArray? {
+    /** Positive spectral flux with the slow trend removed; see [Envelopes]. */
+    private fun onsetEnvelopes(samples: FloatArray, length: Int): Envelopes? {
         val count = (length - FRAME) / HOP + 1
         if (count < MIN_ENVELOPE_FRAMES) return null
         val re = DoubleArray(FRAME)
         val im = DoubleArray(FRAME)
         val bins = FRAME / 2
+        val lowBins = (LOW_BAND_HZ * FRAME / sampleRate).roundToInt().coerceIn(2, bins)
         var previous = DoubleArray(bins)
         var current = DoubleArray(bins)
+        var previousMagnitude = DoubleArray(bins)
+        var currentMagnitude = DoubleArray(bins)
         val flux = DoubleArray(count)
+        val accentFlux = DoubleArray(count)
+        val lowFlux = DoubleArray(count)
         var energy = 0.0
         for (frame in 0 until count) {
             val start = frame * HOP
@@ -75,19 +109,36 @@ class TempoDetector(private val sampleRate: Int) {
             }
             fft(re, im)
             var sum = 0.0
+            var accentSum = 0.0
+            var lowSum = 0.0
             for (bin in 1 until bins) {
                 val magnitude = sqrt(re[bin] * re[bin] + im[bin] * im[bin])
                 energy += magnitude
                 current[bin] = ln(1 + COMPRESSION * magnitude)
-                if (frame > 0) sum += max(0.0, current[bin] - previous[bin])
+                currentMagnitude[bin] = magnitude
+                if (frame > 0) {
+                    sum += max(0.0, current[bin] - previous[bin])
+                    val rise = max(0.0, magnitude - previousMagnitude[bin])
+                    accentSum += rise
+                    if (bin < lowBins) lowSum += rise
+                }
             }
             flux[frame] = sum
+            accentFlux[frame] = accentSum
+            lowFlux[frame] = lowSum
             val swap = previous
             previous = current
             current = swap
+            val swapMagnitude = previousMagnitude
+            previousMagnitude = currentMagnitude
+            currentMagnitude = swapMagnitude
         }
         if (energy / count < SILENCE_ENERGY) return null
+        return Envelopes(shape(flux), shape(accentFlux), shape(lowFlux))
+    }
 
+    private fun shape(flux: DoubleArray): DoubleArray {
+        val count = flux.size
         // Subtracting a half-second moving average leaves the onsets and drops loudness swells.
         val half = (framesPerSecond * 0.25).roundToInt().coerceAtLeast(1)
         val prefix = DoubleArray(count + 1)
@@ -172,6 +223,8 @@ class TempoDetector(private val sampleRate: Int) {
         private const val MIN_ENVELOPE_FRAMES = 400
         private const val HIGH_CONFIDENCE = 0.3f
         private const val MEDIUM_CONFIDENCE = 0.12f
+        /** Kicks and bass notes, which usually mark the downbeat, sit below this. */
+        private const val LOW_BAND_HZ = 200.0
 
         /** A Gaussian with a sigma of 1.5 frames. */
         private val SMOOTHING = DoubleArray(9) { exp(-0.5 * ((it - 4) / 1.5) * ((it - 4) / 1.5)) }

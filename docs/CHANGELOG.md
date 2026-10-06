@@ -15,6 +15,7 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 - Sing-along recording over the instrumental stem with count-in, review, voice/music/sync mixing, preview and save to `Music/MPlay Recordings`. (`e13b2f7`, [sing-along](features/sing-along.md))
 - Separation time estimate based on this phone's measured speed. (`e13b2f7`, [vocal separation](features/vocal-separation.md))
 - Permissions `RECORD_AUDIO` and `FOREGROUND_SERVICE_MICROPHONE`; services `MetronomeService` and `RecordingService`. (`e13b2f7`, [architecture](architecture.md))
+- Time signature detection (MT18-MT21): Detect BPM also estimates 2/4, 3/4, 4/4 or 6/8 with a confidence, from the same analysis pass (`MeterDetector`). Medium/High results set the metronome's time signature with the BPM and show "Time signature set to 3/4" with Undo; Low results show a "Looks like 3/4. Use it?" chip; undetermined meters keep the current signature. For 6/8 the metronome clicks the eighth notes. The result card reads "120 BPM, 4/4". `versionCode` 5. ([metronome](features/metronome.md))
 
 ### Changed
 - The separation notice now shows before every separation, with an estimate and a "Don't show again" option (previously shown once). The time notice also appears in the notification, progress pill and queue. (`e13b2f7`)
@@ -26,6 +27,7 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 
 ### Database
 - Schema v4: new table `song_tempos`, `AutoMigration(3, 4)`. (`e13b2f7`, [database](database.md))
+- Schema v5: `song_tempos` gains nullable `beatsPerBar`, `beatUnit`, `meterConfidence`, `meterBpm`, `AutoMigration(4, 5)`. Existing rows are kept; rows without a meter are re-analyzed once on the next Detect. ([database](database.md), [metronome](features/metronome.md))
 
 ## [3.1] - 2026-10-06
 
