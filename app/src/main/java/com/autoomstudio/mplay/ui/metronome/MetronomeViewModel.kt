@@ -94,6 +94,8 @@ class MetronomeViewModel(
 
     fun toggle() = controller.toggle()
 
+    fun toggleMute() = controller.setUserMuted(!controller.state.value.muted)
+
     fun tap() {
         val bpm = tapTempo.tap(SystemClock.elapsedRealtime())
         _tapCount.value = tapTempo.count

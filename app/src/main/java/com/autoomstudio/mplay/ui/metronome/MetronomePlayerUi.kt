@@ -2,18 +2,25 @@ package com.autoomstudio.mplay.ui.metronome
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.GraphicEq
-import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -21,12 +28,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -118,11 +125,8 @@ fun MetronomeSheet(
                     .verticalScroll(rememberScrollState())
                     .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
             ) {
-                Text(
-                    text = stringResource(R.string.metronome_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+                val songDetection = detection.takeIf { song != null && it.songId == song.id } ?: TempoDetection.Idle
+                val songSync = (sync as? SyncState.On)?.takeIf { song != null && it.songId == song.id }
                 MetronomeControls(
                     state = state,
                     beat = viewModel.beat,
@@ -130,18 +134,27 @@ fun MetronomeSheet(
                     onUpdate = viewModel::update,
                     onToggle = viewModel::toggle,
                     onTap = viewModel::tap,
+                    onToggleMute = viewModel::toggleMute,
+                    onBack = onDismiss,
                     tempoExtras = {
                         DetectTempo(
-                            detection = detection.takeIf { song != null && it.songId == song.id }
-                                ?: TempoDetection.Idle,
+                            detection = songDetection,
                             bpm = state.settings.bpm,
                             canDetect = song != null,
                             onDetect = { song?.let(viewModel::detect) },
                             onScale = viewModel::scaleBpm,
                             onApplyMeter = viewModel::applyMeter,
-                            sync = (sync as? SyncState.On)?.takeIf { song != null && it.songId == song.id },
-                            onToggleSync = viewModel::toggleSync,
                         )
+                    },
+                    syncTile = (songDetection as? TempoDetection.Done)?.let { done ->
+                        {
+                            SyncTile(
+                                sync = songSync,
+                                available = done.grid != null,
+                                onToggle = viewModel::toggleSync,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     },
                 )
             }
@@ -179,57 +192,88 @@ private fun DetectTempo(
     onDetect: () -> Unit,
     onScale: (Double) -> Unit,
     onApplyMeter: () -> Unit,
-    sync: SyncState.On?,
-    onToggleSync: () -> Unit,
 ) {
     val running = detection is TempoDetection.Running
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(onClick = onDetect, enabled = canDetect && !running, modifier = Modifier.weight(1f)) {
-                Icon(Icons.Outlined.GraphicEq, contentDescription = null)
-                Text(stringResource(R.string.metronome_detect), Modifier.padding(start = 8.dp))
+            BoxButton(onClick = onDetect, enabled = canDetect && !running, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Outlined.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.metronome_detect), Modifier.padding(start = 10.dp))
             }
-            val halveLabel = stringResource(R.string.metronome_halve_description)
-            OutlinedButton(
+            BoxButton(
                 onClick = { onScale(0.5) },
                 enabled = bpm / 2 >= MetronomeSettings.MIN_BPM,
-                modifier = Modifier.semantics { contentDescription = halveLabel },
+                description = stringResource(R.string.metronome_halve_description),
+                modifier = Modifier.width(64.dp),
             ) {
                 Text(stringResource(R.string.metronome_halve))
             }
-            val doubleLabel = stringResource(R.string.metronome_double_description)
-            OutlinedButton(
+            BoxButton(
                 onClick = { onScale(2.0) },
                 enabled = bpm * 2 <= MetronomeSettings.MAX_BPM,
-                modifier = Modifier.semantics { contentDescription = doubleLabel },
+                description = stringResource(R.string.metronome_double_description),
+                modifier = Modifier.width(64.dp),
             ) {
                 Text(stringResource(R.string.metronome_double))
             }
         }
         when (detection) {
             TempoDetection.Idle -> Unit
-            is TempoDetection.Running -> {
+            is TempoDetection.Running -> MetronomeCard {
                 Text(
                     stringResource(R.string.metronome_detecting),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                LinearProgressIndicator(progress = { detection.progress }, modifier = Modifier.fillMaxWidth())
+                LinearProgressIndicator(
+                    progress = { detection.progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                )
             }
-            is TempoDetection.Done -> {
-                DetectResult(detection, onApplyMeter)
-                if (detection.grid != null) SyncWithSong(sync, onToggleSync)
+            is TempoDetection.Done -> DetectResult(detection, onApplyMeter)
+            is TempoDetection.Failed -> MetronomeCard {
+                Text(
+                    stringResource(R.string.metronome_detect_failed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
-            is TempoDetection.Failed -> Text(
-                stringResource(R.string.metronome_detect_failed),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-            )
         }
     }
 }
 
-/** "120 BPM, 4/4" with a hint for each part, and the time signature as a chip when it wasn't applied (MT19, MT21). */
+/** An outlined rounded box, for the Detect BPM row. */
+@Composable
+private fun BoxButton(
+    onClick: () -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    description: String? = null,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = TILE_SHAPE,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.4f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = modifier
+            .heightIn(min = 52.dp)
+            .then(if (description != null) Modifier.semantics { contentDescription = description } else Modifier),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp),
+            content = content,
+        )
+    }
+}
+
+/** "120 BPM, 4/4" with a hint for each part, and the time signature as a pill when it wasn't applied (MT19, MT21). */
 @Composable
 private fun DetectResult(detection: TempoDetection.Done, onApplyMeter: () -> Unit) {
     val meter = detection.meter
@@ -246,69 +290,103 @@ private fun DetectResult(detection: TempoDetection.Done, onApplyMeter: () -> Uni
         )
         else -> stringResource(R.string.metronome_detected_with_meter, meter.clickBpm, meter.timeSignature.toString())
     }
-    Text(headline, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-    Text(
-        stringResource(
-            when (detection.estimate.confidence) {
-                TempoConfidence.High -> R.string.metronome_confidence_high
-                TempoConfidence.Medium -> R.string.metronome_confidence_medium
-                TempoConfidence.Low -> R.string.metronome_confidence_low
-            },
-        ),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    Text(
-        stringResource(
-            when (meter?.confidence) {
-                null -> R.string.metronome_meter_unknown
-                TempoConfidence.High -> R.string.metronome_meter_confidence_high
-                TempoConfidence.Medium -> R.string.metronome_meter_confidence_medium
-                TempoConfidence.Low -> R.string.metronome_meter_confidence_low
-            },
-        ),
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    if (meter != null && !detection.applied) {
-        val signature = meter.timeSignature.toString()
-        val description = stringResource(R.string.metronome_meter_suggestion_description, signature)
-        AssistChip(
-            onClick = onApplyMeter,
-            label = { Text(stringResource(R.string.metronome_meter_suggestion, signature)) },
-            modifier = Modifier.semantics { contentDescription = description },
-        )
+    MetronomeCard {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(headline, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    stringResource(
+                        when (detection.estimate.confidence) {
+                            TempoConfidence.High -> R.string.metronome_confidence_high
+                            TempoConfidence.Medium -> R.string.metronome_confidence_medium
+                            TempoConfidence.Low -> R.string.metronome_confidence_low
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    stringResource(
+                        when (meter?.confidence) {
+                            null -> R.string.metronome_meter_unknown
+                            TempoConfidence.High -> R.string.metronome_meter_confidence_high
+                            TempoConfidence.Medium -> R.string.metronome_meter_confidence_medium
+                            TempoConfidence.Low -> R.string.metronome_meter_confidence_low
+                        },
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (meter != null && !detection.applied) {
+                MeterSuggestion(signature = meter.timeSignature.toString(), onClick = onApplyMeter)
+            }
+        }
     }
 }
 
-/** Turns following the song on or off, with what the clicks are doing while on. */
+/** "Looks like 3/4. Use it?" as a tappable pill (MT19). */
 @Composable
-private fun SyncWithSong(sync: SyncState.On?, onToggle: () -> Unit) {
-    val description = stringResource(
-        if (sync != null) R.string.metronome_sync_on_description else R.string.metronome_sync_off_description,
-    )
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth(),
+private fun MeterSuggestion(signature: String, onClick: () -> Unit) {
+    val description = stringResource(R.string.metronome_meter_suggestion_description, signature)
+    Surface(
+        onClick = onClick,
+        shape = TILE_SHAPE,
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)),
+        modifier = Modifier
+            .widthIn(max = 168.dp)
+            .semantics { contentDescription = description },
     ) {
-        FilterChip(
-            selected = sync != null,
-            onClick = onToggle,
-            label = { Text(stringResource(R.string.metronome_sync)) },
-            leadingIcon = {
-                Icon(MetronomeIcons.Default, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize))
-            },
-            modifier = Modifier.semantics { contentDescription = description },
-        )
-        if (sync != null) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+        ) {
+            Icon(
+                Icons.Outlined.Lightbulb,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp),
+            )
             Text(
-                stringResource(if (sync.musicPaused) R.string.metronome_sync_paused else R.string.metronome_sync_following),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                stringResource(R.string.metronome_meter_suggestion, signature),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .padding(horizontal = 8.dp),
+            )
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
             )
         }
     }
+}
+
+/** Turns following the song on or off, and says what the clicks are doing while on. */
+@Composable
+private fun SyncTile(sync: SyncState.On?, available: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    ActionTile(
+        icon = Icons.Outlined.MusicNote,
+        title = stringResource(R.string.metronome_sync),
+        subtitle = stringResource(
+            when {
+                sync == null -> R.string.metronome_sync_hint
+                sync.musicPaused -> R.string.metronome_sync_paused
+                else -> R.string.metronome_sync_following
+            },
+        ),
+        onClick = onToggle,
+        selected = sync != null,
+        enabled = available,
+        description = stringResource(
+            if (sync != null) R.string.metronome_sync_on_description else R.string.metronome_sync_off_description,
+        ),
+        modifier = modifier,
+    )
 }
 
 /** A small metronome mark for the mini player that pulses on each beat while the metronome runs (MT12). */

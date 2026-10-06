@@ -28,7 +28,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-data class MetronomeState(val running: Boolean = false, val settings: MetronomeSettings = MetronomeSettings())
+/** [muted] is the user's mute toggle; the beat keeps going while muted. */
+data class MetronomeState(
+    val running: Boolean = false,
+    val settings: MetronomeSettings = MetronomeSettings(),
+    val muted: Boolean = false,
+)
 
 /** Whether the clicks follow a song's beats. */
 sealed interface SyncState {
@@ -68,7 +73,9 @@ class MetronomeController(
     private val running = MutableStateFlow(false)
     private val settings = MutableStateFlow(MetronomeSettings())
 
-    val state: StateFlow<MetronomeState> = combine(running, settings, ::MetronomeState)
+    private val userMuted = MutableStateFlow(false)
+
+    val state: StateFlow<MetronomeState> = combine(running, settings, userMuted, ::MetronomeState)
         .stateIn(scope, SharingStarted.Eagerly, MetronomeState())
 
     private var saveJob: Job? = null
@@ -153,7 +160,7 @@ class MetronomeController(
         abandonFocus()
         inCall = false
         focusPaused = false
-        engine.setMuted(false)
+        updateMute()
     }
 
     /** Doubles or halves the BPM; while synced the grid is scaled exactly, so the clicks stay on the song. */
@@ -259,8 +266,14 @@ class MetronomeController(
         engine.align(fresh)
     }
 
+    /** Not saved, but kept across stop and start. */
+    fun setUserMuted(muted: Boolean) {
+        userMuted.value = muted
+        updateMute()
+    }
+
     private fun updateMute() {
-        engine.setMuted(inCall || focusPaused || musicPaused)
+        engine.setMuted(inCall || focusPaused || musicPaused || userMuted.value)
     }
 
     private fun requestFocus() {

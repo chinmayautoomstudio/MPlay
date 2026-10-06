@@ -26,6 +26,7 @@ fun MetronomeScreen(
         onUpdate = viewModel::update,
         onToggle = viewModel::toggle,
         onTap = viewModel::tap,
+        onToggleMute = viewModel::toggleMute,
         modifier = modifier
             .verticalScroll(rememberScrollState())
             .fillMaxWidth()
