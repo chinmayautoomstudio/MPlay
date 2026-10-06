@@ -272,6 +272,10 @@
     <string name="duplicates_bitrate">%1$d kbps</string>
     <string name="duplicates_lossless">Lossless</string>
     <string name="settings_offline_note">Fully offline. MPlay has no internet permission, no ads and no analytics.</string>
+    <string name="settings_licenses">Open-source licenses</string>
+    <string name="settings_licenses_summary">The separation model, ONNX Runtime and the libraries MPlay uses</string>
+    <string name="licenses_title">Open-source licenses</string>
+    <string name="licenses_intro">MPlay is built with these open-source projects. Tap one to read its license.</string>
 
     <string name="separate_vocals">Separate vocals</string>
     <string name="stem_mode_label">Version</string>
@@ -354,6 +358,7 @@
     <string name="message_stems_deleted">Stems deleted</string>
     <string name="message_stem_exported">Saved to Music/MPlay Stems</string>
     <string name="message_stem_export_failed">Couldn\'t save to Music/MPlay Stems</string>
+    <string name="message_stem_export_permission">MPlay needs storage permission to save stems.</string>
 
     <string name="settings_section_separation">Vocal separation</string>
     <string name="settings_separation_queue">Separated songs and queue</string>
@@ -375,6 +380,7 @@
     <string name="settings_separation_import_model">Import model file</string>
     <string name="message_model_imported">Model imported</string>
     <string name="message_model_import_failed">Couldn\'t import the model file</string>
+    <string name="message_model_import_wrong_file">That file isn\'t the MPlay separation model (htdemucs.onnx)</string>
     <string name="settings_separation_model_missing_title">AI model not installed</string>
     <string name="model_missing_title">AI model needed</string>
     <string name="model_missing_message">The AI Vocal Separator needs its model (%1$s), which isn\'t included in this build. Import the model file to continue.</string>

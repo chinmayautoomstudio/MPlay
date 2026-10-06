@@ -44,6 +44,7 @@ import com.autoomstudio.mplay.data.stems.PauseReason
 import com.autoomstudio.mplay.data.stems.SeparationJobEntity
 import com.autoomstudio.mplay.data.stems.StemMode
 import com.autoomstudio.mplay.data.stems.StemSetEntity
+import com.autoomstudio.mplay.ui.common.rememberWithLegacyStorage
 import com.autoomstudio.mplay.ui.components.ComingSoon
 import com.autoomstudio.mplay.ui.library.DetailBackButton
 import kotlin.math.roundToInt
@@ -198,6 +199,7 @@ private fun FinishedJobRow(job: SeparationJobEntity, canRetry: Boolean, viewMode
 private fun StemSetRow(set: StemSetEntity, viewModel: SeparationViewModel) {
     val context = LocalContext.current
     var menuOpen by remember { mutableStateOf(false) }
+    val withStorage = rememberWithLegacyStorage(viewModel::exportPermissionDenied)
     ListItem(
         headlineContent = { SongTitle(set.title) },
         supportingContent = {
@@ -224,14 +226,14 @@ private fun StemSetRow(set: StemSetEntity, viewModel: SeparationViewModel) {
                         text = { Text(stringResource(R.string.separation_export_instrumental)) },
                         onClick = {
                             menuOpen = false
-                            viewModel.export(set, StemMode.Instrumental)
+                            withStorage { viewModel.export(set, StemMode.Instrumental) }
                         },
                     )
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.separation_export_vocals)) },
                         onClick = {
                             menuOpen = false
-                            viewModel.export(set, StemMode.Vocals)
+                            withStorage { viewModel.export(set, StemMode.Vocals) }
                         },
                     )
                     DropdownMenuItem(

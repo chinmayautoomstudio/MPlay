@@ -38,6 +38,7 @@ import androidx.glance.layout.ContentScale
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
@@ -55,7 +56,7 @@ import com.autoomstudio.mplay.ui.theme.NeonLightColors
 
 class MPlayWidget : GlanceAppWidget() {
 
-    override val sizeMode = SizeMode.Responsive(setOf(SMALL, WIDE))
+    override val sizeMode = SizeMode.Responsive(setOf(SMALL, MEDIUM, WIDE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val store = (context.applicationContext as MPlayApp).container.widgetStateStore
@@ -71,6 +72,7 @@ class MPlayWidget : GlanceAppWidget() {
 
     companion object {
         val SMALL = DpSize(110.dp, 48.dp)
+        val MEDIUM = DpSize(180.dp, 48.dp)
         val WIDE = DpSize(250.dp, 48.dp)
     }
 }
@@ -80,7 +82,9 @@ private val WidgetColors = ColorProviders(light = NeonLightColors, dark = NeonDa
 @Composable
 private fun WidgetContent(state: WidgetState, artwork: Bitmap?) {
     val context = LocalContext.current
-    val wide = LocalSize.current.width >= MPlayWidget.WIDE.width
+    val width = LocalSize.current.width
+    val wide = width >= MPlayWidget.WIDE.width
+    val showText = width >= MPlayWidget.MEDIUM.width
     val openPlayer = Intent(context, MainActivity::class.java)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         .putExtra(MainActivity.EXTRA_OPEN_NOW_PLAYING, !state.isIdle)
@@ -97,51 +101,56 @@ private fun WidgetContent(state: WidgetState, artwork: Bitmap?) {
             .clickable(actionStartActivity(openPlayer)),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Artwork(artwork, contentDescription = context.getString(R.string.album_art_description, title))
-        Spacer(GlanceModifier.width(10.dp))
-        Column(
-            modifier = GlanceModifier.defaultWeight(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = title,
-                maxLines = 1,
-                style = TextStyle(
-                    color = GlanceTheme.colors.onSurface,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                ),
-            )
-            Text(
-                text = subtitle,
-                maxLines = 1,
-                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
-            )
-        }
         if (wide) {
-            ControlButton(
-                icon = R.drawable.ic_widget_previous,
-                description = context.getString(R.string.action_previous),
-                onClick = actionRunCallback<SkipActionCallback>(
-                    actionParametersOf(SkipActionCallback.KEY_FORWARD to false),
-                ),
-            )
+            Artwork(artwork, contentDescription = context.getString(R.string.album_art_description, title))
+            Spacer(GlanceModifier.width(10.dp))
         }
+        if (showText) {
+            Column(
+                modifier = GlanceModifier.defaultWeight(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    maxLines = 1,
+                    style = TextStyle(
+                        color = GlanceTheme.colors.onSurface,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                    ),
+                )
+                Text(
+                    text = subtitle,
+                    maxLines = 1,
+                    style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp),
+                )
+            }
+        }
+        // Without text the buttons share the width, since three full-size ones don't fit the smallest widget.
+        val buttonModifier = if (showText) GlanceModifier.size(48.dp) else GlanceModifier.defaultWeight().height(48.dp)
+        ControlButton(
+            icon = R.drawable.ic_widget_previous,
+            description = context.getString(R.string.action_previous),
+            onClick = actionRunCallback<SkipActionCallback>(
+                actionParametersOf(SkipActionCallback.KEY_FORWARD to false),
+            ),
+            modifier = buttonModifier,
+        )
         ControlButton(
             icon = if (state.isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play,
             description = context.getString(if (state.isPlaying) R.string.action_pause else R.string.action_play),
             onClick = actionSendBroadcast(mediaButtonIntent(context, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)),
+            modifier = buttonModifier,
             prominent = true,
         )
-        if (wide) {
-            ControlButton(
-                icon = R.drawable.ic_widget_next,
-                description = context.getString(R.string.action_next),
-                onClick = actionRunCallback<SkipActionCallback>(
-                    actionParametersOf(SkipActionCallback.KEY_FORWARD to true),
-                ),
-            )
-        }
+        ControlButton(
+            icon = R.drawable.ic_widget_next,
+            description = context.getString(R.string.action_next),
+            onClick = actionRunCallback<SkipActionCallback>(
+                actionParametersOf(SkipActionCallback.KEY_FORWARD to true),
+            ),
+            modifier = buttonModifier,
+        )
     }
 }
 
@@ -177,11 +186,11 @@ private fun ControlButton(
     icon: Int,
     description: String,
     onClick: Action,
+    modifier: GlanceModifier,
     prominent: Boolean = false,
 ) {
     Box(
-        modifier = GlanceModifier
-            .size(48.dp)
+        modifier = modifier
             .cornerRadius(24.dp)
             .then(if (prominent) GlanceModifier.background(GlanceTheme.colors.primary) else GlanceModifier)
             .clickable(onClick),

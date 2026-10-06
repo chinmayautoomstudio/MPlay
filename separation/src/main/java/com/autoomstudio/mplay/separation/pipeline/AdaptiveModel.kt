@@ -45,7 +45,7 @@ class AdaptiveModel(
                 model = it
                 threads = target
                 switchedAt = now
-                onSwitch(target, heat)
+                if (current != null) onSwitch(target, heat)
             }
         }
         active.run(mix, mag, spec, wave)

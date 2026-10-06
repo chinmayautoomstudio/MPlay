@@ -237,8 +237,10 @@ fun separationMessageText(context: android.content.Context, message: SeparationM
         SeparationMessage.StemsDeleted -> res.getString(R.string.message_stems_deleted)
         SeparationMessage.Exported -> res.getString(R.string.message_stem_exported)
         SeparationMessage.ExportFailed -> res.getString(R.string.message_stem_export_failed)
+        SeparationMessage.ExportPermissionDenied -> res.getString(R.string.message_stem_export_permission)
         SeparationMessage.ModelImported -> res.getString(R.string.message_model_imported)
         SeparationMessage.ModelImportFailed -> res.getString(R.string.message_model_import_failed)
+        SeparationMessage.ModelImportWrongFile -> res.getString(R.string.message_model_import_wrong_file)
         is SeparationMessage.Ready -> res.getString(R.string.message_separation_ready, message.title)
         is SeparationMessage.Failed ->
             res.getString(R.string.message_separation_failed, message.title, res.getString(errorTextRes(message.error)))

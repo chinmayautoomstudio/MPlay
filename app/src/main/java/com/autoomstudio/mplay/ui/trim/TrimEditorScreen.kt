@@ -1,14 +1,9 @@
 package com.autoomstudio.mplay.ui.trim
 
-import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -77,7 +72,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -86,6 +80,7 @@ import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.clip.SoundType
 import com.autoomstudio.mplay.ui.common.formatDuration
 import com.autoomstudio.mplay.ui.common.formatPreciseDuration
+import com.autoomstudio.mplay.ui.common.rememberWithLegacyStorage
 import com.autoomstudio.mplay.ui.playlist.PlaylistNameDialog
 import kotlinx.coroutines.launch
 
@@ -138,26 +133,8 @@ fun TrimEditorScreen(viewModel: TrimEditorViewModel, onClose: () -> Unit) {
         }
     }
 
-    // Android 9 and older write the clip as a plain file, which needs the storage permission.
-    var pendingStorageAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-    val storageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            pendingStorageAction?.invoke()
-        } else {
-            showSnackbar(resources.getString(TrimError.PermissionDenied.message), null) {}
-        }
-        pendingStorageAction = null
-    }
-    val withStorage: (() -> Unit) -> Unit = { action ->
-        val needsPermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
-            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
-            PackageManager.PERMISSION_GRANTED
-        if (needsPermission) {
-            pendingStorageAction = action
-            storageLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        } else {
-            action()
-        }
+    val withStorage = rememberWithLegacyStorage {
+        showSnackbar(resources.getString(TrimError.PermissionDenied.message), null) {}
     }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {

@@ -65,8 +65,10 @@ sealed interface SeparationMessage {
     data object StemsDeleted : SeparationMessage
     data object Exported : SeparationMessage
     data object ExportFailed : SeparationMessage
+    data object ExportPermissionDenied : SeparationMessage
     data object ModelImported : SeparationMessage
     data object ModelImportFailed : SeparationMessage
+    data object ModelImportWrongFile : SeparationMessage
 
     /** A song finished while the app was open; the snackbar offers to play it as instrumental. */
     data class Ready(val songId: Long, val title: String) : SeparationMessage
@@ -221,6 +223,10 @@ class SeparationViewModel(
         export(set, mode)
     }
 
+    fun exportPermissionDenied() {
+        viewModelScope.launch { _messages.send(SeparationMessage.ExportPermissionDenied) }
+    }
+
     fun export(set: StemSetEntity, mode: StemMode) {
         viewModelScope.launch {
             val message = try {
@@ -253,6 +259,9 @@ class SeparationViewModel(
                 SeparationMessage.ModelImported
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: ModelImporter.WrongModelException) {
+                Log.w(TAG, "Picked file is not the model", e)
+                SeparationMessage.ModelImportWrongFile
             } catch (e: Exception) {
                 Log.w(TAG, "Model import failed", e)
                 SeparationMessage.ModelImportFailed

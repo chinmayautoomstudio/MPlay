@@ -69,6 +69,7 @@ import com.autoomstudio.mplay.data.stems.StemMode
 import com.autoomstudio.mplay.data.settings.ThemeSettings
 import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.data.library.SongDeleter
+import com.autoomstudio.mplay.ui.common.rememberWithLegacyStorage
 import com.autoomstudio.mplay.ui.components.MPlayTopBar
 import com.autoomstudio.mplay.ui.components.SelectionTopBar
 import com.autoomstudio.mplay.ui.duplicates.DuplicateActions
@@ -106,6 +107,7 @@ import com.autoomstudio.mplay.ui.separation.SeparationUiState
 import com.autoomstudio.mplay.ui.separation.SeparationViewModel
 import com.autoomstudio.mplay.ui.separation.SeparatorUi
 import com.autoomstudio.mplay.ui.separation.separationMessageText
+import com.autoomstudio.mplay.ui.settings.LicensesScreen
 import com.autoomstudio.mplay.ui.settings.SettingsScreen
 import com.autoomstudio.mplay.ui.trim.TrimEditorActivity
 import com.autoomstudio.mplay.ui.trim.TrimMode
@@ -244,7 +246,8 @@ fun MainScreen(
     var deleteSongIds by rememberSaveable { mutableStateOf<LongArray?>(null) }
     // Offered whenever the phone qualifies; a missing model is explained when the action is picked.
     val canSeparate = separationState.deviceEligible
-    val songActions = remember(onPlayNext, onAddToQueue, resources, context, canSeparate) {
+    val withStorage = rememberWithLegacyStorage(separationViewModel::exportPermissionDenied)
+    val songActions = remember(onPlayNext, onAddToQueue, resources, context, canSeparate, withStorage) {
         SongActions(
             onAddToPlaylist = { addToPlaylistSongIds = longArrayOf(it.id) },
             onPlayNext = {
@@ -264,7 +267,7 @@ fun MainScreen(
             } else {
                 null
             },
-            onSaveStem = { song, mode -> separationViewModel.export(song.id, mode) },
+            onSaveStem = { song, mode -> withStorage { separationViewModel.export(song.id, mode) } },
         )
     }
 
@@ -477,6 +480,11 @@ fun MainScreen(
                                     modifier = contentModifier,
                                     backEnabled = pageBackEnabled,
                                 )
+                                SettingsPage.Licenses -> LicensesScreen(
+                                    onBack = { settingsPage = SettingsPage.Main },
+                                    modifier = contentModifier,
+                                    backEnabled = pageBackEnabled,
+                                )
                                 SettingsPage.Main -> SettingsScreen(
                                     theme = themeSettings,
                                     onThemeModeChange = onThemeModeChange,
@@ -485,6 +493,7 @@ fun MainScreen(
                                     onHideDuplicatesChange = duplicateActions.onHideDuplicatesChange,
                                     duplicateGroupCount = duplicates.groups.size,
                                     onReviewDuplicates = { settingsPage = SettingsPage.Duplicates },
+                                    onOpenLicenses = { settingsPage = SettingsPage.Licenses },
                                     modifier = contentModifier,
                                     separationSection = { header ->
                                         SeparationSettingsSection(
@@ -618,7 +627,7 @@ fun MainScreen(
     }
 }
 
-private enum class SettingsPage { Main, Duplicates, Separation }
+private enum class SettingsPage { Main, Duplicates, Separation, Licenses }
 
 @Composable
 private fun MPlayNavigationBar(

@@ -50,6 +50,7 @@ fun SettingsScreen(
     onHideDuplicatesChange: (Boolean) -> Unit,
     duplicateGroupCount: Int,
     onReviewDuplicates: () -> Unit,
+    onOpenLicenses: () -> Unit,
     modifier: Modifier = Modifier,
     separationSection: @Composable (sectionHeader: @Composable (String) -> Unit) -> Unit = {},
 ) {
@@ -120,6 +121,12 @@ fun SettingsScreen(
                 }
             },
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+        )
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_licenses)) },
+            supportingContent = { Text(stringResource(R.string.settings_licenses_summary)) },
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+            modifier = Modifier.clickable(onClick = onOpenLicenses),
         )
     }
 }

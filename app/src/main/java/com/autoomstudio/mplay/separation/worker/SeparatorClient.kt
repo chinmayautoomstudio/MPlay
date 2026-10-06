@@ -12,10 +12,12 @@ import android.os.Looper
 import android.os.Message
 import android.os.Messenger
 import android.os.RemoteException
+import android.util.Log
 import com.autoomstudio.mplay.separation.pipeline.SeparationError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import kotlin.coroutines.resume
 
@@ -37,9 +39,14 @@ class SeparatorClient(private val context: Context) : AutoCloseable {
 
     suspend fun connect() {
         if (service != null) return
+        withTimeoutOrNull(CONNECT_TIMEOUT_MS) { bind() } ?: Log.w(TAG, "Timed out binding the separator")
+    }
+
+    private suspend fun bind() {
         suspendCancellableCoroutine { continuation ->
             val conn = object : ServiceConnection {
                 override fun onServiceConnected(name: ComponentName?, binder: IBinder) {
+                    if (connection !== this) return
                     service = Messenger(binder)
                     if (continuation.isActive) continuation.resume(Unit)
                 }
@@ -51,6 +58,7 @@ class SeparatorClient(private val context: Context) : AutoCloseable {
                 override fun onNullBinding(name: ComponentName?) = onDied()
 
                 private fun onDied() {
+                    if (connection !== this) return
                     service = null
                     // The process died mid-song; almost always the low-memory killer.
                     pending?.complete(SeparatorOutcome.Failed(SeparationError.OutOfMemory, "Separator process died"))
@@ -77,7 +85,7 @@ class SeparatorClient(private val context: Context) : AutoCloseable {
         instrumental: File,
         onProgress: (fraction: Float, remainingMs: Long?, cooling: Boolean) -> Unit,
     ): SeparatorOutcome {
-        val target = service
+        val target = service ?: reconnect()
             ?: return SeparatorOutcome.Failed(SeparationError.ModelFailed, "Could not start the separator")
         val result = CompletableDeferred<SeparatorOutcome>()
         pending = result
@@ -124,6 +132,17 @@ class SeparatorClient(private val context: Context) : AutoCloseable {
         }
     }
 
+    /**
+     * The `:separator` process died (usually the low-memory killer on the previous song). Binds a fresh one so the
+     * rest of the queue still runs; the song that was running when it died has already failed.
+     */
+    private suspend fun reconnect(): Messenger? {
+        Log.i(TAG, "Separator is gone; starting it again")
+        close()
+        connect()
+        return service
+    }
+
     /** Asks the running song to stop; [separate] then returns [SeparatorOutcome.Cancelled]. */
     fun cancel() {
         try {
@@ -149,5 +168,10 @@ class SeparatorClient(private val context: Context) : AutoCloseable {
             } catch (_: IllegalArgumentException) {
             }
         }
+    }
+
+    private companion object {
+        const val TAG = "SeparatorClient"
+        const val CONNECT_TIMEOUT_MS = 20_000L
     }
 }
