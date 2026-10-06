@@ -107,6 +107,7 @@ import com.autoomstudio.mplay.ui.separation.SeparationUiState
 import com.autoomstudio.mplay.ui.separation.SeparationViewModel
 import com.autoomstudio.mplay.ui.separation.SeparatorUi
 import com.autoomstudio.mplay.ui.separation.separationMessageText
+import com.autoomstudio.mplay.ui.settings.AboutScreen
 import com.autoomstudio.mplay.ui.settings.LicensesScreen
 import com.autoomstudio.mplay.ui.settings.SettingsScreen
 import com.autoomstudio.mplay.ui.trim.TrimEditorActivity
@@ -480,8 +481,15 @@ fun MainScreen(
                                     modifier = contentModifier,
                                     backEnabled = pageBackEnabled,
                                 )
-                                SettingsPage.Licenses -> LicensesScreen(
+                                SettingsPage.About -> AboutScreen(
                                     onBack = { settingsPage = SettingsPage.Main },
+                                    onOpenLicenses = { settingsPage = SettingsPage.Licenses },
+                                    onMessage = showMessage,
+                                    modifier = contentModifier,
+                                    backEnabled = pageBackEnabled,
+                                )
+                                SettingsPage.Licenses -> LicensesScreen(
+                                    onBack = { settingsPage = SettingsPage.About },
                                     modifier = contentModifier,
                                     backEnabled = pageBackEnabled,
                                 )
@@ -493,7 +501,7 @@ fun MainScreen(
                                     onHideDuplicatesChange = duplicateActions.onHideDuplicatesChange,
                                     duplicateGroupCount = duplicates.groups.size,
                                     onReviewDuplicates = { settingsPage = SettingsPage.Duplicates },
-                                    onOpenLicenses = { settingsPage = SettingsPage.Licenses },
+                                    onOpenAbout = { settingsPage = SettingsPage.About },
                                     modifier = contentModifier,
                                     separationSection = { header ->
                                         SeparationSettingsSection(
@@ -627,7 +635,7 @@ fun MainScreen(
     }
 }
 
-private enum class SettingsPage { Main, Duplicates, Separation, Licenses }
+private enum class SettingsPage { Main, Duplicates, Separation, About, Licenses }
 
 @Composable
 private fun MPlayNavigationBar(

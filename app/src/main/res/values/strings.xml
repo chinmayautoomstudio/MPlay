@@ -271,11 +271,31 @@
     <string name="duplicates_copy_details">%1$s · %2$s · %3$s</string>
     <string name="duplicates_bitrate">%1$d kbps</string>
     <string name="duplicates_lossless">Lossless</string>
-    <string name="settings_offline_note">Fully offline. MPlay has no internet permission, no ads and no analytics.</string>
     <string name="settings_licenses">Open-source licenses</string>
     <string name="settings_licenses_summary">The separation model, ONNX Runtime and the libraries MPlay uses</string>
     <string name="licenses_title">Open-source licenses</string>
     <string name="licenses_intro">MPlay is built with these open-source projects. Tap one to read its license.</string>
+
+    <string name="settings_about_mplay">About MPlay</string>
+    <string name="settings_about_mplay_summary">Version, contact and privacy</string>
+    <string name="about_version">Version %1$s (build %2$d)</string>
+    <string name="about_made_by">Made by</string>
+    <string name="about_company_name" translatable="false">Autoom Studio</string>
+    <string name="about_description">MPlay is an offline music player made by Autoom Studio, an AI automation and IT solutions company based in India.</string>
+    <string name="about_website_label">Website</string>
+    <string name="about_website" translatable="false">https://autoomstudio.com/</string>
+    <string name="about_website_display" translatable="false">autoomstudio.com</string>
+    <string name="about_email_label">Email</string>
+    <string name="about_email" translatable="false">connect@autoomstudio.com</string>
+    <string name="about_email_subject">MPlay %1$s feedback</string>
+    <string name="about_privacy_title">Privacy</string>
+    <string name="about_privacy_note">MPlay works fully offline, with no internet access, no accounts, no ads and no analytics. Your music and recordings stay on your phone. The microphone is used only when you record a sing-along.</string>
+    <string name="about_privacy_policy">Privacy policy</string>
+    <string name="about_privacy_url" translatable="false">https://autoomstudio.com/privacy-policy</string>
+    <string name="about_copyright" translatable="false">© 2026 AUTOOM STUDIO (OPC) PRIVATE LIMITED. All rights reserved.</string>
+    <string name="about_copied">Copied %1$s</string>
+    <string name="about_no_browser">No browser app found</string>
+    <string name="about_no_mail_app">No email app found</string>
 
     <string name="separate_vocals">Separate vocals</string>
     <string name="stem_mode_label">Version</string>

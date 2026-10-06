@@ -1,6 +1,11 @@
 # MPlay: Product Requirements Document (v3.1)
 
-**Features:** Metronome, Sing Along, Separation Time Notice, About MPlay **Product:** MPlay, an offline Android music player **Platform:** Android (native Kotlin, Jetpack Compose) **Version:** 3.1 **Status:** Draft
+- **Features:** Metronome, Sing Along, Separation Time Notice, About MPlay
+- **Product:** MPlay, an offline Android music player
+- **Company:** AUTOOM STUDIO (OPC) PRIVATE LIMITED ([autoomstudio.com](https://autoomstudio.com/), connect@autoomstudio.com)
+- **Platform:** Android (native Kotlin, Jetpack Compose)
+- **Version:** 3.1
+- **Status:** Draft
 
 ---
 
@@ -52,7 +57,7 @@ MPlay stays fully offline. The only new permissions are for the microphone, and 
 | --- | --- |
 | Metronome audio | Own low-latency audio output (AudioTrack, low-latency mode), separate from the music player, so it mixes with music at the system level |
 | Metronome timing | Beats scheduled by counting audio frames with a double-precision frames-per-beat value; no timers or handlers for beat timing |
-| Metronome in background | Must keep running with the screen off; runs in a foreground service of type media playback (either the existing playback service or a small dedicated one) |
+| Metronome in background | Must keep running with the screen off; runs in a small dedicated foreground service of type media playback. The existing playback service is not reused, because Media3 ties its foreground state to the music player and would stop the metronome when music is paused |
 | Tempo detection | On-device and offline: decode a mono low-rate signal (about 11 kHz) of 60 to 90 seconds from the middle of the song, compute an onset envelope, estimate tempo in the 60 to 200 BPM range with octave correction and a confidence score |
 | Tempo cache | Detected tempo stored per song in the local database, invalidated when the file changes |
 | Voice capture | AudioRecord, mono, 44.1 kHz, 16-bit, minimal-processing source, automatic gain control and noise suppression off where possible, written to a temporary file |
@@ -60,9 +65,9 @@ MPlay stays fully offline. The only new permissions are for the microphone, and 
 | Mixing | Offline after the take: decode the instrumental stem file, mix with the voice file using the chosen levels and sync offset, protect against clipping, encode to AAC/M4A (192 kbps, 44.1 kHz stereo) |
 | Saved recordings | Music/MPlay Recordings via MediaStore, appearing in the library automatically |
 | Permissions | RECORD_AUDIO (runtime, requested on first recording) and FOREGROUND_SERVICE_MICROPHONE. No INTERNET permission |
-| Links | Website, email and phone links open through system intents (browser, mail app, dialer) and need no extra permission |
+| Links | Website, privacy policy and email links open through system intents (browser, mail app) and need no extra permission |
 | Data | Database schema updated with an automatic migration; existing playlists, stems and settings are preserved |
-| Version | Version name 3.1, version code incremented |
+| Version | Version name 3.1, version code 4 (up from 3.0, version code 3) |
 
 ## 6. Functional Requirements
 
@@ -84,10 +89,10 @@ Priority: **P0** = must ship, **P1** = should ship, **P2** = nice to have.
 | MT10 | Cache each song's detected BPM so repeat detection is instant; discard it if the file changes | P1 |
 | MT11 | When a song has separated stems, analyze the instrumental stem, since drums are clearer there | P2 |
 | MT12 | A compact metronome control on Now Playing that opens a sheet with the same controls and Detect BPM, plus a small indicator on the mini player when the metronome is running | P0 |
-| MT13 | The metronome mixes with the music and never pauses or ducks it; when nothing is playing it requests audio focus normally | P0 |
+| MT13 | The metronome mixes with the music and never pauses or ducks it; when nothing is playing it requests audio focus normally. If the metronome holds focus and the user then starts music in MPlay, the metronome keeps running (MPlay's own playback never stops it); only focus loss to another app or a call stops it | P0 |
 | MT14 | Sample-accurate timing with no drift over long sessions; BPM changes apply on the next beat without a click or glitch | P0 |
 | MT15 | Keeps running with the screen off and when the app is in the background | P0 |
-| MT16 | Pauses during phone calls | P1 |
+| MT16 | Pauses during phone calls, detected without a phone-state permission: through audio focus loss, plus the audio mode listener (communication or call mode) on Android 12 and later | P1 |
 | MT17 | Remember the last BPM, time signature, accent, sound and volume | P1 |
 
 ### 6.2 Sing Along
@@ -112,6 +117,7 @@ Priority: **P0** = must ship, **P1** = should ship, **P2** = nice to have.
 | SA16 | Delete temporary files on discard, failure or cancel; never leave partial files in the library, even after the app is killed | P0 |
 | SA17 | Saved recordings appear in the library automatically | P1 |
 | SA18 | Check there is enough free storage before recording and warn if not | P1 |
+| SA19 | The first-run sing-along sheet shows a short personal-use note: recordings are for personal use, and users should only share recordings of songs they have the rights to | P1 |
 
 ### 6.3 Separation Time Notice
 
@@ -130,11 +136,14 @@ Priority: **P0** = must ship, **P1** = should ship, **P2** = nice to have.
 | AB1 | An About screen reachable from Settings (and from the top bar menu if one exists) | P0 |
 | AB2 | Show the MPlay logo and the Autoom Studio logo | P0 |
 | AB3 | Text: MPlay is an offline music player made by Autoom Studio, an AI automation and IT solutions company based in India | P0 |
-| AB4 | Website autoomstudio.com opens in the browser | P0 |
-| AB5 | Contact details (email and phone, supplied by Autoom Studio): email opens the mail app, phone opens the dialer, and long-press copies the value | P0 |
+| AB4 | Website https://autoomstudio.com/ opens in the browser | P0 |
+| AB5 | Contact email connect@autoomstudio.com: tapping opens the mail app, and long-press copies it. No phone number is shown | P0 |
 | AB6 | Show the app version and build number, read at runtime (for example "Version 3.1 (build 4)") | P0 |
 | AB7 | Privacy note: MPlay works fully offline, with no internet access, no accounts, no ads and no analytics; music and recordings stay on the phone; the microphone is used only when recording a sing-along | P0 |
-| AB8 | If no browser, mail app or dialer is available, show a message instead of crashing | P1 |
+| AB8 | If no browser or mail app is available, show a message instead of crashing | P1 |
+| AB9 | Brand assets: the MPlay logo in a light version (light theme) and a dark version (dark theme). The Autoom Studio full logo with text in light theme; in dark theme, the Autoom Studio icon with "Autoom Studio" as app text, since the logo's dark-brown lettering is hard to read on dark backgrounds | P0 |
+| AB10 | A "Privacy policy" row opens https://autoomstudio.com/privacy-policy in the browser (Google Play requires a privacy policy for apps that use the microphone) | P0 |
+| AB11 | Copyright footer: "© 2026 AUTOOM STUDIO (OPC) PRIVATE LIMITED. All rights reserved." | P0 |
 
 ## 7. Non-Functional Requirements
 
@@ -153,7 +162,7 @@ Priority: **P0** = must ship, **P1** = should ship, **P2** = nice to have.
 3. **Sing along:** Now Playing → Sing along → grant microphone permission (first time) → read headphone advice → optional count-in → record while the instrumental plays → Stop → review, adjust levels and offset → name and Save.
 4. **Sing along on an unseparated song:** Sing along → "Separate vocals first" → time notice dialog → Start → return when separation finishes.
 5. **Separation notice:** Separate vocals → dialog explains it can take time and may show an estimate → Start → progress sheet and notification repeat the notice.
-6. **About:** Settings → About MPlay → tap website, email or phone.
+6. **About:** Settings → About MPlay → tap website, email or privacy policy.
 
 ## 9. Screens
 
@@ -190,7 +199,7 @@ MPlay collects no analytics, so success is measured by testing:
 | Lofi mode changes speed and breaks sync | Turn lofi off during sing-along and restore it afterwards |
 | Recording runs out of storage | Check free space first and handle write failures cleanly |
 | The separation estimate is wrong (heat, other apps) | Label it as approximate and update the time remaining while running |
-| Users record and share songs they do not own | Include a short personal-use note in the first-run sing-along sheet |
+| Users record and share songs they do not own | Include a short personal-use note in the first-run sing-along sheet (SA19) |
 
 ## 12. Milestones
 
@@ -210,6 +219,8 @@ Metronome subdivisions, rhythm patterns and presets; aligning the metronome to a
 
 - **Sing-along output:** One file with the voice mixed with the instrumental.
 - **Metronome tempo:** Manual BPM, tap tempo and automatic detection of the song's BPM are all included.
-- **About page contents:** Company name, logo and website, contact details (email and phone), app version and build number, and a privacy note.
+- **About page contents:** Company name, logo and website, contact email (no phone number), app version and build number, privacy note, privacy policy link and copyright line.
+- **Branding:** Website https://autoomstudio.com/, email connect@autoomstudio.com, privacy policy https://autoomstudio.com/privacy-policy, copyright "© 2026 AUTOOM STUDIO (OPC) PRIVATE LIMITED. All rights reserved." Logo usage as in AB9.
+- **Metronome service:** A small dedicated media-playback foreground service, separate from the music playback service.
 - **Mixing method:** The voice is mixed offline against the instrumental stem file, not recorded from the speaker, which keeps the instrumental clean and allows a sync offset.
 - **Lofi during sing-along:** Lofi mode is turned off during sing-along and restored afterwards.

@@ -50,7 +50,7 @@ fun SettingsScreen(
     onHideDuplicatesChange: (Boolean) -> Unit,
     duplicateGroupCount: Int,
     onReviewDuplicates: () -> Unit,
-    onOpenLicenses: () -> Unit,
+    onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier,
     separationSection: @Composable (sectionHeader: @Composable (String) -> Unit) -> Unit = {},
 ) {
@@ -113,20 +113,15 @@ fun SettingsScreen(
 
         SectionHeader(stringResource(R.string.settings_section_about))
         ListItem(
-            headlineContent = { Text(stringResource(R.string.app_name)) },
+            headlineContent = { Text(stringResource(R.string.settings_about_mplay)) },
             supportingContent = {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME))
-                    Text(stringResource(R.string.settings_offline_note))
+                    Text(stringResource(R.string.settings_about_mplay_summary))
                 }
             },
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-        )
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_licenses)) },
-            supportingContent = { Text(stringResource(R.string.settings_licenses_summary)) },
-            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-            modifier = Modifier.clickable(onClick = onOpenLicenses),
+            modifier = Modifier.clickable(onClick = onOpenAbout),
         )
     }
 }

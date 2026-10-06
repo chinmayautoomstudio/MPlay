@@ -25,8 +25,8 @@ android {
         applicationId = "com.autoomstudio.mplay"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "3.0"
+        versionCode = 4
+        versionName = "3.1"
         // An imported model file must match the same export the build bundles.
         val modelHash = rootProject.file("models/htdemucs.onnx.sha256").readText().trim().substringBefore(' ').lowercase()
         buildConfigField("String", "MODEL_SHA256", "\"$modelHash\"")
