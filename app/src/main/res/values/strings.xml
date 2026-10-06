@@ -403,7 +403,7 @@
     <string name="stem_mode_vocals">Vocals</string>
     <string name="stem_badge_description">Vocals separated</string>
     <string name="separation_notice_title">Separate vocals?</string>
-    <string name="separation_notice_message">MPlay splits the song into vocals and instrumental on your phone. Nothing is uploaded.\n\nSeparating can take several minutes per song. How long depends on your phone\'s processor, memory and temperature. Your phone may get warm and use more battery, so it works best while charging. You can keep using MPlay meanwhile.\n\nResults aren\'t perfect: faint traces of the removed part may remain.\n\nFor personal use only. Don\'t share separated tracks of music you don\'t own.</string>
+    <string name="separation_notice_message">Please be patient while MPlay separates your song into vocals and instrumental. This may take a little time.\n\nThe separation time depends on your phone’s processor and available resources. You can continue using MPlay while it works.</string>
     <plurals name="separation_notice_estimate">
         <item quantity="one">About %d minute for this song on your phone.</item>
         <item quantity="other">About %d minutes for this song on your phone.</item>

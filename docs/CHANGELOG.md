@@ -18,6 +18,7 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 
 ### Changed
 - The separation notice now shows before every separation, with an estimate and a "Don't show again" option (previously shown once). The time notice also appears in the notification, progress pill and queue. (`e13b2f7`)
+- The "Separate vocals?" dialog text (`separation_notice_message`) is shorter: it asks for patience while MPlay separates the song and says the time depends on the phone's processor and available resources. It no longer mentions heat, battery, charging, result quality, personal use, or "Nothing is uploaded". ([vocal separation](features/vocal-separation.md))
 - Now Playing chips wrap (`FlowRow`); the mini player shows a metronome indicator. (`e13b2f7`, [playback](features/playback.md))
 - `PlaybackController` gained `play()`, `pause()`, `currentPositionMs()`, `isSeekable()`. (`e13b2f7`)
 - Files in `Music/MPlay Recordings/` are exempt from the library's 30-second minimum. (`e13b2f7`, [library](features/library.md))

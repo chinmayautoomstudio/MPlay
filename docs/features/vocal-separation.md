@@ -147,3 +147,4 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 | 2026-10-06 | `3c47315` | Thermal monitoring and adaptive thread count. |
 | 2026-10-06 | `26863d9` | Model import improvements. |
 | 2026-10-06 | `e13b2f7` | Time estimate (`SeparationEstimate`), notice before every separation with "Don't show again", time notice in notification, pill and queue. |
+| 2026-10-06 | - | Simpler `separation_notice_message`: patience, processor and resources; dropped heat, quality and personal-use wording. |
