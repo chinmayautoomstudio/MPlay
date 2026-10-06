@@ -15,6 +15,7 @@ import com.autoomstudio.mplay.data.stems.JobState
 import com.autoomstudio.mplay.data.stems.PauseReason
 import com.autoomstudio.mplay.data.stems.SeparationJobEntity
 import com.autoomstudio.mplay.separation.StorageEstimate
+import com.autoomstudio.mplay.separation.pipeline.HeatLevel
 import com.autoomstudio.mplay.separation.pipeline.SeparationError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +41,7 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
     private val container get() = (applicationContext as MPlayApp).container
     private val repository get() = container.stemRepository
     private val notifications = SeparationNotifications(context)
+    private val thermal = ThermalMonitor(context)
 
     private var currentJobId: Long? = null
     private var done = 0
@@ -78,7 +80,7 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
     private suspend fun processQueue(client: SeparatorClient): Result {
         while (true) {
             val settings = container.appSettings.separationSettings.first()
-            DeviceConditions.pauseReason(applicationContext, settings)?.let { return pause(it) }
+            DeviceConditions.pauseReason(applicationContext, settings, thermal, HeatLevel.Hot)?.let { return pause(it) }
             val job = repository.nextQueued() ?: return Result.success()
             if (!repository.markRunning(job.id)) continue
             repository.setQueuedPauseReason(null)
@@ -116,12 +118,12 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
         var pausedBy: PauseReason? = null
 
         val outcome = coroutineScope {
-            val progress = MutableStateFlow<Pair<Float, Long?>?>(null)
+            val progress = MutableStateFlow<Progress?>(null)
             val reporter = launch {
-                progress.filterNotNull().sample(PROGRESS_INTERVAL_MS).collect { (fraction, remaining) ->
-                    repository.updateProgress(job.id, fraction, remaining)
+                progress.filterNotNull().sample(PROGRESS_INTERVAL_MS).collect { (fraction, remaining, cooling) ->
+                    repository.updateProgress(job.id, fraction, remaining, PauseReason.Heat.takeIf { cooling })
                     try {
-                        setForeground(foregroundInfo(job, fraction, remaining))
+                        setForeground(foregroundInfo(job, fraction, remaining, cooling))
                     } catch (_: IllegalStateException) {
                     }
                 }
@@ -134,7 +136,12 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 val settings = container.appSettings.separationSettings
                 while (true) {
                     delay(CONDITION_CHECK_MS)
-                    val reason = DeviceConditions.pauseReason(applicationContext, settings.first())
+                    val reason = DeviceConditions.pauseReason(
+                        applicationContext,
+                        settings.first(),
+                        thermal,
+                        HeatLevel.Critical,
+                    )
                     if (reason != null) {
                         pausedBy = reason
                         client.cancel()
@@ -142,8 +149,8 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
                     }
                 }
             }
-            val result = client.separate(uri, vocals, instrumental) { fraction, remaining ->
-                progress.value = fraction to remaining
+            val result = client.separate(uri, vocals, instrumental) { fraction, remaining, cooling ->
+                progress.value = Progress(fraction, remaining, cooling)
             }
             reporter.cancel()
             cancelWatcher.cancel()
@@ -181,9 +188,16 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
         failed++
     }
 
-    private suspend fun foregroundInfo(job: SeparationJobEntity, fraction: Float?, remainingMs: Long?): ForegroundInfo {
+    private data class Progress(val fraction: Float, val remainingMs: Long?, val cooling: Boolean)
+
+    private suspend fun foregroundInfo(
+        job: SeparationJobEntity,
+        fraction: Float?,
+        remainingMs: Long?,
+        cooling: Boolean = false,
+    ): ForegroundInfo {
         val waiting = repository.queuedCount()
-        val notification = notifications.progress(job.id, job.title, fraction, remainingMs, waiting)
+        val notification = notifications.progress(job.id, job.title, fraction, remainingMs, waiting, cooling)
         val id = SeparationNotifications.PROGRESS_ID
         return when {
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM ->

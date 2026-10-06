@@ -75,7 +75,7 @@ class SeparatorClient(private val context: Context) : AutoCloseable {
         uri: Uri,
         vocals: File,
         instrumental: File,
-        onProgress: (fraction: Float, remainingMs: Long?) -> Unit,
+        onProgress: (fraction: Float, remainingMs: Long?, cooling: Boolean) -> Unit,
     ): SeparatorOutcome {
         val target = service
             ?: return SeparatorOutcome.Failed(SeparationError.ModelFailed, "Could not start the separator")
@@ -91,7 +91,11 @@ class SeparatorClient(private val context: Context) : AutoCloseable {
                         } else {
                             null
                         }
-                        onProgress(data.getFloat(SeparatorProtocol.KEY_FRACTION), remaining)
+                        onProgress(
+                            data.getFloat(SeparatorProtocol.KEY_FRACTION),
+                            remaining,
+                            data.getBoolean(SeparatorProtocol.KEY_COOLING),
+                        )
                     }
                     SeparatorProtocol.MSG_DONE -> result.complete(SeparatorOutcome.Done)
                     SeparatorProtocol.MSG_FAILED -> result.complete(failureOf(msg.data))

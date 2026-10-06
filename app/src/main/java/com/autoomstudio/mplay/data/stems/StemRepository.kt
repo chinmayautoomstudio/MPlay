@@ -185,8 +185,8 @@ class StemRepository(
 
     suspend fun markRunning(jobId: Long): Boolean = dao.markRunning(jobId) > 0
 
-    suspend fun updateProgress(jobId: Long, progress: Float, remainingMs: Long?) =
-        dao.updateProgress(jobId, progress, remainingMs)
+    suspend fun updateProgress(jobId: Long, progress: Float, remainingMs: Long?, pauseReason: PauseReason? = null) =
+        dao.updateProgress(jobId, progress, remainingMs, pauseReason?.name)
 
     suspend fun requeue(jobId: Long, reason: PauseReason?) = dao.requeue(jobId, reason?.name)
 

@@ -55,8 +55,12 @@ abstract class StemDao {
     )
     abstract suspend fun markRunning(id: Long): Int
 
-    @Query("UPDATE separation_jobs SET progress = :progress, remainingMs = :remainingMs WHERE id = :id AND state = 'Running'")
-    abstract suspend fun updateProgress(id: Long, progress: Float, remainingMs: Long?)
+    /** [pauseReason] on a running job means it is briefly waiting, for example for the phone to cool down. */
+    @Query(
+        "UPDATE separation_jobs SET progress = :progress, remainingMs = :remainingMs, pauseReason = :pauseReason " +
+            "WHERE id = :id AND state = 'Running'",
+    )
+    abstract suspend fun updateProgress(id: Long, progress: Float, remainingMs: Long?, pauseReason: String?)
 
     /** Puts a running job back in the queue, for example when the system stopped the worker. */
     @Query(

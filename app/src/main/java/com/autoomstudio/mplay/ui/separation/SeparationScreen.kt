@@ -138,9 +138,12 @@ private fun RunningJobRow(job: SeparationJobEntity, viewModel: SeparationViewMod
         supportingContent = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = job.remainingMs?.let {
-                        stringResource(R.string.separation_notification_percent_eta, percent, remainingText(it))
-                    } ?: stringResource(R.string.separation_notification_percent, percent),
+                    text = when {
+                        job.isCoolingDown -> stringResource(R.string.separation_pill_cooling, percent)
+                        job.remainingMs != null ->
+                            stringResource(R.string.separation_notification_percent_eta, percent, remainingText(job.remainingMs))
+                        else -> stringResource(R.string.separation_notification_percent, percent)
+                    },
                 )
                 LinearProgressIndicator(progress = { job.progress }, modifier = Modifier.fillMaxWidth())
             }
@@ -249,6 +252,10 @@ private fun StemSetRow(set: StemSetEntity, viewModel: SeparationViewModel) {
 private fun SongTitle(title: String) {
     Text(text = title, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
+
+/** A running job waits between segments while the phone is hot, keeping its progress. */
+internal val SeparationJobEntity.isCoolingDown: Boolean
+    get() = state == JobState.Running.name && pauseReason == PauseReason.Heat.name
 
 @Composable
 internal fun pauseText(reason: String?): String = stringResource(

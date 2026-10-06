@@ -298,6 +298,7 @@
     <string name="separation_notification_preparing">Preparing…</string>
     <string name="separation_notification_percent">%1$d%%</string>
     <string name="separation_notification_percent_eta">%1$d%% · about %2$s left</string>
+    <string name="separation_notification_cooling">%1$d%% · cooling down, resumes automatically</string>
     <plurals name="separation_notification_queued">
         <item quantity="one">%d more song waiting</item>
         <item quantity="other">%d more songs waiting</item>
@@ -383,12 +384,14 @@
     <string name="separator_chip_preparing">Preparing…</string>
     <string name="separator_chip_running">Separating %1$d%%</string>
     <string name="separator_chip_retry">Retry separation</string>
+    <string name="separator_chip_cooling">Cooling down %1$d%%</string>
     <string name="separator_cancel_title">Stop separating?</string>
     <string name="separator_cancel_message">\"%1$s\" is being split into vocals and instrumental. Stopping discards the progress.</string>
     <string name="separator_cancel_confirm">Stop</string>
     <string name="separator_cancel_keep">Keep going</string>
     <string name="separation_pill">Separating \"%1$s\"</string>
     <string name="separation_pill_description">Vocal separation in progress. Open the queue.</string>
+    <string name="separation_pill_cooling">%1$d%% · cooling down</string>
     <string name="message_separation_ready">\"%1$s\" is ready as vocals and instrumental</string>
     <string name="message_separation_ready_action">Play instrumental</string>
     <string name="message_separation_failed">Couldn\'t separate \"%1$s\". %2$s</string>

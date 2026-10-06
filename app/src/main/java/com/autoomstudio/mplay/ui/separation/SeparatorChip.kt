@@ -54,6 +54,7 @@ fun SeparatorChip(ui: SeparatorUi, title: String, modifier: Modifier = Modifier)
             Text(
                 text = when {
                     job == null -> stringResource(R.string.separator_chip)
+                    job.isCoolingDown -> stringResource(R.string.separator_chip_cooling, (job.progress * 100).toInt())
                     state == JobState.Running.name && job.progress <= 0f -> stringResource(R.string.separator_chip_preparing)
                     state == JobState.Running.name ->
                         stringResource(R.string.separator_chip_running, (job.progress * 100).toInt())

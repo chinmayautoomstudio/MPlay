@@ -17,6 +17,7 @@ import com.autoomstudio.mplay.separation.android.ModelOptions
 import com.autoomstudio.mplay.separation.android.ModelSource
 import com.autoomstudio.mplay.separation.android.OrtDemucsModel
 import com.autoomstudio.mplay.separation.android.separateToFiles
+import com.autoomstudio.mplay.separation.pipeline.AdaptiveModel
 import com.autoomstudio.mplay.separation.pipeline.SeparationCancelledException
 import com.autoomstudio.mplay.separation.pipeline.SeparationError
 import com.autoomstudio.mplay.separation.pipeline.SeparationException
@@ -36,6 +37,9 @@ class SeparatorService : Service() {
     private val cancelled = AtomicBoolean(false)
     private val busy = AtomicBoolean(false)
     private var separator: StemSeparator? = null
+    private val thermal by lazy { ThermalMonitor(this) }
+    @Volatile private var activeReply: Messenger? = null
+    @Volatile private var lastFraction = 0f
 
     private val messenger = Messenger(
         object : Handler(Looper.getMainLooper()) {
@@ -67,6 +71,8 @@ class SeparatorService : Service() {
     }
 
     private fun separate(request: Bundle, replyTo: Messenger) {
+        lastFraction = 0f
+        activeReply = replyTo
         val result = try {
             val uri = Uri.parse(request.getString(SeparatorProtocol.KEY_URI).orEmpty())
             val vocals = File(request.getString(SeparatorProtocol.KEY_VOCALS).orEmpty())
@@ -78,15 +84,8 @@ class SeparatorService : Service() {
                 instrumental = instrumental,
                 isCancelled = cancelled::get,
                 onProgress = { progress ->
-                    reply(
-                        replyTo,
-                        Message.obtain(null, SeparatorProtocol.MSG_PROGRESS).apply {
-                            data = Bundle().apply {
-                                putFloat(SeparatorProtocol.KEY_FRACTION, progress.fraction)
-                                progress.remainingMs?.let { putLong(SeparatorProtocol.KEY_REMAINING_MS, it) }
-                            }
-                        },
-                    )
+                    lastFraction = progress.fraction
+                    reply(replyTo, progressMessage(progress.fraction, progress.remainingMs, cooling = false))
                 },
             )
             Message.obtain(null, SeparatorProtocol.MSG_DONE)
@@ -104,17 +103,40 @@ class SeparatorService : Service() {
             Log.e(TAG, "Separation failed", e)
             failure(SeparationError.Unknown, e.message)
         }
+        activeReply = null
         reply(replyTo, result)
     }
 
     private fun separator(): StemSeparator = separator ?: run {
         val source = ModelSource.find(this)
             ?: throw SeparationException(SeparationError.ModelUnavailable, "No model installed")
-        val started = System.nanoTime()
-        val model = OrtDemucsModel.create(ModelMapper.map(this, source), ModelOptions())
-        Log.i(TAG, "Model loaded in ${(System.nanoTime() - started) / 1_000_000} ms from $source")
-        StemSeparator(model).also { separator = it }
+        val weights = ModelMapper.map(this, source)
+        val model = AdaptiveModel(
+            create = { threads ->
+                val started = System.nanoTime()
+                OrtDemucsModel.create(weights, ModelOptions(threads = threads)).also {
+                    Log.i(TAG, "Model loaded on $threads threads in ${(System.nanoTime() - started) / 1_000_000} ms")
+                }
+            },
+            level = thermal::level,
+            isCancelled = cancelled::get,
+            onCooling = { cooling ->
+                Log.i(TAG, if (cooling) "Phone is hot; cooling down" else "Cooling down ended")
+                activeReply?.let { reply(it, progressMessage(lastFraction, remainingMs = null, cooling = cooling)) }
+            },
+            onSwitch = { threads, heat -> Log.i(TAG, "Switched to $threads threads ($heat)") },
+        )
+        StemSeparator(model, clock = { System.nanoTime() - model.cooledMs * 1_000_000 }).also { separator = it }
     }
+
+    private fun progressMessage(fraction: Float, remainingMs: Long?, cooling: Boolean): Message =
+        Message.obtain(null, SeparatorProtocol.MSG_PROGRESS).apply {
+            data = Bundle().apply {
+                putFloat(SeparatorProtocol.KEY_FRACTION, fraction)
+                remainingMs?.let { putLong(SeparatorProtocol.KEY_REMAINING_MS, it) }
+                putBoolean(SeparatorProtocol.KEY_COOLING, cooling)
+            }
+        }
 
     private fun failure(error: SeparationError, message: String?): Message =
         Message.obtain(null, SeparatorProtocol.MSG_FAILED).apply {

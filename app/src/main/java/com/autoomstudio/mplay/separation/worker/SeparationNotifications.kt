@@ -27,9 +27,17 @@ internal class SeparationNotifications(private val context: Context) {
         context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
     }
 
-    fun progress(jobId: Long, title: String, fraction: Float?, remainingMs: Long?, waiting: Int): Notification {
+    fun progress(
+        jobId: Long,
+        title: String,
+        fraction: Float?,
+        remainingMs: Long?,
+        waiting: Int,
+        cooling: Boolean = false,
+    ): Notification {
         val text = when {
             fraction == null -> context.getString(R.string.separation_notification_preparing)
+            cooling -> context.getString(R.string.separation_notification_cooling, percent(fraction))
             remainingMs == null -> context.getString(R.string.separation_notification_percent, percent(fraction))
             else -> context.getString(
                 R.string.separation_notification_percent_eta,

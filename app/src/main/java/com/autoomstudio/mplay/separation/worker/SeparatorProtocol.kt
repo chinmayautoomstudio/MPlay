@@ -8,7 +8,7 @@ internal object SeparatorProtocol {
     /** Client to service. */
     const val MSG_CANCEL = 2
 
-    /** Service to client. Data: [KEY_FRACTION], [KEY_REMAINING_MS] (absent until known). */
+    /** Service to client. Data: [KEY_FRACTION], [KEY_REMAINING_MS] (absent until known or while cooling), [KEY_COOLING]. */
     const val MSG_PROGRESS = 3
 
     /** Service to client. */
@@ -22,6 +22,7 @@ internal object SeparatorProtocol {
     const val KEY_INSTRUMENTAL = "instrumental"
     const val KEY_FRACTION = "fraction"
     const val KEY_REMAINING_MS = "remaining_ms"
+    const val KEY_COOLING = "cooling"
     const val KEY_ERROR = "error"
     const val KEY_CANCELLED = "cancelled"
     const val KEY_MESSAGE = "message"

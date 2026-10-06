@@ -90,6 +90,7 @@ private fun progressText(job: SeparationJobEntity): String {
     val percent = (job.progress * 100).toInt()
     val remaining = job.remainingMs
     return when {
+        job.isCoolingDown -> stringResource(R.string.separation_pill_cooling, percent)
         job.progress <= 0f -> stringResource(R.string.separation_notification_preparing)
         remaining != null -> stringResource(R.string.separation_notification_percent_eta, percent, remainingText(remaining))
         else -> stringResource(R.string.separation_notification_percent, percent)
