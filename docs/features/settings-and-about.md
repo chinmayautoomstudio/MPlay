@@ -1,0 +1,85 @@
+# Settings, About, theme and shared components
+
+> Status: Shipped | Added in: 1.0 (About in 3.1) | Last updated: 2026-10-06 (`e13b2f7`)
+
+## Summary
+
+The Settings tab covers appearance (System/Light/Dark, dynamic colour on Android 12+), library (hide and review duplicates), vocal separation, background playback (battery optimisation) and About. About MPlay shows the version, Autoom Studio links, a privacy note and open-source licenses. The UI uses the "Neon Midnight" purple palette, or wallpaper colours.
+
+## Key files
+
+Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
+
+| File | Role |
+|---|---|
+| `data/settings/AppSettings.kt` | DataStore `app_settings`; `ThemeMode`, `ThemeSettings`, `SeparationSettings`; all app-wide keys. |
+| `ui/settings/SettingsViewModel.kt` | `theme: StateFlow<ThemeSettings?>` (null until loaded), theme setters, `claimNotificationPrompt()`. |
+| `ui/settings/SettingsScreen.kt` | Settings list, separation section slot, battery item, About entry. |
+| `ui/settings/AboutScreen.kt` | Logos, version/build, website, email, privacy policy, licenses. |
+| `ui/settings/LicensesScreen.kt` | Hand-maintained license list and detail view. |
+| `ui/theme/Color.kt`, `Theme.kt`, `Type.kt`, `Motion.kt` | Palette, `MPlayAppTheme`, typography, motion durations and transitions. |
+| `ui/components/*` | Shared components: `ArtworkImage`, `ComingSoon`, `Interactions` (`pressBounce`, `popOnChange`), `LoadingIndicator`, `MPlayTopBar`, `MPlayWordmark`, `NowPlayingBars`, `SelectionTopBar`, `ThemedLottie`, `LofiWaveIcon`, `MetronomeIcons`. |
+
+## How it works
+
+- `MPlayAppTheme` decides dark/light from the setting (or system), runs edge-to-edge with matching bar icons, and uses dynamic colour on API 31+ when enabled, otherwise `NeonDarkColors` / `NeonLightColors`.
+- `MainActivity` keeps the splash screen until the theme has loaded.
+- The battery item re-checks `isIgnoringBatteryOptimizations` on resume and opens system settings.
+- About picks logos by background luminance (the in-app theme doesn't change resource night mode). Links: `https://autoomstudio.com/`, `connect@autoomstudio.com`, `https://autoomstudio.com/privacy-policy`. Long press copies a link.
+- Licenses: HT-Demucs (MIT), ONNX Runtime (MIT), AndroidX, Material Icons, Kotlin, Guava, Coil, Lottie (Apache 2.0).
+- `ThemedLottie` recolours animations to the theme; `rememberAnimationsEnabled()` respects the system animation scale.
+- Motion: `MotionShort/Medium/Long` = 180/300/450 ms, `fadeThrough()`, `sharedAxisX()`.
+
+## Data and persistence
+
+All keys in DataStore `app_settings`:
+
+| Key | Type | Default | Owner |
+|---|---|---|---|
+| `theme_mode` | String | `System` | Theme |
+| `dynamic_color` | Boolean | `false` | Theme |
+| `notification_prompt_shown` | Boolean | `false` | Notification permission prompt |
+| `last_sleep_minutes` | Int | none | [Playback](playback.md) |
+| `lofi_enabled` | Boolean | `false` | [Lofi](lofi-mode.md) |
+| `hide_duplicates` | Boolean | `true` | [Duplicates](duplicates.md) |
+| `stem_mode` | String | `Original` | [Separation](vocal-separation.md) |
+| `separation_charging_only` | Boolean | `false` | Separation |
+| `separation_pause_low_battery` | Boolean | `true` | Separation |
+| `separation_notice_hidden` | Boolean | `false` | Separation |
+| `separation_speed_factor` | Float | none | Separation time estimate |
+| `metronome_bpm` | Int | 120 (20-300) | [Metronome](metronome.md) |
+| `metronome_beats` | Int | 4 (1-12) | Metronome |
+| `metronome_unit` | Int | 4 (4 or 8) | Metronome |
+| `metronome_accent` | Boolean | `true` | Metronome |
+| `metronome_sound` | String | `Classic` | Metronome |
+| `metronome_volume` | Float | 0.8 (0-1) | Metronome |
+| `singalong_note_seen` | Boolean | `false` | [Sing-along](sing-along.md) |
+
+Other DataStores: `playback_session`, `library_prefs`, `widget_state`.
+
+## Manifest, permissions and notifications
+
+Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` is requested once, tracked by `notification_prompt_shown`. `ACCESS_NETWORK_STATE` is removed, consistent with the offline claim on About.
+
+## Tests
+
+- `data/settings/ThemeSettingsTest.kt`: defaults, stored values, unknown-mode fallback.
+- No tests for `AppSettings` itself, `MetronomeSettings.of`, or the screens.
+
+## Known limitations and TODOs
+
+- The licenses list is maintained by hand.
+- `rememberAnimationsEnabled()` doesn't react to live changes.
+- In `e13b2f7` the key `separation_notice_shown` was replaced by `separation_notice_hidden` without a migration, so old values are ignored.
+
+## Change history
+
+| Date | Commit | Change |
+|---|---|---|
+| 2026-10-02 | `5685cb3`, `ee66e5a` | Settings, theme and shared components. |
+| 2026-10-02 | `3039fba` | Splash screen theme colours. |
+| 2026-10-03 | `99970fe` | Component animations (`pressBounce`, Lottie). |
+| 2026-10-05 | `55e39e6` | Separation settings section. |
+| 2026-10-06 | `26863d9` | Licenses screen. |
+| 2026-10-06 | `40a4c10` | About screen (version 3.1). |
+| 2026-10-06 | `e13b2f7` | Keys `separation_notice_hidden`, `separation_speed_factor`, `metronome_*`, `singalong_note_seen`; `MetronomeIcons`. |

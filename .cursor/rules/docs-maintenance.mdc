@@ -1,0 +1,38 @@
+---
+description: Keep docs/ (changelog, feature docs, database, architecture) updated whenever app code changes
+alwaysApply: true
+---
+
+# Documentation maintenance
+
+The developer docs live in `docs/` (index: `docs/README.md`). Whenever you change code or resources under `app/`, `separation/`, or the Gradle build, update the docs in the same task, before you finish:
+
+1. **Changelog**: add a bullet under `## [Unreleased]` in `docs/CHANGELOG.md`, in the right group (Added / Changed / Fixed / Removed / Database). Say what changed for the user or developer and link the feature doc. Add the commit hash if there is one.
+2. **Feature doc**: update the matching `docs/features/*.md`. Keep "Key files", "How it works", "Data and persistence", "Manifest, permissions and notifications", "Tests" and "Known limitations" accurate, set "Last updated" to today, and add a row to "Change history".
+3. **New feature area** (new package or user-facing feature with no doc): copy `docs/templates/feature-template.md` to `docs/features/<name>.md`, fill it in, and add it to the Features table in `docs/README.md`.
+4. **Room schema change** (`MPlayDatabase` version, entities, migrations): update `docs/database.md` (version table and table section) and add a `### Database` entry to the changelog.
+5. **Architecture change** (new service, receiver, activity, process, permission, module, or `AppContainer` dependency): update `docs/architecture.md`.
+6. **DataStore key added/renamed/removed**: update the key table in `docs/features/settings-and-about.md` and the feature doc that owns it.
+7. **Version bump** (`versionName` in `app/build.gradle.kts`): rename `## [Unreleased]` to `## [x.y] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` above it, and update the version in `docs/README.md`.
+
+Feature area to doc mapping:
+
+| Code | Doc |
+|---|---|
+| `playback/` (not `lofi/`), `ui/playback/` | `features/playback.md` |
+| `playback/lofi/` | `features/lofi-mode.md` |
+| `data/library/`, `data/model/`, `ui/library/`, `ui/permission/` | `features/library.md` |
+| `data/playlist/` (not the database class), `ui/playlist/` | `features/playlists.md` |
+| `data/clip/`, `ui/trim/` | `features/clips-and-ringtones.md` |
+| `data/duplicates/`, `ui/duplicates/` | `features/duplicates.md` |
+| `separation/`, `data/stems/`, `ui/separation/`, `:separation` module | `features/vocal-separation.md` |
+| `metronome/`, `data/tempo/`, `ui/metronome/` | `features/metronome.md` |
+| `singalong/`, `ui/singalong/` | `features/sing-along.md` |
+| `widget/` | `features/widget.md` |
+| `data/settings/`, `ui/settings/`, `ui/theme/`, `ui/components/` | `features/settings-and-about.md` |
+| `di/`, `MPlayApp.kt`, `MainActivity.kt`, `ui/main/`, `AndroidManifest.xml` | `architecture.md` |
+
+Rules for the docs themselves:
+- Describe what the code does, not what the PRD planned. Use real class, constant and key names.
+- Keep entries short; don't duplicate whole sections between files, link instead.
+- Skip doc updates only for changes with no behavioural or structural effect (formatting, comments, renaming a private local).
