@@ -32,7 +32,7 @@ class SongTempoAnalyzer(
                 dao.delete(song.id)
                 null
             }
-            TempoLookup.Empty, TempoLookup.MissingMeter -> null
+            TempoLookup.Empty, TempoLookup.Incomplete -> null
         }
 
     /** Returns null when the file can't be decoded or has no clear beat. */
@@ -55,7 +55,9 @@ class SongTempoAnalyzer(
         var decoded = 0L
         val context = currentCoroutineContext()
         try {
-            MediaPcmSource(this.context, uri, maxFrames = windowFrames, startUs = startMs * 1000).read { block, frames ->
+            MediaPcmSource(
+                this.context, uri, maxFrames = windowFrames, startUs = startMs * 1000, exactStart = true,
+            ).read { block, frames ->
                 if (!context.isActive) throw Stopped()
                 for (frame in 0 until frames) {
                     pending += (block[frame * 2] + block[frame * 2 + 1]) * 0.5f
@@ -74,7 +76,9 @@ class SongTempoAnalyzer(
             Log.w(TAG, "Could not decode ${song.id} for tempo detection", e)
             return null
         }
-        return TempoDetector(TempoDetector.ANALYSIS_RATE).detectRhythm(mono, written)
+        val rhythm = TempoDetector(TempoDetector.ANALYSIS_RATE).detectRhythm(mono, written) ?: return null
+        // The grid is measured from the start of the window; the metronome needs it in song time.
+        return rhythm.copy(grid = rhythm.grid?.shifted(startMs.toDouble()))
     }
 
     /** Not a CancellationException, which the decoder would report as a corrupt file. */

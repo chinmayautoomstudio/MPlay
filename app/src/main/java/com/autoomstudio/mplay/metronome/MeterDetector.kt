@@ -19,6 +19,22 @@ data class MeterEstimate(
 }
 
 /**
+ * Where the song's beats fall: a downbeat at [downbeatMs] and a click every [periodMs] (the eighth note for 6/8, so
+ * it matches [MeterEstimate.clickBpm]). Times are in the analyzed audio's timeline.
+ */
+data class BeatGrid(val downbeatMs: Double, val periodMs: Double) {
+    fun shifted(ms: Double): BeatGrid = copy(downbeatMs = downbeatMs + ms)
+
+    /** The same downbeat with [factor] times as many clicks, for the ÷2 and ×2 buttons. */
+    fun scaled(factor: Double): BeatGrid = copy(periodMs = periodMs / factor)
+}
+
+/** [grid] is in envelope frames; [meter] is null when there are too few bars to judge. */
+internal data class MeterAnalysis(val meter: MeterEstimate?, val grid: FrameGrid)
+
+internal data class FrameGrid(val downbeat: Double, val period: Double)
+
+/**
  * Guesses the time signature from the onset envelopes and the beat period found by [TempoDetector] (MT18). It lines
  * a comb up with the beats, takes each beat's full-band and low-band onset strength, and scores bar lengths of 2,
  * 3, 4 and 6 beats by how much one position in the bar stands out (a t-statistic of the accented position against
@@ -34,23 +50,28 @@ internal class MeterDetector {
      * [accents] (full-band) and [low] are linear-magnitude onset envelopes, so they show how hard each beat is hit.
      * [beatPeriod] is in envelope frames and matches [tempo].
      */
-    fun detect(accents: DoubleArray, low: DoubleArray, beatPeriod: Double, tempo: TempoEstimate): MeterEstimate? {
+    fun detect(accents: DoubleArray, low: DoubleArray, beatPeriod: Double, tempo: TempoEstimate): MeterAnalysis? {
         if (beatPeriod < MIN_PERIOD_FRAMES * 2 || accents.size <= beatPeriod || low.size != accents.size) return null
         // The loud hits are the beats; on the log envelope a quiet off-beat hat can look as strong as the snare.
         val phase = beatPhase(accents, beatPeriod)
         val strength = strengths(accents, low, phase, beatPeriod) ?: return null
         val beats = strength.size
-        if (beats < MIN_BARS * 4) return null
+        if (beats < MIN_BARS * 4) return MeterAnalysis(null, FrameGrid(phase, beatPeriod))
         val acf = autocorrelation(strength, MAX_BAR * 3)
 
         val fits = CANDIDATE_BARS.filter { beats >= MIN_BARS * it }.associateWith { fit(strength, it) }
         fun score(bar: Int): Double = fits[bar]?.let { it.t * (0.5 + 0.5 * support(acf, bar)) } ?: 0.0
+        /** [accent] is the downbeat's position in bars of [bar] beats on the beat grid. */
+        fun result(meter: MeterEstimate, accent: Int, clickPeriod: Double = beatPeriod) =
+            MeterAnalysis(meter, FrameGrid(phase + accent * beatPeriod, clickPeriod))
 
         val duple = max(score(2), score(4)) * PRIOR_DUPLE
         val triple = max(score(3), score(6)) * PRIOR_TRIPLE
         val best = max(duple, triple)
         val bpm = tempo.bpm.roundToInt()
-        if (best < MIN_SCORE) return MeterEstimate(4, 4, TempoConfidence.Low, best.toFloat(), bpm)
+        if (best < MIN_SCORE) {
+            return result(MeterEstimate(4, 4, TempoConfidence.Low, best.toFloat(), bpm), fits[4]?.accent ?: 0)
+        }
 
         val margin = best / max(minOf(duple, triple), MIN_SCORE)
         var confidence = when {
@@ -64,7 +85,7 @@ internal class MeterDetector {
             // The beat is the eighth: six beats, pulse 4 accented less than pulse 1 but more than its neighbours.
             val six = fits[6]
             if (six != null && six.split(3) >= SPLIT_T && six.secondaryAccent() >= SPLIT_T) {
-                return MeterEstimate(6, 8, confidence, best.toFloat(), bpm)
+                return result(MeterEstimate(6, 8, confidence, best.toFloat(), bpm), six.accent)
             }
             // The beat is the quarter of a 6/8 bar (two eighths), so the second accent falls between beats 2 and 3.
             val eighths = (tempo.bpm * 2).roundToInt()
@@ -72,38 +93,51 @@ internal class MeterDetector {
                 ?.takeIf { it.size >= MIN_BARS * 6 }
                 ?.let { fit(it, 6) }
             if (halves != null && halves.secondaryAccent() >= SPLIT_T && eighths <= MetronomeSettings.MAX_BPM) {
-                return MeterEstimate(6, 8, confidence, best.toFloat(), eighths)
+                val half = beatPeriod / 2
+                return MeterAnalysis(
+                    MeterEstimate(6, 8, confidence, best.toFloat(), eighths),
+                    FrameGrid(phase + halves.accent * half, half),
+                )
             }
-            return MeterEstimate(3, 4, confidence, best.toFloat(), bpm)
+            val three = fits[3]
+            return result(MeterEstimate(3, 4, confidence, best.toFloat(), bpm), three?.accent ?: 0)
         }
         val four = fits.getValue(4)
-        if (four.split(2) >= SPLIT_T) return MeterEstimate(4, 4, confidence, best.toFloat(), bpm)
+        if (four.split(2) >= SPLIT_T) return result(MeterEstimate(4, 4, confidence, best.toFloat(), bpm), four.accent)
+        val two = fits.getValue(2)
         // Two-beat bars whose beats split in three are 6/8 felt in two; click the eighths when the engine can.
         val eighths = (tempo.bpm * 3).roundToInt()
         if (isTriplet(accents, phase, beatPeriod) && eighths <= MetronomeSettings.MAX_BPM) {
-            return MeterEstimate(6, 8, confidence, best.toFloat(), eighths)
+            return result(MeterEstimate(6, 8, confidence, best.toFloat(), eighths), two.accent, beatPeriod / 3)
         }
         // A 4/4 bar whose halves sound alike is the same pattern as 2/4, so this is never more than a suggestion.
-        return MeterEstimate(2, 4, TempoConfidence.Low, best.toFloat(), bpm)
+        return result(MeterEstimate(2, 4, TempoConfidence.Low, best.toFloat(), bpm), two.accent)
     }
 
-    /** Where the beat comb sums the most onset energy, in frames from the start. */
+    /** Where the beat comb sums the most onset energy, in fractional frames from the start. */
     private fun beatPhase(envelope: DoubleArray, period: Double): Double {
-        var bestOffset = 0
-        var bestSum = Double.NEGATIVE_INFINITY
-        for (offset in 0 until period.toInt().coerceAtLeast(1)) {
+        // A little over one period, so the peak always has real neighbours instead of wrapping round a fractional period.
+        val offsets = period.toInt() + 3
+        val sums = DoubleArray(offsets) { offset ->
             var sum = 0.0
             var position = offset.toDouble()
-            while (position < envelope.size) {
-                sum += envelope[position.roundToInt().coerceAtMost(envelope.size - 1)]
+            while (position < envelope.size - 1) {
+                // Interpolated, so a fractional period doesn't jitter the comb by up to half a frame per beat.
+                val index = position.toInt()
+                val fraction = position - index
+                sum += envelope[index] * (1 - fraction) + envelope[index + 1] * fraction
                 position += period
             }
-            if (sum > bestSum) {
-                bestSum = sum
-                bestOffset = offset
-            }
+            sum
         }
-        return bestOffset.toDouble()
+        val best = (1 until offsets - 1).maxBy { sums[it] }
+        // A parabola through the peak and its neighbours places it between frames.
+        val a = sums[best - 1]
+        val b = sums[best]
+        val c = sums[best + 1]
+        val denominator = a - 2 * b + c
+        val offset = if (denominator < 0) (0.5 * (a - c) / denominator).coerceIn(-0.5, 0.5) else 0.0
+        return best + offset
     }
 
     /**

@@ -63,4 +63,67 @@ class BeatClockTest {
         clock.beatsIn(0, 1_000) { _, beat -> indexes += beat }
         assertEquals((0L until 10L).toList(), indexes)
     }
+
+    /** Runs [clock] in 100-frame blocks over [from, to) and returns (frame, beat) pairs. */
+    private fun run(clock: BeatClock, from: Long, to: Long): List<Pair<Long, Long>> {
+        val beats = mutableListOf<Pair<Long, Long>>()
+        var start = from
+        while (start < to) {
+            clock.beatsIn(start, 100) { offset, beat -> beats += (start + offset) to beat }
+            start += 100
+        }
+        return beats
+    }
+
+    @Test
+    fun alignPutsBeatsOnTheGridWithSongNumbers() {
+        val clock = BeatClock(1_000, 60.0)
+        clock.align(anchorFrame = 250.0, framesPerBeat = 400.0, firstBeat = 0, fromFrame = 0)
+        val beats = run(clock, 0, 2_000)
+        assertEquals(listOf(250L to 0L, 650L to 1L, 1_050L to 2L, 1_450L to 3L, 1_850L to 4L), beats)
+        assertTrue(clock.aligned)
+    }
+
+    @Test
+    fun alignNumbersBeatsBeforeTheDownbeatNegatively() {
+        val clock = BeatClock(1_000, 60.0)
+        clock.align(anchorFrame = 2_000.0, framesPerBeat = 500.0, firstBeat = 0, fromFrame = 0)
+        val beats = run(clock, 0, 2_600)
+        assertEquals(listOf(0L to -4L, 500L to -3L, 1_000L to -2L, 1_500L to -1L, 2_000L to 0L, 2_500L to 1L), beats)
+    }
+
+    @Test
+    fun realignSkipsABeatTooCloseToTheLastClick() {
+        val clock = BeatClock(1_000, 60.0)
+        run(clock, 0, 1_100) // clicks at 0 and 1000
+        // The grid has a beat at 1100, only 10% of a beat after the last click; the next one is at 2100.
+        clock.align(anchorFrame = 100.0, framesPerBeat = 1_000.0, firstBeat = 0, fromFrame = 1_100)
+        assertEquals(listOf(2_100L to 2L, 3_100L to 3L), run(clock, 1_100, 3_200))
+    }
+
+    @Test
+    fun realignKeepsABeatFarEnoughFromTheLastClick() {
+        val clock = BeatClock(1_000, 60.0)
+        run(clock, 0, 1_100) // clicks at 0 and 1000
+        clock.align(anchorFrame = 1_500.0, framesPerBeat = 1_000.0, firstBeat = 0, fromFrame = 1_100)
+        assertEquals(listOf(1_500L to 0L, 2_500L to 1L), run(clock, 1_100, 2_600))
+    }
+
+    @Test
+    fun unalignCarriesOnAtTheTempoFromTheLastClick() {
+        val clock = BeatClock(1_000, 60.0)
+        clock.align(anchorFrame = 300.0, framesPerBeat = 400.0, firstBeat = 0, fromFrame = 0)
+        run(clock, 0, 800) // grid clicks at 300 and 700
+        clock.unalign(120.0)
+        assertEquals(listOf(1_200L to 2L, 1_700L to 3L), run(clock, 800, 1_800))
+        assertTrue(!clock.aligned)
+    }
+
+    @Test
+    fun alignedPeriodReplacesTheTempo() {
+        val clock = BeatClock(1_000, 60.0)
+        clock.align(anchorFrame = 0.0, framesPerBeat = 250.0, firstBeat = 0, fromFrame = 0)
+        val frames = run(clock, 0, 1_000).map { it.first }
+        assertEquals(listOf(0L, 250L, 500L, 750L), frames)
+    }
 }

@@ -18,13 +18,15 @@ import java.nio.ByteOrder
 /**
  * Decodes [uri] with MediaCodec into 44.1 kHz interleaved stereo float, whatever the source's rate and channels.
  * [maxFrames] cuts the output short, for example to test on the first 30 seconds. [startUs] skips ahead first;
- * it lands on the sync point at or before it, which is close enough for analysis but not sample-exact.
+ * it lands on the sync point at or before it. With [exactStart] the decoded audio before [startUs] is dropped, using
+ * each buffer's presentation time, so the first output frame is the one at [startUs].
  */
 class MediaPcmSource(
     private val context: Context,
     private val uri: Uri,
     private val maxFrames: Long? = null,
     private val startUs: Long = 0,
+    private val exactStart: Boolean = false,
 ) : PcmSource {
 
     override fun read(consumer: (interleaved: FloatArray, frames: Int) -> Unit) {
@@ -139,9 +141,16 @@ class MediaPcmSource(
                             val frames = samples / channels
                             if (stereo.size < frames * 2) stereo = FloatArray(frames * 2)
                             ChannelMixer.toStereo(raw, channels, frames, stereo)
-                            val r = resampler ?: StereoResampler(sampleRate, TARGET_RATE).also { resampler = it }
                             decoder.releaseOutputBuffer(outIndex, false)
-                            r.process(stereo, frames, emit)
+                            val skip = if (exactStart && info.presentationTimeUs < startUs) {
+                                ((startUs - info.presentationTimeUs) * sampleRate / 1_000_000L)
+                                    .coerceAtMost(frames.toLong()).toInt()
+                            } else {
+                                0
+                            }
+                            if (skip > 0) stereo.copyInto(stereo, 0, skip * 2, frames * 2)
+                            val r = resampler ?: StereoResampler(sampleRate, TARGET_RATE).also { resampler = it }
+                            if (frames > skip) r.process(stereo, frames - skip, emit)
                         } else {
                             decoder.releaseOutputBuffer(outIndex, false)
                         }

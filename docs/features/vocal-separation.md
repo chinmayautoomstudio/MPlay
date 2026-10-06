@@ -1,6 +1,6 @@
 # AI vocal separation (stems)
 
-> Status: Shipped | Added in: 3.0 | Last updated: 2026-10-06 (`e13b2f7`)
+> Status: Shipped | Added in: 3.0 | Last updated: 2026-10-06
 
 ## Summary
 
@@ -34,7 +34,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/` unless they st
 | `ui/separation/SeparationTimeNotice.kt` | "May take a while" line and `SeparationNoticeDialog`. |
 | `ui/separation/SeparationSettings.kt` | Settings section, `ModelMissingDialog`. |
 | `ui/separation/SeparatorChip.kt` | Now Playing chip. |
-| `separation/src/main/.../android/` | `OrtDemucsModel`, `ModelSource`, `MediaPcmSource`, `AacStemSink`, `SeparateToFiles`. |
+| `separation/src/main/.../android/` | `OrtDemucsModel`, `ModelSource`, `MediaPcmSource` (optional `startUs`, `exactStart`, `maxFrames`), `AacStemSink`, `SeparateToFiles`. |
 | `separation/src/main/.../pipeline/` | `StemSeparator`, `SegmentPlan`, `AdaptiveModel`, `HeatLevel`, `TrackStats`. |
 | `separation/src/main/.../dsp/` | `DemucsSpectrogram`, `Fft`, `StereoResampler`, `ChannelMixer`. |
 
@@ -148,3 +148,4 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 | 2026-10-06 | `26863d9` | Model import improvements. |
 | 2026-10-06 | `e13b2f7` | Time estimate (`SeparationEstimate`), notice before every separation with "Don't show again", time notice in notification, pill and queue. |
 | 2026-10-06 | - | Simpler `separation_notice_message`: patience, processor and resources; dropped heat, quality and personal-use wording. |
+| 2026-10-06 | - | `MediaPcmSource(exactStart = true)` drops decoded audio before `startUs` (by buffer presentation time), for the metronome's beat grid. Separation doesn't use it. |

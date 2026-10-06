@@ -1,6 +1,6 @@
 # Playback
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-06 (`e13b2f7`)
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-06
 
 ## Summary
 
@@ -13,7 +13,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
 | File | Role |
 |---|---|
 | `playback/PlaybackService.kt` | `MediaSessionService`: owns `ExoPlayer` + `MediaSession`, custom commands, session saving, stem switching, lofi, resumption. |
-| `playback/PlaybackController.kt` | UI-side `MediaController` wrapper. `state: StateFlow<NowPlayingState?>`, `positionMs()`, queue/transport methods. Main thread only. |
+| `playback/PlaybackController.kt` | UI-side `MediaController` wrapper. `state: StateFlow<NowPlayingState?>`, `positionMs()`, queue/transport methods. Main thread only. Also the metronome's `MusicTimeline`: `songId`, `playing`, `seeks` (position discontinuities and playback-parameter changes), `snapshot()` (position, `System.nanoTime()`, speed). `restoresSession = false` skips restoring the saved queue on connect. |
 | `playback/PlaybackCommands.kt` | Custom `SessionCommand`s, argument keys, session extras encode/decode. |
 | `playback/NowPlayingState.kt` | `NowPlayingState`, `RepeatMode`, `nextRepeatMode()` (Off, All, One). |
 | `playback/PlaybackSessionStore.kt` | DataStore for the saved queue (`SavedSession`) and modes (`PlaybackModes`). |
@@ -114,3 +114,4 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 | 2026-10-05 | `55e39e6` | Stem mode switching (`SET_STEM_MODE`). |
 | 2026-10-05 | `0a56dcd` | Auto-sizing stem mode labels. |
 | 2026-10-06 | `e13b2f7` | `musicPlaying` flag; `play`/`pause`/`currentPositionMs`/`isSeekable`; chip row became `FlowRow` with metronome and sing-along chips; `MetronomeMiniIndicator` in mini player. |
+| 2026-10-06 | - | `PlaybackController` implements `MusicTimeline` for metronome sync; `restoresSession` parameter. See [metronome](metronome.md). |

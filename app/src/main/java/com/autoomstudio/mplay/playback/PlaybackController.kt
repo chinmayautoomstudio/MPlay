@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
 import androidx.media3.common.C
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionCommand
@@ -14,13 +15,18 @@ import androidx.media3.session.SessionToken
 import com.autoomstudio.mplay.data.library.SongRepository
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.data.stems.StemMode
+import com.autoomstudio.mplay.metronome.MusicSnapshot
+import com.autoomstudio.mplay.metronome.MusicTimeline
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
@@ -36,17 +42,40 @@ class PlaybackController(
     private val scope: CoroutineScope,
     private val songRepository: SongRepository,
     private val sessionStore: PlaybackSessionStore,
-) {
+    /** Off for controllers that only watch playback, so the saved queue is restored once. */
+    private val restoresSession: Boolean = true,
+) : MusicTimeline {
     private val _state = MutableStateFlow<NowPlayingState?>(null)
 
     /** Null while nothing is queued. */
     val state: StateFlow<NowPlayingState?> = _state.asStateFlow()
+
+    private val _songId = MutableStateFlow<Long?>(null)
+    override val songId: StateFlow<Long?> = _songId.asStateFlow()
+
+    private val _playing = MutableStateFlow(false)
+    override val playing: StateFlow<Boolean> = _playing.asStateFlow()
+
+    private val _seeks = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    override val seeks: Flow<Unit> = _seeks.asSharedFlow()
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = sync(player)
+
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int,
+        ) {
+            _seeks.tryEmit(Unit)
+        }
+
+        override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+            _seeks.tryEmit(Unit)
+        }
     }
 
     private val sessionListener = object : MediaController.Listener {
@@ -54,7 +83,7 @@ class PlaybackController(
     }
 
     /** Connects early so the UI reflects playback that is already running in the service. */
-    fun connect() {
+    override fun connect() {
         controllerFuture()
     }
 
@@ -152,6 +181,12 @@ class PlaybackController(
     /** The position right now, or null before the controller has connected. */
     fun currentPositionMs(): Long? = controller?.currentPosition?.coerceAtLeast(0L)
 
+    override fun snapshot(): MusicSnapshot? {
+        val connected = controller ?: return null
+        if (connected.mediaItemCount == 0) return null
+        return MusicSnapshot(connected.currentPosition, System.nanoTime(), connected.playbackParameters.speed)
+    }
+
     fun next() = withController { it.seekToNext() }
 
     fun previous() = withController { it.seekToPrevious() }
@@ -189,10 +224,12 @@ class PlaybackController(
         controller.sendCustomCommand(command, args)
     }
 
-    fun release() {
+    override fun release() {
         controllerFuture?.let(MediaController::releaseFuture)
         controllerFuture = null
         controller = null
+        _playing.value = false
+        _songId.value = null
     }
 
     private fun withController(block: (MediaController) -> Unit) {
@@ -227,7 +264,7 @@ class PlaybackController(
                         controller = connected
                         connected.addListener(listener)
                         sync(connected)
-                        if (connected.mediaItemCount == 0) restoreSession(connected)
+                        if (restoresSession && connected.mediaItemCount == 0) restoreSession(connected)
                     }
                 },
                 ContextCompat.getMainExecutor(context),
@@ -253,6 +290,8 @@ class PlaybackController(
     }
 
     private fun sync(player: Player) {
+        _playing.value = player.isPlaying
+        _songId.value = player.currentMediaItem?.mediaId?.toLongOrNull()
         if (player.mediaItemCount == 0) {
             _state.value = null
             return

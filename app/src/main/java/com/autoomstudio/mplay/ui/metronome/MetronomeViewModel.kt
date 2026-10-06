@@ -9,11 +9,13 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.autoomstudio.mplay.MPlayApp
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.data.tempo.SongTempoAnalyzer
+import com.autoomstudio.mplay.metronome.BeatGrid
 import com.autoomstudio.mplay.metronome.BeatTick
 import com.autoomstudio.mplay.metronome.MeterEstimate
 import com.autoomstudio.mplay.metronome.MetronomeController
 import com.autoomstudio.mplay.metronome.MetronomeSettings
 import com.autoomstudio.mplay.metronome.MetronomeState
+import com.autoomstudio.mplay.metronome.SyncState
 import com.autoomstudio.mplay.metronome.TapTempo
 import com.autoomstudio.mplay.metronome.TempoConfidence
 import com.autoomstudio.mplay.metronome.TempoEstimate
@@ -41,13 +43,14 @@ sealed interface TempoDetection {
 
     /**
      * [meter] is null when the time signature couldn't be told (MT19). [applied] says whether the metronome took
-     * it; when false the sheet offers it as a suggestion.
+     * it; when false the sheet offers it as a suggestion. [grid] places the song's clicks, for syncing.
      */
     data class Done(
         override val songId: Long,
         val estimate: TempoEstimate,
         val meter: MeterEstimate? = null,
         val applied: Boolean = false,
+        val grid: BeatGrid? = null,
     ) : TempoDetection
 
     data class Failed(override val songId: Long) : TempoDetection
@@ -68,6 +71,7 @@ class MetronomeViewModel(
 
     val state: StateFlow<MetronomeState> = controller.state
     val beat: StateFlow<BeatTick?> = controller.beat
+    val sync: StateFlow<SyncState> = controller.sync
 
     private val tapTempo = TapTempo()
     private val _tapCount = MutableStateFlow(0)
@@ -86,7 +90,7 @@ class MetronomeViewModel(
     private var tapReset: Job? = null
     private var detectJob: Job? = null
 
-    fun update(transform: (MetronomeSettings) -> MetronomeSettings) = controller.update(transform)
+    fun update(transform: (MetronomeSettings) -> MetronomeSettings) = controller.update(transform = transform)
 
     fun toggle() = controller.toggle()
 
@@ -104,7 +108,7 @@ class MetronomeViewModel(
 
     /**
      * Fills in the BPM from [song], instantly when it was detected before, and the time signature when it is at
-     * least fairly sure of it (MT18, MT19).
+     * least fairly sure of it (MT18, MT19), then puts the clicks on the song's beats.
      */
     fun detect(song: Song) {
         if ((_detection.value as? TempoDetection.Running)?.songId == song.id) return
@@ -123,14 +127,45 @@ class MetronomeViewModel(
                 return@launch
             }
             val meter = rhythm.meter
-            val done = TempoDetection.Done(song.id, rhythm.tempo, meter)
+            val done = TempoDetection.Done(song.id, rhythm.tempo, meter, grid = rhythm.grid)
             if (meter != null && meter.confidence != TempoConfidence.Low) {
                 applyMeter(done)
             } else {
-                controller.update { it.copy(bpm = rhythm.tempo.bpm.roundToInt()) }
+                controller.update(keepSync = true) { it.copy(bpm = rhythm.tempo.bpm.roundToInt()) }
                 _detection.value = done
             }
+            follow(_detection.value as TempoDetection.Done)
         }
+    }
+
+    /** Turns following the song on or off; on needs a detection with a beat grid for that song. */
+    fun toggleSync() {
+        if (controller.sync.value is SyncState.On) {
+            controller.stopSync()
+        } else {
+            (_detection.value as? TempoDetection.Done)?.let(::follow)
+        }
+    }
+
+    private fun follow(done: TempoDetection.Done) {
+        gridFor(done)?.let { controller.syncTo(done.songId, it) }
+    }
+
+    /** Re-places the clicks after the BPM was changed for [done], if they were following its song. */
+    private fun refollow(done: TempoDetection.Done) {
+        if ((controller.sync.value as? SyncState.On)?.songId == done.songId) follow(done)
+    }
+
+    /**
+     * The grid for the BPM [done] set. The detected grid clicks at the meter's rate; when the meter wasn't taken,
+     * the BPM is the detected tempo, which for 6/8 is a whole number of those clicks.
+     */
+    private fun gridFor(done: TempoDetection.Done): BeatGrid? {
+        val grid = done.grid ?: return null
+        val meter = done.meter
+        if (meter == null || done.applied) return grid
+        val clicksPerBeat = (meter.clickBpm / done.estimate.bpm).roundToInt().coerceAtLeast(1)
+        return grid.copy(periodMs = grid.periodMs * clicksPerBeat)
     }
 
     /** Takes the suggested time signature (and its BPM) from the last detection, for the Low-confidence chip. */
@@ -138,12 +173,13 @@ class MetronomeViewModel(
         val done = _detection.value as? TempoDetection.Done ?: return
         if (done.meter == null || done.applied) return
         applyMeter(done)
+        refollow(_detection.value as TempoDetection.Done)
     }
 
     private fun applyMeter(done: TempoDetection.Done) {
         val meter = done.meter ?: return
         val previous = controller.state.value.settings.timeSignature
-        controller.update {
+        controller.update(keepSync = true) {
             it.copy(bpm = meter.clickBpm, beatsPerBar = meter.beatsPerBar, beatUnit = meter.beatUnit)
         }
         _detection.value = done.copy(applied = true)
@@ -152,15 +188,18 @@ class MetronomeViewModel(
 
     /** Puts back the time signature from before [event] and the plain detected BPM. */
     fun undoMeter(event: MeterApplied) {
-        controller.update {
+        val done = (_detection.value as? TempoDetection.Done)?.takeIf { it.songId == event.songId }
+        controller.update(keepSync = done != null) {
             it.copy(bpm = event.tempoBpm, beatsPerBar = event.previous.beats, beatUnit = event.previous.unit)
         }
-        val done = _detection.value as? TempoDetection.Done ?: return
-        if (done.songId == event.songId) _detection.value = done.copy(applied = false)
+        if (done == null) return
+        val undone = done.copy(applied = false)
+        _detection.value = undone
+        refollow(undone)
     }
 
-    /** Doubles or halves the BPM, for detections that landed on half or double time. */
-    fun scaleBpm(factor: Double) = controller.update { it.copy(bpm = (it.bpm * factor).roundToInt()) }
+    /** Doubles or halves the BPM, for detections that landed on half or double time; sync stays on. */
+    fun scaleBpm(factor: Double) = controller.scaleTempo(factor)
 
     companion object {
         private const val TAP_RESET_MS = 2_000L

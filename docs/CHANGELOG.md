@@ -16,6 +16,9 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 - Separation time estimate based on this phone's measured speed. (`e13b2f7`, [vocal separation](features/vocal-separation.md))
 - Permissions `RECORD_AUDIO` and `FOREGROUND_SERVICE_MICROPHONE`; services `MetronomeService` and `RecordingService`. (`e13b2f7`, [architecture](architecture.md))
 - Time signature detection (MT18-MT21): Detect BPM also estimates 2/4, 3/4, 4/4 or 6/8 with a confidence, from the same analysis pass (`MeterDetector`). Medium/High results set the metronome's time signature with the BPM and show "Time signature set to 3/4" with Undo; Low results show a "Looks like 3/4. Use it?" chip; undetermined meters keep the current signature. For 6/8 the metronome clicks the eighth notes. The result card reads "120 BPM, 4/4". `versionCode` 5. ([metronome](features/metronome.md))
+- Metronome sync with the song: after Detect BPM the metronome starts on the song's beats (accent on the downbeat), goes silent while the song is paused, re-aligns after seeks, speed changes and drift over 20 ms, and turns off when the song changes or the BPM is changed by hand. A "Sync with song" chip in the Now Playing sheet toggles it. New `BeatGrid`, `SongSync`, `MusicTimeline`, `BeatClock.align()`, `MetronomeEngine.heardFrame()`. ([metronome](features/metronome.md))
+- `MediaPcmSource` gained `exactStart`, which drops decoded audio before `startUs`. ([vocal separation](features/vocal-separation.md))
+- `PlaybackController` implements `MusicTimeline` (song ID, playing, seeks, position snapshot with speed) and takes `restoresSession`; `AppContainer` gives the metronome its own instance. ([playback](features/playback.md), [architecture](architecture.md))
 
 ### Changed
 - The separation notice now shows before every separation, with an estimate and a "Don't show again" option (previously shown once). The time notice also appears in the notification, progress pill and queue. (`e13b2f7`)
@@ -28,6 +31,7 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 ### Database
 - Schema v4: new table `song_tempos`, `AutoMigration(3, 4)`. (`e13b2f7`, [database](database.md))
 - Schema v5: `song_tempos` gains nullable `beatsPerBar`, `beatUnit`, `meterConfidence`, `meterBpm`, `AutoMigration(4, 5)`. Existing rows are kept; rows without a meter are re-analyzed once on the next Detect. ([database](database.md), [metronome](features/metronome.md))
+- Schema v6: `song_tempos` gains nullable `downbeatMs`, `beatPeriodMs`, `AutoMigration(5, 6)`. Rows without a grid are re-analyzed once on the next Detect. ([database](database.md), [metronome](features/metronome.md))
 
 ## [3.1] - 2026-10-06
 

@@ -9,8 +9,9 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 
 /**
- * A song's detected tempo (MT10) and time signature (MT20); the size and date of the analyzed file tell when it
- * has changed. Rows written before the time signature existed have a null [meterConfidence].
+ * A song's detected tempo (MT10), time signature (MT20) and beat grid; the size and date of the analyzed file tell
+ * when it has changed. Rows written before the time signature existed have a null [meterConfidence], and rows
+ * written before the beat grid existed have a null [beatPeriodMs].
  */
 @Entity(tableName = "song_tempos")
 data class SongTempoEntity(
@@ -26,6 +27,10 @@ data class SongTempoEntity(
     @ColumnInfo(defaultValue = "NULL") val meterConfidence: String? = null,
     /** The BPM the metronome clicks with this meter; for 6/8 that is the eighth-note rate. */
     @ColumnInfo(defaultValue = "NULL") val meterBpm: Int? = null,
+    /** Song time of a downbeat, for following the song (schema 6). */
+    @ColumnInfo(defaultValue = "NULL") val downbeatMs: Double? = null,
+    /** Time between clicks; [TempoCache.NO_GRID] when the beats couldn't be placed, null when never analyzed. */
+    @ColumnInfo(defaultValue = "NULL") val beatPeriodMs: Double? = null,
 )
 
 @Dao

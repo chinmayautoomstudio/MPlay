@@ -1,12 +1,12 @@
 # Database
 
-> Last updated: 2026-10-06, schema version 5
+> Last updated: 2026-10-06, schema version 6
 
 ## Overview
 
 - Class: [`data/playlist/MPlayDatabase.kt`](../app/src/main/java/com/autoomstudio/mplay/data/playlist/MPlayDatabase.kt)
 - File: `mplay.db`, built with `Room.databaseBuilder(...)`. No destructive fallback and no manual migrations.
-- `exportSchema = true`. Schemas: [`app/schemas/com.autoomstudio.mplay.data.playlist.MPlayDatabase/`](../app/schemas/com.autoomstudio.mplay.data.playlist.MPlayDatabase/) `1.json` to `5.json`.
+- `exportSchema = true`. Schemas: [`app/schemas/com.autoomstudio.mplay.data.playlist.MPlayDatabase/`](../app/schemas/com.autoomstudio.mplay.data.playlist.MPlayDatabase/) `1.json` to `6.json`.
 - DAOs: `playlistDao()`, `duplicateDao()`, `stemDao()`, `tempoDao()`.
 
 Library songs are not stored here. They are read live from MediaStore, and every table refers to songs by MediaStore `_ID` without a foreign key.
@@ -20,12 +20,13 @@ Library songs are not stored here. They are read live from MediaStore, and every
 | 3 | `55e39e6` (2026-10-05) | `AutoMigration(2, 3)` | `stem_sets`, `separation_jobs` |
 | 4 | `e13b2f7` (2026-10-06) | `AutoMigration(3, 4)` | `song_tempos` |
 | 5 | (2026-10-06) | `AutoMigration(4, 5)` | none; `song_tempos` gains `beatsPerBar`, `beatUnit`, `meterConfidence`, `meterBpm` |
+| 6 | (2026-10-06) | `AutoMigration(5, 6)` | none; `song_tempos` gains `downbeatMs`, `beatPeriodMs` |
 
-Every migration so far only added tables or nullable columns; no existing column has been changed. The 4-to-5 migration is four `ALTER TABLE song_tempos ADD COLUMN ... DEFAULT NULL`, so existing rows are kept.
+Every migration so far only added tables or nullable columns; no existing column has been changed. The 4-to-5 and 5-to-6 migrations are `ALTER TABLE song_tempos ADD COLUMN ... DEFAULT NULL`, so existing rows are kept.
 
 ## Tables
 
-All columns are NOT NULL unless marked nullable. The only SQL default values are the `DEFAULT NULL`s on the v5 `song_tempos` columns.
+All columns are NOT NULL unless marked nullable. The only SQL default values are the `DEFAULT NULL`s on the v5 and v6 `song_tempos` columns.
 
 ### `playlists` (v1), `PlaylistEntity`
 
@@ -91,7 +92,7 @@ Primary key `(playlistId, songId)`; index on `playlistId`. A song can appear onl
 
 Indexes on `songId` and `state`.
 
-### `song_tempos` (v4, meter columns v5), `SongTempoEntity`
+### `song_tempos` (v4, meter columns v5, grid columns v6), `SongTempoEntity`
 
 Declared in [`data/tempo/TempoEntities.kt`](../app/src/main/java/com/autoomstudio/mplay/data/tempo/TempoEntities.kt).
 
@@ -105,6 +106,8 @@ Declared in [`data/tempo/TempoEntities.kt`](../app/src/main/java/com/autoomstudi
 | `beatUnit` | INTEGER, nullable (v5) | 4 or 8 |
 | `meterConfidence` | TEXT, nullable (v5) | `TempoConfidence` name; `None` = analyzed, meter undetermined; NULL = row from before v5, re-analyzed on next Detect |
 | `meterBpm` | INTEGER, nullable (v5) | BPM the metronome uses with this meter (eighth-note rate for 6/8) |
+| `downbeatMs` | REAL, nullable (v6) | Song time of a downbeat, for sync |
+| `beatPeriodMs` | REAL, nullable (v6) | Time between clicks (matches `meterBpm`); `0.0` = analyzed, no grid; NULL = row from before v6, re-analyzed on next Detect |
 
 Read and written through `TempoCache` ([`data/tempo/TempoCache.kt`](../app/src/main/java/com/autoomstudio/mplay/data/tempo/TempoCache.kt)).
 

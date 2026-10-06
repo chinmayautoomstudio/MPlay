@@ -3,9 +3,11 @@ package com.autoomstudio.mplay.metronome
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioTimestamp
 import android.media.AudioTrack
 import android.os.Process
 import android.util.Log
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.max
 
 /** A beat that has just become audible: [beatInBar] counts from 0, where 0 is the accented first beat. */
@@ -26,10 +28,17 @@ class MetronomeEngine(private val onBeat: (BeatTick) -> Unit) {
     @Volatile private var muted = false
 
     @Volatile private var running = false
+
+    /** Picked up by the writer before its next block; [Unalign] goes back to the set tempo. */
+    private val pendingAlignment = AtomicReference<Any?>(null)
+
+    @Volatile private var output: AudioTrack? = null
     private var writer: Thread? = null
     private var watcher: Thread? = null
 
     val isRunning: Boolean get() = running
+
+    val outputSampleRate: Int get() = sampleRate
 
     fun update(newSettings: MetronomeSettings) {
         settings = newSettings
@@ -40,10 +49,40 @@ class MetronomeEngine(private val onBeat: (BeatTick) -> Unit) {
         muted = value
     }
 
+    /**
+     * Puts the clicks on a song's beats: song beat 0 is the accented first beat, and the set tempo is ignored until
+     * [unalign]. [alignment] is in this run's output frames, so it must come from [heardFrame] after [start].
+     */
+    fun align(alignment: Alignment) {
+        pendingAlignment.set(alignment)
+    }
+
+    fun unalign() {
+        pendingAlignment.set(Unalign)
+    }
+
+    /** Which output frame is reaching the speaker now; null when stopped. */
+    fun heardFrame(): HeardFrame? {
+        val track = output ?: return null
+        val timestamp = AudioTimestamp()
+        return try {
+            if (track.getTimestamp(timestamp)) {
+                HeardFrame(timestamp.framePosition, timestamp.nanoTime)
+            } else {
+                // No timestamp until audio flows; the head position is close enough to start with.
+                HeardFrame(track.playbackHeadPosition.toLong() and 0xFFFFFFFFL, System.nanoTime())
+            }
+        } catch (e: IllegalStateException) {
+            null
+        }
+    }
+
     @Synchronized
     fun start() {
         if (running) return
         val track = buildTrack() ?: return
+        pendingAlignment.set(null)
+        output = track
         running = true
         val scheduled = ArrayDeque<ScheduledBeat>()
         writer = Thread({ writeLoop(track, scheduled) }, "MetronomeWriter").apply { start() }
@@ -58,6 +97,7 @@ class MetronomeEngine(private val onBeat: (BeatTick) -> Unit) {
         watcher?.join(JOIN_TIMEOUT_MS)
         writer = null
         watcher = null
+        output = null
     }
 
     private fun buildTrack(): AudioTrack? = try {
@@ -100,7 +140,15 @@ class MetronomeEngine(private val onBeat: (BeatTick) -> Unit) {
             track.play()
             while (running) {
                 val latest = settings
-                if (latest.bpm != current.bpm) clock.setBpm(latest.bpm.toDouble())
+                when (val change = pendingAlignment.getAndSet(null)) {
+                    is Alignment -> clock.align(change.anchorFrame, change.framesPerBeat, 0, written)
+                    Unalign -> if (clock.aligned) {
+                        clock.unalign(latest.bpm.toDouble())
+                        // Keep the bar where the song's numbering had it.
+                        barStartBeat = clock.beatIndex - Math.floorMod(clock.beatIndex, beatsPerBar.toLong())
+                    }
+                }
+                if (latest.bpm != current.bpm && !clock.aligned) clock.setBpm(latest.bpm.toDouble())
                 current = latest
                 block.fill(0f)
                 tail?.let { sound ->
@@ -112,7 +160,11 @@ class MetronomeEngine(private val onBeat: (BeatTick) -> Unit) {
                         beatsPerBar = current.beatsPerBar
                         barStartBeat = beat
                     }
-                    val beatInBar = ((beat - barStartBeat) % beatsPerBar).toInt()
+                    val beatInBar = if (clock.aligned) {
+                        Math.floorMod(beat, beatsPerBar.toLong()).toInt()
+                    } else {
+                        Math.floorMod(beat - barStartBeat, beatsPerBar.toLong()).toInt()
+                    }
                     val accented = current.accent && beatInBar == 0
                     val sound = sounds.get(current.sound, accented)
                     val gain = if (muted) 0f else current.volume
@@ -139,6 +191,7 @@ class MetronomeEngine(private val onBeat: (BeatTick) -> Unit) {
             Log.e(TAG, "Metronome output failed", e)
             running = false
         } finally {
+            output = null
             runCatching { track.pause() }
             runCatching { track.flush() }
             track.release()
@@ -175,6 +228,8 @@ class MetronomeEngine(private val onBeat: (BeatTick) -> Unit) {
     }
 
     private class ScheduledBeat(val frame: Long, val tick: BeatTick)
+
+    private object Unalign
 
     private companion object {
         const val TAG = "MetronomeEngine"

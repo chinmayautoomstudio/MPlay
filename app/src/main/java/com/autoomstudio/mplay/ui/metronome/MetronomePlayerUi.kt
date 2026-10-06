@@ -47,6 +47,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoomstudio.mplay.R
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.metronome.MetronomeSettings
+import com.autoomstudio.mplay.metronome.SyncState
 import com.autoomstudio.mplay.metronome.TempoConfidence
 import com.autoomstudio.mplay.ui.components.MetronomeIcons
 import kotlin.math.roundToInt
@@ -90,6 +91,7 @@ fun MetronomeSheet(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val tapCount by viewModel.tapCount.collectAsStateWithLifecycle()
     val detection by viewModel.detection.collectAsStateWithLifecycle()
+    val sync by viewModel.sync.collectAsStateWithLifecycle()
     // The sheet covers the main screen's snackbar, so it shows its own (MT19).
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalContext.current.resources
@@ -137,6 +139,8 @@ fun MetronomeSheet(
                             onDetect = { song?.let(viewModel::detect) },
                             onScale = viewModel::scaleBpm,
                             onApplyMeter = viewModel::applyMeter,
+                            sync = (sync as? SyncState.On)?.takeIf { song != null && it.songId == song.id },
+                            onToggleSync = viewModel::toggleSync,
                         )
                     },
                 )
@@ -175,6 +179,8 @@ private fun DetectTempo(
     onDetect: () -> Unit,
     onScale: (Double) -> Unit,
     onApplyMeter: () -> Unit,
+    sync: SyncState.On?,
+    onToggleSync: () -> Unit,
 ) {
     val running = detection is TempoDetection.Running
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
@@ -210,7 +216,10 @@ private fun DetectTempo(
                 )
                 LinearProgressIndicator(progress = { detection.progress }, modifier = Modifier.fillMaxWidth())
             }
-            is TempoDetection.Done -> DetectResult(detection, onApplyMeter)
+            is TempoDetection.Done -> {
+                DetectResult(detection, onApplyMeter)
+                if (detection.grid != null) SyncWithSong(sync, onToggleSync)
+            }
             is TempoDetection.Failed -> Text(
                 stringResource(R.string.metronome_detect_failed),
                 style = MaterialTheme.typography.bodyMedium,
@@ -269,6 +278,36 @@ private fun DetectResult(detection: TempoDetection.Done, onApplyMeter: () -> Uni
             label = { Text(stringResource(R.string.metronome_meter_suggestion, signature)) },
             modifier = Modifier.semantics { contentDescription = description },
         )
+    }
+}
+
+/** Turns following the song on or off, with what the clicks are doing while on. */
+@Composable
+private fun SyncWithSong(sync: SyncState.On?, onToggle: () -> Unit) {
+    val description = stringResource(
+        if (sync != null) R.string.metronome_sync_on_description else R.string.metronome_sync_off_description,
+    )
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        FilterChip(
+            selected = sync != null,
+            onClick = onToggle,
+            label = { Text(stringResource(R.string.metronome_sync)) },
+            leadingIcon = {
+                Icon(MetronomeIcons.Default, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize))
+            },
+            modifier = Modifier.semantics { contentDescription = description },
+        )
+        if (sync != null) {
+            Text(
+                stringResource(if (sync.musicPaused) R.string.metronome_sync_paused else R.string.metronome_sync_following),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

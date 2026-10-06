@@ -117,6 +117,37 @@ class MeterDetectorTest {
     }
 
     @Test
+    fun gridLandsOnTheDownbeat() {
+        val rows = mutableListOf<String>()
+        var worst = 0.0
+        var periodsOk = true
+        for (case in cleanCases) {
+            val barMs = 60_000.0 / case.bpm * case.beats
+            // Drop the start so the analyzed audio begins mid-bar, like a window cut from the middle of a song.
+            for (shiftMs in listOf(0.0, 1_234.5)) {
+                val full = SyntheticAudio.pattern(case.bpm, case.beats, case.hits, seconds = 47)
+                val shift = (shiftMs * rate / 1000).toInt()
+                val samples = full.copyOfRange(shift, shift + rate * 45)
+                val grid = detector.detectRhythm(samples)!!.grid
+                assertNotNull(case.name, grid)
+                val expected = Math.floorMod(-shift.toLong(), (barMs * rate / 1000).toLong()) * 1000.0 / rate
+                val actual = ((grid!!.downbeatMs % barMs) + barMs) % barMs
+                var error = kotlin.math.abs(actual - expected)
+                error = minOf(error, barMs - error)
+                val signed = ((actual - expected + barMs / 2) % barMs + barMs) % barMs - barMs / 2
+                rows += "%-9s shift=%.0f downbeat=%.1f expected=%.1f error=%+.1f ms period=%.2f".format(
+                    case.name, shiftMs, actual, expected, signed, grid.periodMs,
+                )
+                worst = maxOf(worst, error)
+                val clickMs = 60_000.0 / case.bpm
+                if (kotlin.math.abs(grid.periodMs - clickMs) > clickMs * 0.001) periodsOk = false
+            }
+        }
+        assertTrue(rows.joinToString("\n"), worst <= 6.0)
+        assertTrue(rows.joinToString("\n"), periodsOk)
+    }
+
+    @Test
     fun detectRhythmMatchesDetectForTheTempo() {
         val samples = SyntheticAudio.pattern(120.0, 4, rock)
         assertEquals(detector.detect(samples), detector.detectRhythm(samples)!!.tempo)

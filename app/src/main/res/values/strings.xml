@@ -382,6 +382,11 @@
     <string name="metronome_meter_set">Time signature set to %s</string>
     <string name="metronome_meter_undo">Undo</string>
     <string name="metronome_meter_undo_description">Undo the time signature change</string>
+    <string name="metronome_sync">Sync with song</string>
+    <string name="metronome_sync_on_description">Clicks follow this song\'s beats. Tap to stop following.</string>
+    <string name="metronome_sync_off_description">Make the clicks follow this song\'s beats</string>
+    <string name="metronome_sync_following">Clicks follow the song</string>
+    <string name="metronome_sync_paused">Sync paused with the music</string>
     <string name="metronome_halve">÷2</string>
     <string name="metronome_double">×2</string>
     <string name="metronome_halve_description">Halve the tempo</string>

@@ -20,6 +20,7 @@ import com.autoomstudio.mplay.data.settings.AppSettings
 import com.autoomstudio.mplay.data.stems.StemRepository
 import com.autoomstudio.mplay.data.tempo.SongTempoAnalyzer
 import com.autoomstudio.mplay.metronome.MetronomeController
+import com.autoomstudio.mplay.metronome.MusicTimeline
 import com.autoomstudio.mplay.playback.PlaybackSessionStore
 import com.autoomstudio.mplay.separation.BundledModelProvider
 import com.autoomstudio.mplay.separation.SeparationBackend
@@ -100,8 +101,16 @@ class AppContainer(context: Context) {
     /** Whether MPlay's own player is audible right now, set by the playback service. */
     val musicPlaying = MutableStateFlow(false)
 
+    /** For main-thread work that outlives screens, like the MediaController the metronome follows. */
+    private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    /** Lets the metronome follow the song; it only watches, so it leaves restoring the queue to the UI's controller. */
+    private val musicTimeline: MusicTimeline by lazy {
+        PlaybackController(appContext, mainScope, songRepository, playbackSessionStore, restoresSession = false)
+    }
+
     val metronomeController: MetronomeController by lazy {
-        MetronomeController(appContext, appSettings, musicPlaying, applicationScope)
+        MetronomeController(appContext, appSettings, musicPlaying, musicTimeline, applicationScope)
     }
 
     val recordingStore: RecordingStore by lazy { RecordingStore(appContext) }

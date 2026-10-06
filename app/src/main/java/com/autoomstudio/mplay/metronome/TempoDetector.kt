@@ -13,8 +13,11 @@ enum class TempoConfidence { Low, Medium, High }
 
 data class TempoEstimate(val bpm: Double, val confidence: TempoConfidence, val score: Float)
 
-/** The tempo and, when there is enough of a pattern to judge, the time signature from one analysis (MT18). */
-data class RhythmEstimate(val tempo: TempoEstimate, val meter: MeterEstimate?)
+/**
+ * The tempo and, when there is enough of a pattern to judge, the time signature from one analysis (MT18), plus
+ * where the beats fall for syncing the metronome with the song.
+ */
+data class RhythmEstimate(val tempo: TempoEstimate, val meter: MeterEstimate?, val grid: BeatGrid? = null)
 
 /**
  * Estimates a song's tempo from mono audio (MT9). It builds an onset envelope from spectral flux, finds the beat
@@ -38,7 +41,13 @@ class TempoDetector(private val sampleRate: Int) {
             beatPeriod = analysis.beatPeriod,
             tempo = analysis.tempo,
         )
-        return RhythmEstimate(analysis.tempo, meter)
+        val grid = meter?.grid?.let { frames ->
+            BeatGrid(
+                downbeatMs = (frames.downbeat * HOP + ONSET_DELAY_SAMPLES) * 1000.0 / sampleRate,
+                periodMs = frames.period * HOP * 1000.0 / sampleRate,
+            )
+        }
+        return RhythmEstimate(analysis.tempo, meter?.meter, grid)
     }
 
     /** [beatPeriod] is in envelope frames and matches the reported (folded) BPM. */
@@ -225,6 +234,11 @@ class TempoDetector(private val sampleRate: Int) {
         private const val MEDIUM_CONFIDENCE = 0.12f
         /** Kicks and bass notes, which usually mark the downbeat, sit below this. */
         private const val LOW_BAND_HZ = 200.0
+        /**
+         * An onset peaks in the flux of the frame whose window it entered a while ago; adding this to the frame's
+         * start sample gives the onset time. Measured on synthetic hits (MeterDetectorTest).
+         */
+        private const val ONSET_DELAY_SAMPLES = 676
 
         /** A Gaussian with a sigma of 1.5 frames. */
         private val SMOOTHING = DoubleArray(9) { exp(-0.5 * ((it - 4) / 1.5) * ((it - 4) / 1.5)) }

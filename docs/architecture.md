@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-10-06 (`e13b2f7`)
+> Last updated: 2026-10-06
 
 ## Modules
 
@@ -36,6 +36,7 @@ There is no DI framework. [`di/AppContainer.kt`](../app/src/main/java/com/autoom
 - `applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)` is used for writes that must outlive the screen or service that started them.
 - Nearly everything is a `lazy` singleton: repositories (songs, playlists, duplicates, stems), stores (session, library prefs, widget, `AppSettings`), `MPlayDatabase`, separation backend/controller, clip helpers, `songDeleter`, `tempoAnalyzer`, `metronomeController`, `recordingStore`, `singAlongSession`.
 - `musicPlaying: MutableStateFlow<Boolean>` is shared state: `PlaybackService` writes it, `MetronomeController` reads it.
+- A private `mainScope` (`Dispatchers.Main.immediate`) backs a private app-scoped `PlaybackController` (`restoresSession = false`) passed to `MetronomeController` as its `MusicTimeline`, for syncing with the song. It binds to `PlaybackService` only while sync is on.
 - Factories: `createWidgetStatePublisher()` and `createPlaybackController(scope)` return new instances per call.
 
 ViewModels all follow the same pattern:
@@ -139,3 +140,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-03 | `73cdb66` | Widget receiver and notification permission. |
 | 2026-10-05 | `55e39e6`, `967eb22` | Separation: WorkManager worker, `:separation` module, `:separator` process, model build tasks. |
 | 2026-10-06 | `e13b2f7` | `MetronomeService`, `RecordingService`, `RECORD_AUDIO`, `FOREGROUND_SERVICE_MICROPHONE`, `EXTRA_OPEN_METRONOME`, Metronome tab, container additions. |
+| 2026-10-06 | - | App-scoped `PlaybackController` as the metronome's `MusicTimeline` (`mainScope` in `AppContainer`). |
