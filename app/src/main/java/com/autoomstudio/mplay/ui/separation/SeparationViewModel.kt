@@ -21,6 +21,7 @@ import com.autoomstudio.mplay.separation.EnqueueResult
 import com.autoomstudio.mplay.separation.ModelImporter
 import com.autoomstudio.mplay.separation.ModelState
 import com.autoomstudio.mplay.separation.SeparationController
+import com.autoomstudio.mplay.separation.SeparationEstimate
 import com.autoomstudio.mplay.separation.UnsupportedReason
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
@@ -56,6 +57,9 @@ data class SeparationUiState(
 
     val runningJob: SeparationJobEntity? by lazy { jobs.firstOrNull { it.state == JobState.Running.name } }
 }
+
+/** [estimateMinutes] is null until a separation has finished on this phone. */
+data class NoticeRequest(val songs: List<Song>, val estimateMinutes: Int?)
 
 sealed interface SeparationMessage {
     data class Queued(val count: Int) : SeparationMessage
@@ -110,10 +114,10 @@ class SeparationViewModel(
         ),
     )
 
-    private val _noticeRequest = MutableStateFlow<List<Song>?>(null)
+    private val _noticeRequest = MutableStateFlow<NoticeRequest?>(null)
 
-    /** Songs waiting for the one-time notice to be confirmed. */
-    val noticeRequest: StateFlow<List<Song>?> = _noticeRequest.asStateFlow()
+    /** Songs waiting for the time notice to be confirmed. */
+    val noticeRequest: StateFlow<NoticeRequest?> = _noticeRequest.asStateFlow()
 
     private val _modelRequest = MutableStateFlow<List<Song>?>(null)
 
@@ -148,15 +152,20 @@ class SeparationViewModel(
             return
         }
         viewModelScope.launch {
-            if (settings.separationNoticeShown()) enqueue(songs) else _noticeRequest.value = songs
+            if (settings.separationNoticeHidden()) {
+                enqueue(songs)
+            } else {
+                val minutes = SeparationEstimate.minutes(settings.separationSpeedFactor(), songs.map { it.durationMs })
+                _noticeRequest.value = NoticeRequest(songs, minutes)
+            }
         }
     }
 
-    fun confirmNotice() {
-        val songs = _noticeRequest.value ?: return
+    fun confirmNotice(dontShowAgain: Boolean) {
+        val songs = _noticeRequest.value?.songs ?: return
         _noticeRequest.value = null
         viewModelScope.launch {
-            settings.setSeparationNoticeShown()
+            if (dontShowAgain) settings.setSeparationNoticeHidden()
             enqueue(songs)
         }
     }

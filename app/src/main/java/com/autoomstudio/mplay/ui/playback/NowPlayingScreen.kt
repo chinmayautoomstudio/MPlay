@@ -18,6 +18,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -96,8 +97,12 @@ import com.autoomstudio.mplay.ui.theme.MotionShort
 import com.autoomstudio.mplay.ui.library.LocalSeparatedSongIds
 import com.autoomstudio.mplay.ui.library.SongActions
 import com.autoomstudio.mplay.ui.library.SongMenuButton
+import com.autoomstudio.mplay.ui.metronome.MetronomeChip
+import com.autoomstudio.mplay.ui.metronome.MetronomeSheet
 import com.autoomstudio.mplay.ui.separation.SeparatorChip
 import com.autoomstudio.mplay.ui.separation.SeparatorUi
+import com.autoomstudio.mplay.ui.singalong.SingAlongChip
+import com.autoomstudio.mplay.ui.singalong.SingAlongSheet
 import kotlinx.coroutines.flow.Flow
 
 /** Full player layout without its own background; the surrounding card draws it. */
@@ -118,6 +123,8 @@ fun NowPlayingContent(
 ) {
     BackHandler(enabled = backEnabled, onBack = onCollapse)
     var showSleepSheet by rememberSaveable { mutableStateOf(false) }
+    var showMetronomeSheet by rememberSaveable { mutableStateOf(false) }
+    var showSingAlongSheet by rememberSaveable { mutableStateOf(false) }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -252,14 +259,23 @@ fun NowPlayingContent(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Row(
+                    FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        LofiChip(enabled = state.lofiEnabled, isPlaying = state.isPlaying, onToggle = actions::setLofi)
+                        val chipModifier = Modifier.align(Alignment.CenterVertically)
+                        LofiChip(
+                            enabled = state.lofiEnabled,
+                            isPlaying = state.isPlaying,
+                            onToggle = actions::setLofi,
+                            modifier = chipModifier,
+                        )
+                        MetronomeChip(onClick = { showMetronomeSheet = true }, modifier = chipModifier)
                         if (separator != null && !separated) {
-                            SeparatorChip(ui = separator, title = state.title, modifier = Modifier.weight(1f, fill = false))
+                            SeparatorChip(ui = separator, title = state.title, modifier = chipModifier)
+                        }
+                        if (song != null) {
+                            SingAlongChip(onClick = { showSingAlongSheet = true }, modifier = chipModifier)
                         }
                     }
                     Text(
@@ -294,6 +310,18 @@ fun NowPlayingContent(
                 showSleepSheet = false
             },
             onDismiss = { showSleepSheet = false },
+        )
+    }
+    if (showMetronomeSheet) {
+        MetronomeSheet(song = song, onDismiss = { showMetronomeSheet = false })
+    }
+    if (showSingAlongSheet) {
+        SingAlongSheet(
+            song = song,
+            separated = state.songId != null && state.songId in LocalSeparatedSongIds.current,
+            separator = separator,
+            position = position,
+            onDismiss = { showSingAlongSheet = false },
         )
     }
 }
@@ -359,8 +387,9 @@ private fun StemModeSelector(mode: StemMode, onSelect: (StemMode) -> Unit) {
 }
 
 @Composable
-private fun LofiChip(enabled: Boolean, isPlaying: Boolean, onToggle: (Boolean) -> Unit) {
+private fun LofiChip(enabled: Boolean, isPlaying: Boolean, onToggle: (Boolean) -> Unit, modifier: Modifier = Modifier) {
     FilterChip(
+        modifier = modifier,
         selected = enabled,
         onClick = { onToggle(!enabled) },
         label = { Text(stringResource(R.string.lofi_mode)) },

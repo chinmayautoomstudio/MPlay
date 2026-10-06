@@ -164,7 +164,9 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
                 val fingerprint = withContext(Dispatchers.IO) { repository.fingerprint(uri) }
                 repository.commit(job, workDir, vocals, instrumental, fingerprint)
                 done++
-                Log.i(TAG, "Separated job ${job.id} in %.1f s (%.2f x real time)".format(seconds, realTime(job, seconds)))
+                val speed = realTime(job, seconds)
+                Log.i(TAG, "Separated job ${job.id} in %.1f s (%.2f x real time)".format(seconds, speed))
+                container.appSettings.recordSeparationSpeed(speed)
             } catch (e: Exception) {
                 Log.e(TAG, "Could not store stems for job ${job.id}", e)
                 workDir.deleteRecursively()

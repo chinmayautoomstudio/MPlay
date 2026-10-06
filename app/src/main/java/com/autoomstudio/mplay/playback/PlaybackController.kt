@@ -142,11 +142,26 @@ class PlaybackController(
         }
     }
 
+    fun play() = withController { controller ->
+        if (controller.playbackState == Player.STATE_IDLE) controller.prepare()
+        controller.play()
+    }
+
+    fun pause() = withController { it.pause() }
+
+    /** The position right now, or null before the controller has connected. */
+    fun currentPositionMs(): Long? = controller?.currentPosition?.coerceAtLeast(0L)
+
     fun next() = withController { it.seekToNext() }
 
     fun previous() = withController { it.seekToPrevious() }
 
     fun seekTo(positionMs: Long) = withController { it.seekTo(positionMs.coerceAtLeast(0L)) }
+
+    /** False while a newly loaded item is still preparing; Media3 drops seeks until then. */
+    fun isSeekable(): Boolean = controller?.let {
+        it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM) && it.isCurrentMediaItemSeekable
+    } == true
 
     fun toggleShuffle() = withController { it.shuffleModeEnabled = !it.shuffleModeEnabled }
 

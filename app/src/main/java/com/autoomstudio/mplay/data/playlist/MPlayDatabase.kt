@@ -11,6 +11,8 @@ import com.autoomstudio.mplay.data.duplicates.SongFingerprintEntity
 import com.autoomstudio.mplay.data.stems.SeparationJobEntity
 import com.autoomstudio.mplay.data.stems.StemDao
 import com.autoomstudio.mplay.data.stems.StemSetEntity
+import com.autoomstudio.mplay.data.tempo.SongTempoEntity
+import com.autoomstudio.mplay.data.tempo.TempoDao
 
 @Database(
     entities = [
@@ -20,10 +22,15 @@ import com.autoomstudio.mplay.data.stems.StemSetEntity
         DuplicateOverrideEntity::class,
         StemSetEntity::class,
         SeparationJobEntity::class,
+        SongTempoEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2),
+        AutoMigration(from = 2, to = 3),
+        AutoMigration(from = 3, to = 4),
+    ],
 )
 abstract class MPlayDatabase : RoomDatabase() {
 
@@ -32,6 +39,8 @@ abstract class MPlayDatabase : RoomDatabase() {
     abstract fun duplicateDao(): DuplicateDao
 
     abstract fun stemDao(): StemDao
+
+    abstract fun tempoDao(): TempoDao
 
     companion object {
         fun create(context: Context): MPlayDatabase =

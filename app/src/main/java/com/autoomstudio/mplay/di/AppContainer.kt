@@ -18,16 +18,21 @@ import com.autoomstudio.mplay.data.playlist.PlaylistRepository
 import com.autoomstudio.mplay.playback.PlaybackController
 import com.autoomstudio.mplay.data.settings.AppSettings
 import com.autoomstudio.mplay.data.stems.StemRepository
+import com.autoomstudio.mplay.data.tempo.SongTempoAnalyzer
+import com.autoomstudio.mplay.metronome.MetronomeController
 import com.autoomstudio.mplay.playback.PlaybackSessionStore
 import com.autoomstudio.mplay.separation.BundledModelProvider
 import com.autoomstudio.mplay.separation.SeparationBackend
 import com.autoomstudio.mplay.separation.SeparationController
 import com.autoomstudio.mplay.separation.WorkManagerSeparationBackend
+import com.autoomstudio.mplay.singalong.RecordingStore
+import com.autoomstudio.mplay.singalong.SingAlongSession
 import com.autoomstudio.mplay.widget.WidgetStatePublisher
 import com.autoomstudio.mplay.widget.WidgetStateStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
@@ -62,6 +67,10 @@ class AppContainer(context: Context) {
         StemRepository(appContext, database.stemDao(), FileFingerprinter(contentResolver), applicationScope)
     }
 
+    val tempoAnalyzer: SongTempoAnalyzer by lazy {
+        SongTempoAnalyzer(appContext, database.tempoDao(), stemRepository)
+    }
+
     val separationBackend: SeparationBackend by lazy { WorkManagerSeparationBackend(appContext, appSettings) }
 
     val separationController: SeparationController by lazy {
@@ -87,6 +96,19 @@ class AppContainer(context: Context) {
     val widgetStateStore: WidgetStateStore by lazy { WidgetStateStore(appContext) }
 
     val appSettings: AppSettings by lazy { AppSettings(appContext) }
+
+    /** Whether MPlay's own player is audible right now, set by the playback service. */
+    val musicPlaying = MutableStateFlow(false)
+
+    val metronomeController: MetronomeController by lazy {
+        MetronomeController(appContext, appSettings, musicPlaying, applicationScope)
+    }
+
+    val recordingStore: RecordingStore by lazy { RecordingStore(appContext) }
+
+    val singAlongSession: SingAlongSession by lazy {
+        SingAlongSession(appContext, stemRepository, recordingStore, metronomeController, ::createPlaybackController)
+    }
 
     fun createWidgetStatePublisher(): WidgetStatePublisher =
         WidgetStatePublisher(appContext, widgetStateStore, applicationScope)

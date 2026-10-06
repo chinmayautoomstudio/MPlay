@@ -46,6 +46,9 @@ class MainActivity : ComponentActivity() {
     /** Set when launched from the vocal separation notification; consumed once by the UI. */
     private var openSeparationRequest by mutableStateOf(false)
 
+    /** Set when launched from the metronome notification; consumed once by the UI. */
+    private var openMetronomeRequest by mutableStateOf(false)
+
     private val settingsViewModel: SettingsViewModel by viewModels { SettingsViewModel.Factory }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,6 +65,8 @@ class MainActivity : ComponentActivity() {
                     onOpenNowPlayingHandled = { openNowPlayingRequest = false },
                     openSeparationRequest = openSeparationRequest,
                     onOpenSeparationHandled = { openSeparationRequest = false },
+                    openMetronomeRequest = openMetronomeRequest,
+                    onOpenMetronomeHandled = { openMetronomeRequest = false },
                     themeSettings = theme,
                     settingsViewModel = settingsViewModel,
                 )
@@ -79,10 +84,12 @@ class MainActivity : ComponentActivity() {
             openNowPlayingRequest = true
         }
         if (intent?.action == SeparationLinks.ACTION_OPEN_QUEUE) openSeparationRequest = true
+        if (intent?.getBooleanExtra(EXTRA_OPEN_METRONOME, false) == true) openMetronomeRequest = true
     }
 
     companion object {
         const val EXTRA_OPEN_NOW_PLAYING = "com.autoomstudio.mplay.extra.OPEN_NOW_PLAYING"
+        const val EXTRA_OPEN_METRONOME = "com.autoomstudio.mplay.extra.OPEN_METRONOME"
     }
 }
 
@@ -92,6 +99,8 @@ private fun MPlayRoot(
     onOpenNowPlayingHandled: () -> Unit,
     openSeparationRequest: Boolean,
     onOpenSeparationHandled: () -> Unit,
+    openMetronomeRequest: Boolean,
+    onOpenMetronomeHandled: () -> Unit,
     themeSettings: ThemeSettings,
     settingsViewModel: SettingsViewModel,
     viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
@@ -186,6 +195,8 @@ private fun MPlayRoot(
             separationViewModel = separationViewModel,
             openSeparationRequest = openSeparationRequest,
             onOpenSeparationHandled = onOpenSeparationHandled,
+            openMetronomeRequest = openMetronomeRequest,
+            onOpenMetronomeHandled = onOpenMetronomeHandled,
         )
     }
 }

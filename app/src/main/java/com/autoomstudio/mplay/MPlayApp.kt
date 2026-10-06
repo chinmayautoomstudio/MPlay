@@ -13,7 +13,10 @@ class MPlayApp : Application() {
         super.onCreate()
         container = AppContainer(this)
         // The separation model runs in a ":separator" process, which needs none of this.
-        if (isMainProcess()) container.separationController.start()
+        if (isMainProcess()) {
+            container.separationController.start()
+            container.singAlongSession.cleanUpLeftovers()
+        }
     }
 
     private fun isMainProcess(): Boolean {

@@ -41,6 +41,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.isActive
@@ -66,6 +67,8 @@ class PlaybackService : MediaSessionService() {
     private lateinit var stemRepository: StemRepository
     private var stemMode = StemMode.Original
 
+    private lateinit var musicPlaying: MutableStateFlow<Boolean>
+
     @OptIn(UnstableApi::class)
     override fun onCreate() {
         super.onCreate()
@@ -88,6 +91,14 @@ class PlaybackService : MediaSessionService() {
         player.addListener(SessionSaver())
         widgetPublisher = container.createWidgetStatePublisher().also(player::addListener)
         songRepository = container.songRepository
+        musicPlaying = container.musicPlaying
+        player.addListener(
+            object : Player.Listener {
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    musicPlaying.value = isPlaying
+                }
+            },
+        )
         sleepTimer = SleepTimerRunner(player, serviceScope, onStatusChanged = { publishExtras() })
             .also(player::addListener)
         serviceScope.launch {
@@ -219,6 +230,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        musicPlaying.value = false
         serviceScope.cancel()
         mediaSession?.run {
             saveSession(player)

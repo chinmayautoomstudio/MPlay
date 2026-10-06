@@ -5,10 +5,13 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.autoomstudio.mplay.data.stems.StemMode
+import com.autoomstudio.mplay.metronome.MetronomeSettings
+import com.autoomstudio.mplay.separation.SeparationEstimate
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -105,18 +108,71 @@ class AppSettings(context: Context) {
         dataStore.edit { it[KEY_SEPARATION_PAUSE_LOW_BATTERY] = enabled }
     }
 
-    /** The one-time explanation shown before the first separation. */
-    suspend fun separationNoticeShown(): Boolean = dataStore.data.first()[KEY_SEPARATION_NOTICE_SHOWN] ?: false
+    /** The time notice is shown before every separation until the user picks "Don't show again". */
+    suspend fun separationNoticeHidden(): Boolean = dataStore.data.first()[KEY_SEPARATION_NOTICE_HIDDEN] ?: false
 
-    suspend fun setSeparationNoticeShown() {
-        dataStore.edit { it[KEY_SEPARATION_NOTICE_SHOWN] = true }
+    suspend fun setSeparationNoticeHidden() {
+        dataStore.edit { it[KEY_SEPARATION_NOTICE_HIDDEN] = true }
+    }
+
+    /** Rolling average of processing seconds per second of audio on this phone; null before the first song. */
+    suspend fun separationSpeedFactor(): Double? =
+        dataStore.data.first()[KEY_SEPARATION_SPEED_FACTOR]?.toDouble()
+
+    suspend fun recordSeparationSpeed(measured: Double) {
+        dataStore.edit { prefs ->
+            val updated = SeparationEstimate.updatedFactor(prefs[KEY_SEPARATION_SPEED_FACTOR]?.toDouble(), measured)
+            if (updated != null) prefs[KEY_SEPARATION_SPEED_FACTOR] = updated.toFloat()
+        }
+    }
+
+    /** The last metronome setup, restored on the next launch (MT17). */
+    val metronomeSettings: Flow<MetronomeSettings> = dataStore.data
+        .map { prefs ->
+            MetronomeSettings.of(
+                bpm = prefs[KEY_METRONOME_BPM],
+                beatsPerBar = prefs[KEY_METRONOME_BEATS],
+                beatUnit = prefs[KEY_METRONOME_UNIT],
+                accent = prefs[KEY_METRONOME_ACCENT],
+                sound = prefs[KEY_METRONOME_SOUND],
+                volume = prefs[KEY_METRONOME_VOLUME],
+            )
+        }
+        .distinctUntilChanged()
+
+    suspend fun setMetronomeSettings(settings: MetronomeSettings) {
+        dataStore.edit {
+            it[KEY_METRONOME_BPM] = settings.bpm
+            it[KEY_METRONOME_BEATS] = settings.beatsPerBar
+            it[KEY_METRONOME_UNIT] = settings.beatUnit
+            it[KEY_METRONOME_ACCENT] = settings.accent
+            it[KEY_METRONOME_SOUND] = settings.sound.name
+            it[KEY_METRONOME_VOLUME] = settings.volume
+        }
+    }
+
+    /** The personal-use note shows in the sing-along sheet until the first recording starts (SA19). */
+    val singAlongNoteSeen: Flow<Boolean> = dataStore.data
+        .map { it[KEY_SINGALONG_NOTE_SEEN] ?: false }
+        .distinctUntilChanged()
+
+    suspend fun setSingAlongNoteSeen() {
+        dataStore.edit { it[KEY_SINGALONG_NOTE_SEEN] = true }
     }
 
     private companion object {
+        val KEY_SINGALONG_NOTE_SEEN = booleanPreferencesKey("singalong_note_seen")
+        val KEY_METRONOME_BPM = intPreferencesKey("metronome_bpm")
+        val KEY_METRONOME_BEATS = intPreferencesKey("metronome_beats")
+        val KEY_METRONOME_UNIT = intPreferencesKey("metronome_unit")
+        val KEY_METRONOME_ACCENT = booleanPreferencesKey("metronome_accent")
+        val KEY_METRONOME_SOUND = stringPreferencesKey("metronome_sound")
+        val KEY_METRONOME_VOLUME = floatPreferencesKey("metronome_volume")
         val KEY_STEM_MODE = stringPreferencesKey("stem_mode")
         val KEY_SEPARATION_CHARGING_ONLY = booleanPreferencesKey("separation_charging_only")
         val KEY_SEPARATION_PAUSE_LOW_BATTERY = booleanPreferencesKey("separation_pause_low_battery")
-        val KEY_SEPARATION_NOTICE_SHOWN = booleanPreferencesKey("separation_notice_shown")
+        val KEY_SEPARATION_NOTICE_HIDDEN = booleanPreferencesKey("separation_notice_hidden")
+        val KEY_SEPARATION_SPEED_FACTOR = floatPreferencesKey("separation_speed_factor")
         val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         val KEY_DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val KEY_NOTIFICATION_PROMPT_SHOWN = booleanPreferencesKey("notification_prompt_shown")

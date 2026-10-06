@@ -147,6 +147,7 @@ private fun RunningJobRow(job: SeparationJobEntity, viewModel: SeparationViewMod
                     },
                 )
                 LinearProgressIndicator(progress = { job.progress }, modifier = Modifier.fillMaxWidth())
+                SeparationTimeNotice()
             }
         },
         trailingContent = {

@@ -49,6 +49,10 @@ internal class SeparationNotifications(private val context: Context) {
             .setSmallIcon(R.drawable.ic_notification_separation)
             .setContentTitle(context.getString(R.string.separation_notification_title, title))
             .setContentText(text)
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText("$text\n${context.getString(R.string.separation_time_notice)}"),
+            )
             .apply {
                 if (waiting > 0) {
                     setSubText(

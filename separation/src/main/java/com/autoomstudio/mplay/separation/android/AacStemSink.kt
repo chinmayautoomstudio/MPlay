@@ -16,9 +16,9 @@ class AacStemSink(
     instrumentalFile: File,
     bitrate: Int = DEFAULT_BITRATE,
 ) : StemSink {
-    private val vocals = AacFileEncoder(vocalsFile, bitrate)
+    private val vocals = AacFileWriter(vocalsFile, bitrate)
     private val instrumental = try {
-        AacFileEncoder(instrumentalFile, bitrate)
+        AacFileWriter(instrumentalFile, bitrate)
     } catch (e: Exception) {
         vocals.abort()
         throw e
@@ -58,7 +58,8 @@ class AacStemSink(
     }
 }
 
-internal class AacFileEncoder(private val file: File, bitrate: Int) {
+/** Encodes 44.1 kHz interleaved stereo float to one AAC/M4A file. Call [abort] instead of [finish] to discard it. */
+class AacFileWriter(private val file: File, bitrate: Int = AacStemSink.DEFAULT_BITRATE) {
     private val codec: MediaCodec
     private val muxer: MediaMuxer
     private var track = -1

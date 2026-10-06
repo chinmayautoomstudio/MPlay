@@ -206,22 +206,6 @@ private fun SwitchItem(title: String, summary: String, checked: Boolean, onChang
     )
 }
 
-/** The one-time notice before the first separation (AI4), with the personal-use note. */
-@Composable
-fun SeparationNoticeDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.separation_notice_title)) },
-        text = { Text(stringResource(R.string.separation_notice_message)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) { Text(stringResource(R.string.separation_notice_confirm)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.separation_notice_cancel)) }
-        },
-    )
-}
-
 /** Snackbar text for [message]. */
 fun separationMessageText(context: android.content.Context, message: SeparationMessage): String {
     val res = context.resources

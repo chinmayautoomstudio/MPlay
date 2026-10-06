@@ -71,6 +71,8 @@ import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.data.library.SongDeleter
 import com.autoomstudio.mplay.ui.common.rememberWithLegacyStorage
 import com.autoomstudio.mplay.ui.components.MPlayTopBar
+import com.autoomstudio.mplay.ui.components.MetronomeIcons
+import com.autoomstudio.mplay.ui.metronome.MetronomeScreen
 import com.autoomstudio.mplay.ui.components.SelectionTopBar
 import com.autoomstudio.mplay.ui.duplicates.DuplicateActions
 import com.autoomstudio.mplay.ui.duplicates.ReviewDuplicatesScreen
@@ -100,6 +102,7 @@ import com.autoomstudio.mplay.separation.ModelState
 import com.autoomstudio.mplay.ui.separation.ModelMissingDialog
 import com.autoomstudio.mplay.ui.separation.SeparationMessage
 import com.autoomstudio.mplay.ui.separation.SeparationNoticeDialog
+import com.autoomstudio.mplay.ui.singalong.SingAlongOverlay
 import com.autoomstudio.mplay.ui.separation.SeparationProgressPill
 import com.autoomstudio.mplay.ui.separation.SeparationScreen
 import com.autoomstudio.mplay.ui.separation.SeparationSettingsSection
@@ -127,6 +130,7 @@ private enum class Destination(
         Icons.AutoMirrored.Filled.QueueMusic,
         Icons.AutoMirrored.Outlined.QueueMusic,
     ),
+    Metronome(R.string.nav_metronome, MetronomeIcons.Default, MetronomeIcons.Default),
     Settings(R.string.nav_settings, Icons.Filled.Settings, Icons.Outlined.Settings),
 }
 
@@ -164,6 +168,8 @@ fun MainScreen(
     separationViewModel: SeparationViewModel,
     openSeparationRequest: Boolean,
     onOpenSeparationHandled: () -> Unit,
+    openMetronomeRequest: Boolean,
+    onOpenMetronomeHandled: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var destination by rememberSaveable { mutableStateOf(Destination.Library) }
@@ -183,6 +189,13 @@ fun MainScreen(
             openSeparation()
             onShowNowPlayingChange(false)
             onOpenSeparationHandled()
+        }
+    }
+    LaunchedEffect(openMetronomeRequest) {
+        if (openMetronomeRequest) {
+            destination = Destination.Metronome
+            onShowNowPlayingChange(false)
+            onOpenMetronomeHandled()
         }
     }
 
@@ -459,6 +472,8 @@ fun MainScreen(
                             backEnabled = screenBackEnabled,
                         )
 
+                        Destination.Metronome -> MetronomeScreen(modifier = contentModifier)
+
                         Destination.Settings -> AnimatedContent(
                             targetState = settingsPage,
                             transitionSpec = { fadeThrough() },
@@ -622,8 +637,9 @@ fun MainScreen(
     )
     SongInfoHost(songs = allSongs, songId = infoSongId, onDismiss = { infoSongId = null })
     val noticeRequest by separationViewModel.noticeRequest.collectAsStateWithLifecycle()
-    if (noticeRequest != null) {
+    noticeRequest?.let { request ->
         SeparationNoticeDialog(
+            request = request,
             onConfirm = separationViewModel::confirmNotice,
             onDismiss = separationViewModel::dismissNotice,
         )
@@ -633,6 +649,7 @@ fun MainScreen(
     if (modelRequest != null && missingModel != null) {
         ModelMissingDialog(state = missingModel, viewModel = separationViewModel)
     }
+    SingAlongOverlay()
 }
 
 private enum class SettingsPage { Main, Duplicates, Separation, About, Licenses }

@@ -91,7 +91,7 @@ private fun progressText(job: SeparationJobEntity): String {
     val remaining = job.remainingMs
     return when {
         job.isCoolingDown -> stringResource(R.string.separation_pill_cooling, percent)
-        job.progress <= 0f -> stringResource(R.string.separation_notification_preparing)
+        job.progress <= 0f -> stringResource(R.string.separation_time_notice)
         remaining != null -> stringResource(R.string.separation_notification_percent_eta, percent, remainingText(remaining))
         else -> stringResource(R.string.separation_notification_percent, percent)
     }

@@ -17,12 +17,14 @@ import java.nio.ByteOrder
 
 /**
  * Decodes [uri] with MediaCodec into 44.1 kHz interleaved stereo float, whatever the source's rate and channels.
- * [maxFrames] cuts the output short, for example to test on the first 30 seconds.
+ * [maxFrames] cuts the output short, for example to test on the first 30 seconds. [startUs] skips ahead first;
+ * it lands on the sync point at or before it, which is close enough for analysis but not sample-exact.
  */
 class MediaPcmSource(
     private val context: Context,
     private val uri: Uri,
     private val maxFrames: Long? = null,
+    private val startUs: Long = 0,
 ) : PcmSource {
 
     override fun read(consumer: (interleaved: FloatArray, frames: Int) -> Unit) {
@@ -42,6 +44,7 @@ class MediaPcmSource(
                 extractor.getTrackFormat(index).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
             } ?: throw SeparationException(SeparationError.UnsupportedFormat, "No audio track in $uri")
             extractor.selectTrack(track)
+            if (startUs > 0) extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
             val inputFormat = extractor.getTrackFormat(track)
             val mime = inputFormat.getString(MediaFormat.KEY_MIME)!!
             val decoder = try {

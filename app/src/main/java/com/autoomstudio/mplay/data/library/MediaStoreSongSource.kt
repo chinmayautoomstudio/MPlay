@@ -8,6 +8,7 @@ import android.provider.MediaStore
 import androidx.core.net.toUri
 import com.autoomstudio.mplay.data.clip.ClipStore
 import com.autoomstudio.mplay.data.model.Song
+import com.autoomstudio.mplay.singalong.RecordingStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -37,19 +38,27 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
             MediaStore.Audio.Media.MIME_TYPE,
             if (hasBitrate) MediaStore.Audio.Media.BITRATE else null,
         ).toTypedArray()
-        // Saved clips can be shorter than the minimum, so their folder skips the length check.
+        // Saved clips and sing-alongs can be shorter than the minimum, so their folders skip the length check.
         @Suppress("DEPRECATION")
-        val (pathColumn, clipsPattern) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStore.Audio.Media.RELATIVE_PATH to "${ClipStore.CLIPS_RELATIVE_PATH}%"
+        val (pathColumn, clipsPattern, recordingsPattern) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Triple(
+                MediaStore.Audio.Media.RELATIVE_PATH,
+                "${ClipStore.CLIPS_RELATIVE_PATH}%",
+                "${RecordingStore.RELATIVE_PATH}%",
+            )
         } else {
-            MediaStore.Audio.Media.DATA to "%/${ClipStore.CLIPS_RELATIVE_PATH}%"
+            Triple(
+                MediaStore.Audio.Media.DATA,
+                "%/${ClipStore.CLIPS_RELATIVE_PATH}%",
+                "%/${RecordingStore.RELATIVE_PATH}%",
+            )
         }
         // NULL means the scanner has not extracted metadata yet; show those rows rather than hide them.
         val selection =
             "(${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.IS_MUSIC} IS NULL)" +
                 " AND (${MediaStore.Audio.Media.DURATION} >= ? OR ${MediaStore.Audio.Media.DURATION} IS NULL" +
-                " OR $pathColumn LIKE ?)"
-        val selectionArgs = arrayOf(MIN_DURATION_MS.toString(), clipsPattern)
+                " OR $pathColumn LIKE ? OR $pathColumn LIKE ?)"
+        val selectionArgs = arrayOf(MIN_DURATION_MS.toString(), clipsPattern, recordingsPattern)
         val sortOrder = "${MediaStore.Audio.Media.TITLE} COLLATE NOCASE ASC"
 
         val songs = mutableListOf<Song>()

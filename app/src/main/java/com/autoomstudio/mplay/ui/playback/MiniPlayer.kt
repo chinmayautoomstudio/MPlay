@@ -47,6 +47,7 @@ import com.autoomstudio.mplay.playback.NowPlayingState
 import com.autoomstudio.mplay.ui.common.formatDuration
 import com.autoomstudio.mplay.ui.components.ArtworkImage
 import com.autoomstudio.mplay.ui.components.pressBounce
+import com.autoomstudio.mplay.ui.metronome.MetronomeMiniIndicator
 import kotlinx.coroutines.flow.Flow
 
 private val ProgressLineHeight = 4.dp
@@ -107,13 +108,16 @@ fun MiniPlayerContent(
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = state.title,
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        MetronomeMiniIndicator(Modifier.padding(end = 6.dp))
+                        Text(
+                            text = state.title,
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     val scrubbing = scrubFraction
                     Text(
                         text = if (scrubbing != null) {
