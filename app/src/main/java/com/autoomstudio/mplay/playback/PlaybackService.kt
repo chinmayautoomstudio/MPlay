@@ -27,6 +27,8 @@ import androidx.media3.session.SessionError
 import androidx.media3.session.SessionResult
 import com.autoomstudio.mplay.MPlayApp
 import com.autoomstudio.mplay.MainActivity
+import com.autoomstudio.mplay.data.account.AuthRepository
+import com.autoomstudio.mplay.data.account.AuthState
 import com.autoomstudio.mplay.data.library.SongRepository
 import com.autoomstudio.mplay.data.model.Song
 import com.autoomstudio.mplay.data.settings.AppSettings
@@ -68,6 +70,7 @@ class PlaybackService : MediaSessionService() {
     private var stemMode = StemMode.Original
 
     private lateinit var musicPlaying: MutableStateFlow<Boolean>
+    private lateinit var authRepository: AuthRepository
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
@@ -76,6 +79,7 @@ class PlaybackService : MediaSessionService() {
         sessionStore = container.playbackSessionStore
         saveScope = container.applicationScope
         appSettings = container.appSettings
+        authRepository = container.authRepository
 
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
@@ -127,6 +131,21 @@ class PlaybackService : MediaSessionService() {
             .setCallback(SessionCallback())
             .setSessionExtras(PlaybackCommands.extras(SleepTimerStatus.Off, lofiEnabled))
             .build()
+
+        serviceScope.launch {
+            authRepository.state.first { it is AuthState.SignedIn }
+            authRepository.state.first { it is AuthState.SignedOut }
+            stopForSignOut(player)
+        }
+    }
+
+    /** The saved queue is kept, so the next sign-in can resume it; only the live player is cleared. */
+    private fun stopForSignOut(player: Player) {
+        saveSession(player)
+        sleepTimer.cancel()
+        player.stop()
+        player.clearMediaItems()
+        stopSelf()
     }
 
     private fun publishExtras() {
@@ -297,7 +316,11 @@ class PlaybackService : MediaSessionService() {
         override fun onConnectAsync(
             session: MediaSession,
             controller: MediaSession.ControllerInfo,
-        ): ListenableFuture<MediaSession.ConnectionResult> {
+        ): ListenableFuture<MediaSession.ConnectionResult> = serviceScope.future {
+            // Nothing controls playback while signed out (PRD AU4): not the app, the notification or the system.
+            if (authRepository.awaitReady() !is AuthState.SignedIn) {
+                return@future MediaSession.ConnectionResult.reject()
+            }
             val result = MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
                 .setSessionExtras(session.sessionExtras)
             if (controller.packageName == packageName) {
@@ -305,7 +328,7 @@ class PlaybackService : MediaSessionService() {
                 PlaybackCommands.all.forEach(commands::add)
                 result.setAvailableSessionCommands(commands.build())
             }
-            return Futures.immediateFuture(result.build())
+            result.build()
         }
 
         override fun onCustomCommand(
@@ -340,6 +363,7 @@ class PlaybackService : MediaSessionService() {
             controller: MediaSession.ControllerInfo,
             isForPlayback: Boolean,
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = serviceScope.future {
+            if (authRepository.awaitReady() !is AuthState.SignedIn) throw UnsupportedOperationException("Signed out")
             val saved = sessionStore.load() ?: throw UnsupportedOperationException("No saved session")
             val restored = restoreQueue(saved, songRepository.loadSongs(), Song::id)
                 ?: throw UnsupportedOperationException("Saved songs are no longer in the library")

@@ -10,6 +10,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkInfo
 import androidx.work.WorkerParameters
 import com.autoomstudio.mplay.MPlayApp
+import com.autoomstudio.mplay.data.account.AuthState
 import com.autoomstudio.mplay.data.stems.JobError
 import com.autoomstudio.mplay.data.stems.JobState
 import com.autoomstudio.mplay.data.stems.PauseReason
@@ -49,6 +50,8 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
     override suspend fun doWork(): Result {
         repository.recoverInterrupted()
+        // Signed out: leave the queue as it is; sign-in schedules the worker again.
+        if (container.authRepository.awaitReady() !is AuthState.SignedIn) return Result.success()
         val first = repository.nextQueued() ?: return Result.success()
         notifications.ensureChannel()
         notifications.cancelResult()
@@ -81,6 +84,7 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
         while (true) {
             val settings = container.appSettings.separationSettings.first()
             DeviceConditions.pauseReason(applicationContext, settings, thermal, HeatLevel.Hot)?.let { return pause(it) }
+            if (!container.authRepository.isSignedIn) return Result.success()
             val job = repository.nextQueued() ?: return Result.success()
             if (!repository.markRunning(job.id)) continue
             repository.setQueuedPauseReason(null)

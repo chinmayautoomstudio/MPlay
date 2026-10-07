@@ -1,10 +1,10 @@
 # Settings, About, theme and shared components
 
-> Status: Shipped | Added in: 1.0 (About in 3.1) | Last updated: 2026-10-06 (`e13b2f7`)
+> Status: Shipped | Added in: 1.0 (About in 3.1) | Last updated: 2026-10-07
 
 ## Summary
 
-The Settings tab covers appearance (System/Light/Dark, dynamic colour on Android 12+), library (hide and review duplicates), vocal separation, background playback (battery optimisation) and About. About MPlay shows the version, Autoom Studio links, a privacy note and open-source licenses. The UI uses the "Neon Midnight" purple palette, or wallpaper colours.
+The Settings tab starts with the Account card (Google photo, name, email, Edit name, Log out; see [accounts](accounts.md)), then covers appearance (System/Light/Dark, dynamic colour on Android 12+), library (hide and review duplicates), vocal separation, background playback (battery optimisation) and About. About MP3 Studio shows the version, Autoom Studio links, a privacy note, the privacy policy and terms links, and open-source licenses. The UI uses the "Neon Midnight" purple palette, or wallpaper colours.
 
 ## Key files
 
@@ -14,8 +14,9 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
 |---|---|
 | `data/settings/AppSettings.kt` | DataStore `app_settings`; `ThemeMode`, `ThemeSettings`, `SeparationSettings`; all app-wide keys. |
 | `ui/settings/SettingsViewModel.kt` | `theme: StateFlow<ThemeSettings?>` (null until loaded), theme setters, `claimNotificationPrompt()`. |
-| `ui/settings/SettingsScreen.kt` | Settings list, separation section slot, battery item, About entry. |
-| `ui/settings/AboutScreen.kt` | Logos, version/build, website, email, privacy policy, licenses. |
+| `ui/settings/SettingsScreen.kt` | Settings list, account and separation section slots, battery item, About entry. |
+| `ui/settings/AccountSection.kt`, `AccountViewModel.kt` | Account card; documented in [accounts](accounts.md). |
+| `ui/settings/AboutScreen.kt` | Logos, version/build, website, email, privacy note, privacy policy, terms, licenses. |
 | `ui/settings/LicensesScreen.kt` | Hand-maintained license list and detail view. |
 | `ui/theme/Color.kt`, `Theme.kt`, `Type.kt`, `Motion.kt` | Palette, `MPlayAppTheme`, typography, motion durations and transitions. |
 | `ui/components/*` | Shared components: `ArtworkImage`, `ComingSoon`, `Interactions` (`pressBounce`, `popOnChange`), `LoadingIndicator`, `MPlayTopBar`, `MPlayWordmark`, `NowPlayingBars`, `SelectionTopBar`, `ThemedLottie`, `LofiWaveIcon`, `MetronomeIcons`. |
@@ -25,7 +26,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
 - `MPlayAppTheme` decides dark/light from the setting (or system), runs edge-to-edge with matching bar icons, and uses dynamic colour on API 31+ when enabled, otherwise `NeonDarkColors` / `NeonLightColors`.
 - `MainActivity` keeps the splash screen until the theme has loaded.
 - The battery item re-checks `isIgnoringBatteryOptimizations` on resume and opens system settings.
-- About picks logos by background luminance (the in-app theme doesn't change resource night mode). Links: `https://autoomstudio.com/`, `connect@autoomstudio.com`, `https://autoomstudio.com/privacy-policy`. Long press copies a link.
+- About picks logos by background luminance (the in-app theme doesn't change resource night mode). Links: `https://autoomstudio.com/`, `connect@autoomstudio.com`, `https://autoomstudio.com/privacy-policy`, `https://autoomstudio.com/terms` (`about_terms_url`). Long press copies a link. The privacy note (`about_privacy_note`) says there are no ads, music and recordings stay on the phone, and the Google account details, plan and usage are stored on the backend.
+- `MPlayWordmark` draws "MP3" in the neon gradient followed by " Studio".
 - Licenses: HT-Demucs (MIT), ONNX Runtime (MIT), AndroidX, Material Icons, Kotlin, Guava, Coil, Lottie (Apache 2.0).
 - `ThemedLottie` recolours animations to the theme; `rememberAnimationsEnabled()` respects the system animation scale.
 - Motion: `MotionShort/Medium/Long` = 180/300/450 ms, `fadeThrough()`, `sharedAxisX()`.
@@ -55,11 +57,11 @@ All keys in DataStore `app_settings`:
 | `metronome_volume` | Float | 0.8 (0-1) | Metronome |
 | `singalong_note_seen` | Boolean | `false` | [Sing-along](sing-along.md) |
 
-Other DataStores: `playback_session`, `library_prefs`, `widget_state`.
+Other DataStores: `playback_session`, `library_prefs`, `widget_state`, and `auth_session` (key `session`: the Supabase session, encrypted with Tink, excluded from backup; see [accounts](accounts.md)). The Tink keyset lives in SharedPreferences `auth_keyset_prefs`.
 
 ## Manifest, permissions and notifications
 
-Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` is requested once, tracked by `notification_prompt_shown`. `ACCESS_NETWORK_STATE` is removed, consistent with the offline claim on About.
+Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` is requested once, tracked by `notification_prompt_shown`. The app now uses `INTERNET` and `ACCESS_NETWORK_STATE` for sign-in (see [architecture](../architecture.md#permissions-summary)); the About and permission texts no longer claim the app is offline.
 
 ## Tests
 
@@ -83,3 +85,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-06 | `26863d9` | Licenses screen. |
 | 2026-10-06 | `40a4c10` | About screen (version 3.1). |
 | 2026-10-06 | `e13b2f7` | Keys `separation_notice_hidden`, `separation_speed_factor`, `metronome_*`, `singalong_note_seen`; `MetronomeIcons`. |
+| 2026-10-07 | - | Renamed to MP3 Studio (strings, wordmark). Account card at the top of Settings, Terms link and new privacy text in About, DataStore `auth_session`. |

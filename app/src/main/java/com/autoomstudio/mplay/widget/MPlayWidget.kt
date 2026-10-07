@@ -47,10 +47,11 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.session.MediaButtonReceiver
 import com.autoomstudio.mplay.MPlayApp
 import com.autoomstudio.mplay.MainActivity
 import com.autoomstudio.mplay.R
+import com.autoomstudio.mplay.data.account.AuthState
+import com.autoomstudio.mplay.playback.SignedInMediaButtonReceiver
 import com.autoomstudio.mplay.ui.theme.NeonDarkColors
 import com.autoomstudio.mplay.ui.theme.NeonLightColors
 
@@ -59,13 +60,21 @@ class MPlayWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Responsive(setOf(SMALL, MEDIUM, WIDE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val store = (context.applicationContext as MPlayApp).container.widgetStateStore
+        val container = (context.applicationContext as MPlayApp).container
+        val store = container.widgetStateStore
         val initial = store.current()
+        val auth = container.authRepository
+        auth.awaitReady()
         provideContent {
             val state by store.state.collectAsState(initial)
             val artwork by store.artwork.collectAsState(null)
+            val authState by auth.state.collectAsState()
             GlanceTheme(colors = WidgetColors) {
-                WidgetContent(state, if (state.isIdle) null else artwork)
+                if (authState is AuthState.SignedIn) {
+                    WidgetContent(state, if (state.isIdle) null else artwork)
+                } else {
+                    SignedOutContent()
+                }
             }
         }
     }
@@ -154,6 +163,38 @@ private fun WidgetContent(state: WidgetState, artwork: Bitmap?) {
     }
 }
 
+/** No controls while signed out (PRD AU4); a tap opens the app at the sign-in screen. */
+@Composable
+private fun SignedOutContent() {
+    val context = LocalContext.current
+    val openApp = Intent(context, MainActivity::class.java)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    Row(
+        modifier = GlanceModifier
+            .fillMaxSize()
+            .appWidgetBackground()
+            .cornerRadius(20.dp)
+            .background(GlanceTheme.colors.widgetBackground)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .clickable(actionStartActivity(openApp)),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Image(
+            provider = ImageProvider(R.drawable.ic_widget_music_note),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+            modifier = GlanceModifier.size(24.dp),
+        )
+        Spacer(GlanceModifier.width(10.dp))
+        Text(
+            text = context.getString(R.string.widget_signed_out),
+            maxLines = 2,
+            style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Medium),
+            modifier = GlanceModifier.defaultWeight(),
+        )
+    }
+}
+
 @Composable
 private fun Artwork(artwork: Bitmap?, contentDescription: String) {
     Box(
@@ -214,7 +255,7 @@ private fun ControlButton(
 @OptIn(UnstableApi::class)
 private fun mediaButtonIntent(context: Context, keyCode: Int): Intent =
     Intent(Intent.ACTION_MEDIA_BUTTON)
-        .setClass(context, MediaButtonReceiver::class.java)
+        .setClass(context, SignedInMediaButtonReceiver::class.java)
         .putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
 
 private val ARTWORK_SIZE = 48.dp

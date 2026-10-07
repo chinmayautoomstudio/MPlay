@@ -21,8 +21,8 @@ fun MPlayWordmark(
 ) {
     val text = remember {
         buildAnnotatedString {
-            withStyle(SpanStyle(brush = NeonBrush)) { append("M") }
-            append("Play")
+            withStyle(SpanStyle(brush = NeonBrush)) { append("MP3") }
+            append(" Studio")
         }
     }
     Text(text = text, style = style, color = color, modifier = modifier)

@@ -104,8 +104,11 @@ class ClipStore(private val context: Context) {
     }
 
     companion object {
-        const val CLIPS_FOLDER = "MPlay Clips"
+        const val CLIPS_FOLDER = "MP3 Studio Clips"
         val CLIPS_RELATIVE_PATH = "${Environment.DIRECTORY_MUSIC}/$CLIPS_FOLDER/"
+
+        /** Where clips were saved before the rename to MP3 Studio; still listed in the library. */
+        val LEGACY_CLIPS_RELATIVE_PATH = "${Environment.DIRECTORY_MUSIC}/MPlay Clips/"
         private const val MIME_TYPE = "audio/mp4"
         private const val BYTES_PER_MS = 192_000L / 8 / 1000
         private const val SPACE_MARGIN_BYTES = 5L * 1024 * 1024

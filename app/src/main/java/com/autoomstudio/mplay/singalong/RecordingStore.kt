@@ -127,8 +127,11 @@ class RecordingStore(private val context: Context) {
 
     companion object {
         private const val TAG = "RecordingStore"
-        const val FOLDER = "MPlay Recordings"
+        const val FOLDER = "MP3 Studio Recordings"
         val RELATIVE_PATH = "${Environment.DIRECTORY_MUSIC}/$FOLDER/"
+
+        /** Where recordings were saved before the rename to MP3 Studio; still listed in the library. */
+        val LEGACY_RELATIVE_PATH = "${Environment.DIRECTORY_MUSIC}/MPlay Recordings/"
         private const val MIME_TYPE = "audio/mp4"
     }
 }

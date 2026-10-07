@@ -1,6 +1,6 @@
 # Playback
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-06
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-07
 
 ## Summary
 
@@ -39,10 +39,11 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
 - On create it restores shuffle/repeat, applies the saved lofi flag, loads `stemMode`, and watches `stemRepository.stemSets` to repoint stem URIs.
 - The session activity `PendingIntent` opens `MainActivity` with `EXTRA_OPEN_NOW_PLAYING`. Notifications use Media3's default provider.
 - `SessionCallback`:
-  - `onConnectAsync` grants `PlaybackCommands.all` only to MPlay's own package.
+  - `onConnectAsync` waits for `AuthRepository.awaitReady()` and rejects every controller (app, notification, system UI, Bluetooth) while signed out (PRD AU4). Signed in, it grants `PlaybackCommands.all` only to the app's own package.
   - `onCustomCommand` handles the commands below; anything else returns `ERROR_NOT_SUPPORTED`.
-  - `onPlaybackResumption` rebuilds the saved queue for play requests from the widget, headset or system UI.
+  - `onPlaybackResumption` rebuilds the saved queue for play requests from the widget, headset or system UI. It throws while signed out.
   - `onAddMediaItems` maps items through `resolve()` so the current `StemMode` applies.
+- After a sign-in, a collector on `AuthRepository.state` waits for `SignedOut`, then `stopForSignOut()` saves the queue, cancels the sleep timer, stops and clears the player and calls `stopSelf()`. The saved queue (DataStore `playback_session`) is kept, so the next sign-in can resume it.
 - `onTaskRemoved` saves and stops only if nothing is queued or playback is paused/ended. `onDestroy` clears `musicPlaying`, saves, publishes a paused widget state and releases.
 
 ### Custom commands and extras
@@ -85,7 +86,7 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 ## Manifest, permissions and notifications
 
 - `PlaybackService`: exported, `foregroundServiceType="mediaPlayback"`, intent filter `androidx.media3.session.MediaSessionService`.
-- `androidx.media3.session.MediaButtonReceiver` for `MEDIA_BUTTON`.
+- `playback.SignedInMediaButtonReceiver` (extends Media3's `MediaButtonReceiver`) for `MEDIA_BUTTON`. `shouldStartForegroundService` waits up to 3 s for the saved session and returns false while signed out, because a service started in the foreground must start playing.
 - Permissions: `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `WAKE_LOCK`, `POST_NOTIFICATIONS`.
 
 ## Tests
@@ -100,6 +101,7 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 - Custom commands only work for MPlay's own controllers.
 - The saved queue stores song IDs only; deleted songs are dropped on restore.
 - Sleep timer state is lost if the service dies.
+- If reading the saved session takes more than 3 s, a headset or widget play press while the app isn't running is ignored.
 
 ## Change history
 
@@ -115,3 +117,4 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 | 2026-10-05 | `0a56dcd` | Auto-sizing stem mode labels. |
 | 2026-10-06 | `e13b2f7` | `musicPlaying` flag; `play`/`pause`/`currentPositionMs`/`isSeekable`; chip row became `FlowRow` with metronome and sing-along chips; `MetronomeMiniIndicator` in mini player. |
 | 2026-10-06 | - | `PlaybackController` implements `MusicTimeline` for metronome sync; `restoresSession` parameter. See [metronome](metronome.md). |
+| 2026-10-07 | - | Sign-in required: controllers rejected and resumption refused while signed out, service stops on sign-out, `SignedInMediaButtonReceiver`. See [accounts](accounts.md). |

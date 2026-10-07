@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Policy
@@ -61,6 +62,7 @@ fun AboutScreen(
     val website = stringResource(R.string.about_website)
     val email = stringResource(R.string.about_email)
     val privacyUrl = stringResource(R.string.about_privacy_url)
+    val termsUrl = stringResource(R.string.about_terms_url)
     val emailSubject = stringResource(R.string.about_email_subject, BuildConfig.VERSION_NAME)
     val noBrowser = stringResource(R.string.about_no_browser)
     val noMailApp = stringResource(R.string.about_no_mail_app)
@@ -141,6 +143,13 @@ fun AboutScreen(
             value = null,
             onClick = { context.openOrMessage(Intent(Intent.ACTION_VIEW, Uri.parse(privacyUrl)), noBrowser, onMessage) },
             onLongClick = { context.copy(privacyUrl, onMessage) },
+        )
+        LinkItem(
+            icon = Icons.Outlined.Description,
+            label = stringResource(R.string.about_terms),
+            value = null,
+            onClick = { context.openOrMessage(Intent(Intent.ACTION_VIEW, Uri.parse(termsUrl)), noBrowser, onMessage) },
+            onLongClick = { context.copy(termsUrl, onMessage) },
         )
         ListItem(
             headlineContent = { Text(stringResource(R.string.settings_licenses)) },

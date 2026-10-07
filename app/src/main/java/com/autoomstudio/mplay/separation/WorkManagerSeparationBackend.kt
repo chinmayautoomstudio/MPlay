@@ -55,6 +55,10 @@ class WorkManagerSeparationBackend(
         workManager.enqueueUniqueWork(SeparationWorker.UNIQUE_NAME, policy, request)
     }
 
+    override suspend fun cancel() {
+        WorkManager.getInstance(context).cancelUniqueWork(SeparationWorker.UNIQUE_NAME).result.await()
+    }
+
     private companion object {
         const val BACKOFF_MINUTES = 5L
     }

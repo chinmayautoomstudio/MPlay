@@ -29,6 +29,8 @@ class SeparationController(
     private val modelProvider: ModelProvider,
     private val settings: AppSettings,
     private val scope: CoroutineScope,
+    /** Separation only runs for a signed-in user (PRD AU1); the queue waits while signed out. */
+    private val isSignedIn: () -> Boolean,
 ) {
     val deviceReasons: List<UnsupportedReason> get() = backend.deviceReasons
 
@@ -41,19 +43,25 @@ class SeparationController(
     /** Re-checks after the model file changed. */
     fun refreshModel() = modelProvider.refresh()
 
-    /** Resumes queued work after a restart and applies settings changes to waiting work. */
+    /**
+     * Applies settings changes to waiting work. Queued work resumes in [onSignedIn], once the saved session is known.
+     */
     fun start() {
-        if (isAvailable) {
-            scope.launch { if (repository.hasQueued()) backend.schedule() }
-        } else {
-            scope.launch { repository.failQueued(JobError.ModelUnavailable) }
-        }
+        if (!isAvailable) scope.launch { repository.failQueued(JobError.ModelUnavailable) }
         scope.launch {
             settings.separationSettings.drop(1).collect {
-                if (isAvailable && repository.hasQueued()) backend.schedule()
+                if (isAvailable && isSignedIn() && repository.hasQueued()) backend.schedule()
             }
         }
     }
+
+    /** Resumes the queue after sign-in or an app restart with a saved session. */
+    suspend fun onSignedIn() {
+        if (isAvailable && repository.hasQueued()) backend.schedule()
+    }
+
+    /** Stops separating; the interrupted song goes back to the queue and waits for the next sign-in. */
+    suspend fun onSignedOut() = backend.cancel()
 
     suspend fun enqueue(songs: List<Song>): EnqueueResult {
         if (!deviceEligible) return EnqueueResult.Unsupported(deviceReasons)
@@ -70,7 +78,7 @@ class SeparationController(
     suspend fun cancel(jobId: Long) = repository.cancel(jobId)
 
     suspend fun retry(jobId: Long) {
-        if (!isAvailable) return
+        if (!isAvailable || !isSignedIn()) return
         repository.retry(jobId)
         backend.schedule()
     }

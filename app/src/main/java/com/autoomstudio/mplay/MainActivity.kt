@@ -15,6 +15,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -22,8 +23,14 @@ import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.autoomstudio.mplay.data.account.AuthState
 import com.autoomstudio.mplay.data.settings.ThemeSettings
+import com.autoomstudio.mplay.ui.auth.AuthViewModel
+import com.autoomstudio.mplay.ui.auth.SignInScreen
+import com.autoomstudio.mplay.ui.auth.SignedInViewModelOwner
+import com.autoomstudio.mplay.ui.auth.SignedInViewModelScope
 import com.autoomstudio.mplay.ui.duplicates.DuplicateActions
 import com.autoomstudio.mplay.ui.library.LibraryUiState
 import com.autoomstudio.mplay.ui.library.LibraryViewModel
@@ -51,27 +58,56 @@ class MainActivity : ComponentActivity() {
 
     private val settingsViewModel: SettingsViewModel by viewModels { SettingsViewModel.Factory }
 
+    private val authViewModel: AuthViewModel by viewModels { AuthViewModel.Factory }
+
+    private val signedInScope: SignedInViewModelScope by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
-        // Holds the splash until the saved theme is known, so a forced light or dark theme doesn't flash.
-        splash.setKeepOnScreenCondition { settingsViewModel.theme.value == null }
+        // Holds the splash until the saved theme and the saved session are known, so neither the theme nor the
+        // sign-in screen flashes for a returning user.
+        splash.setKeepOnScreenCondition {
+            settingsViewModel.theme.value == null || authViewModel.state.value is AuthState.Loading
+        }
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val theme = settingsViewModel.theme.collectAsStateWithLifecycle().value ?: return@setContent
+            val auth by authViewModel.state.collectAsStateWithLifecycle()
             MPlayAppTheme(activity = this, settings = theme) {
-                MPlayRoot(
-                    openNowPlayingRequest = openNowPlayingRequest,
-                    onOpenNowPlayingHandled = { openNowPlayingRequest = false },
-                    openSeparationRequest = openSeparationRequest,
-                    onOpenSeparationHandled = { openSeparationRequest = false },
-                    openMetronomeRequest = openMetronomeRequest,
-                    onOpenMetronomeHandled = { openMetronomeRequest = false },
-                    themeSettings = theme,
-                    settingsViewModel = settingsViewModel,
-                )
+                // Sign-in is mandatory: nothing below the sign-in screen exists until someone is signed in.
+                // Notification requests stay pending meanwhile and are handled once MPlayRoot appears.
+                when (val state = auth) {
+                    AuthState.Loading -> Unit
+                    AuthState.SignedOut -> {
+                        LaunchedEffect(Unit) { signedInScope.storeFor(null) }
+                        SignInScreen(authViewModel)
+                    }
+                    is AuthState.SignedIn -> {
+                        val owner = remember(state.user.id) {
+                            SignedInViewModelOwner(signedInScope.storeFor(state.user.id), this)
+                        }
+                        CompositionLocalProvider(LocalViewModelStoreOwner provides owner) {
+                            MPlayRoot(
+                                openNowPlayingRequest = openNowPlayingRequest,
+                                onOpenNowPlayingHandled = { openNowPlayingRequest = false },
+                                openSeparationRequest = openSeparationRequest,
+                                onOpenSeparationHandled = { openSeparationRequest = false },
+                                openMetronomeRequest = openMetronomeRequest,
+                                onOpenMetronomeHandled = { openMetronomeRequest = false },
+                                themeSettings = theme,
+                                settingsViewModel = settingsViewModel,
+                            )
+                        }
+                    }
+                }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        authViewModel.verifyAccount()
     }
 
     override fun onNewIntent(intent: Intent) {

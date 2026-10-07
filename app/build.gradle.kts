@@ -5,6 +5,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
 }
@@ -14,6 +15,18 @@ val keystoreProperties = Properties().apply {
     val file = rootProject.file("keystore.properties")
     if (file.isFile) file.inputStream().use(::load)
 }
+
+// Backend settings come from the uncommitted local.properties (supabase.url, supabase.key, google.webClientId).
+// Only publishable values belong there; the service role key stays on the server.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.isFile) file.inputStream().use(::load)
+}
+val backendConfig = mapOf(
+    "SUPABASE_URL" to localProperties.getProperty("supabase.url", "").trim(),
+    "SUPABASE_KEY" to localProperties.getProperty("supabase.key", "").trim(),
+    "GOOGLE_WEB_CLIENT_ID" to localProperties.getProperty("google.webClientId", "").trim(),
+)
 
 android {
     namespace = "com.autoomstudio.mplay"
@@ -30,6 +43,7 @@ android {
         // An imported model file must match the same export the build bundles.
         val modelHash = rootProject.file("models/htdemucs.onnx.sha256").readText().trim().substringBefore(' ').lowercase()
         buildConfigField("String", "MODEL_SHA256", "\"$modelHash\"")
+        backendConfig.forEach { (name, value) -> buildConfigField("String", name, "\"$value\"") }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -92,15 +106,40 @@ androidComponents {
     }
     onVariants { variant ->
         val name = variant.name.replaceFirstChar(Char::uppercase)
-        val check = tasks.register<CheckNoInternetPermission>("check${name}NoInternet") {
+        val permissions = tasks.register<CheckAllowedPermissions>("check${name}Permissions") {
             manifest.set(variant.artifacts.get(SingleArtifact.MERGED_MANIFEST))
-            report.set(layout.buildDirectory.file("reports/no-internet/${variant.name}.txt"))
+            allowed.set(ALLOWED_PERMISSIONS + "${variant.applicationId.get()}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION")
+            report.set(layout.buildDirectory.file("reports/permissions/${variant.name}.txt"))
+        }
+        val backend = tasks.register<CheckBackendConfig>("check${name}BackendConfig") {
+            values.set(backendConfig)
+            required.set(variant.buildType == "release")
+            report.set(layout.buildDirectory.file("reports/backend-config/${variant.name}.txt"))
         }
         tasks.configureEach {
-            if (this.name == "assemble$name" || this.name == "bundle$name") dependsOn(check)
+            if (this.name == "assemble$name" || this.name == "bundle$name") dependsOn(permissions, backend)
         }
     }
 }
+
+/** Every permission the merged manifest may declare. Anything else (usually merged in by a library) fails the build. */
+val ALLOWED_PERMISSIONS = setOf(
+    "android.permission.READ_MEDIA_AUDIO",
+    "android.permission.READ_EXTERNAL_STORAGE",
+    "android.permission.WRITE_EXTERNAL_STORAGE",
+    "android.permission.POST_NOTIFICATIONS",
+    "android.permission.FOREGROUND_SERVICE",
+    "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+    "android.permission.FOREGROUND_SERVICE_DATA_SYNC",
+    "android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING",
+    "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+    "android.permission.RECORD_AUDIO",
+    "android.permission.WAKE_LOCK",
+    "android.permission.WRITE_SETTINGS",
+    "android.permission.RECEIVE_BOOT_COMPLETED",
+    "android.permission.INTERNET",
+    "android.permission.ACCESS_NETWORK_STATE",
+)
 
 val ALL_ABIS = setOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 
@@ -159,21 +198,55 @@ abstract class PrepareModelAssets : DefaultTask() {
     }
 }
 
-/** MPlay is offline by design; fails the build if any dependency merges in the INTERNET permission. */
-abstract class CheckNoInternetPermission : DefaultTask() {
+/** Fails the build when the merged manifest declares a permission outside [allowed]. */
+abstract class CheckAllowedPermissions : DefaultTask() {
     @get:InputFile
     abstract val manifest: RegularFileProperty
+
+    @get:Input
+    abstract val allowed: SetProperty<String>
 
     @get:OutputFile
     abstract val report: RegularFileProperty
 
     @TaskAction
     fun check() {
-        val text = manifest.get().asFile.readText()
-        if (text.contains("android.permission.INTERNET")) {
-            throw GradleException("The merged manifest declares android.permission.INTERNET; MPlay must stay offline.")
+        val declared = Regex("""<uses-permission(?:-sdk-23)?\s[^>]*android:name="([^"]+)"""")
+            .findAll(manifest.get().asFile.readText())
+            .map { it.groupValues[1] }
+            .toSortedSet()
+        val unexpected = declared - allowed.get()
+        if (unexpected.isNotEmpty()) {
+            throw GradleException(
+                "The merged manifest declares permissions that aren't allowed: ${unexpected.joinToString()}. " +
+                    "Remove them with tools:node=\"remove\" or add them to ALLOWED_PERMISSIONS in app/build.gradle.kts.",
+            )
         }
-        report.get().asFile.writeText("OK: no INTERNET permission\n")
+        report.get().asFile.writeText(declared.joinToString("\n", postfix = "\n"))
+    }
+}
+
+/** Release builds need the Supabase URL and key and the Google Web client ID; debug builds only warn. */
+abstract class CheckBackendConfig : DefaultTask() {
+    @get:Input
+    abstract val values: MapProperty<String, String>
+
+    @get:Input
+    abstract val required: Property<Boolean>
+
+    @get:OutputFile
+    abstract val report: RegularFileProperty
+
+    @TaskAction
+    fun check() {
+        val missing = values.get().filterValues { it.isBlank() }.keys
+        if (missing.isNotEmpty()) {
+            val problem = "Missing backend settings in local.properties for ${missing.joinToString()} " +
+                "(supabase.url, supabase.key, google.webClientId). Sign-in won't work."
+            if (required.get()) throw GradleException(problem)
+            logger.warn("Warning: $problem")
+        }
+        report.get().asFile.writeText(if (missing.isEmpty()) "OK\n" else "Missing: ${missing.joinToString()}\n")
     }
 }
 
@@ -194,6 +267,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     implementation(libs.lottie.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.guava)
@@ -208,6 +282,14 @@ dependencies {
     implementation(libs.androidx.glance.material3)
     implementation(project(":separation"))
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(platform(libs.supabase.bom))
+    implementation(libs.supabase.auth)
+    implementation(libs.supabase.postgrest)
+    implementation(libs.ktor.client.okhttp)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services)
+    implementation(libs.googleid)
+    implementation(libs.tink.android)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.mockito.core)

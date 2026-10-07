@@ -21,7 +21,7 @@ val MPlayTypography = Typography(
     labelSmall = Base.labelSmall,
 )
 
-/** Style for the "MPlay" wordmark in the top bar. */
+/** Style for the "MP3 Studio" wordmark in the top bar. */
 val WordmarkStyle = TextStyle(
     fontSize = 28.sp,
     lineHeight = 34.sp,

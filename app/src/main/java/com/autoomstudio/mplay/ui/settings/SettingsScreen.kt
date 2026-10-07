@@ -52,6 +52,7 @@ fun SettingsScreen(
     onReviewDuplicates: () -> Unit,
     onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier,
+    accountSection: @Composable (sectionHeader: @Composable (String) -> Unit) -> Unit = {},
     separationSection: @Composable (sectionHeader: @Composable (String) -> Unit) -> Unit = {},
 ) {
     Column(
@@ -59,6 +60,8 @@ fun SettingsScreen(
             .verticalScroll(rememberScrollState())
             .padding(vertical = 8.dp),
     ) {
+        accountSection { SectionHeader(it) }
+
         SectionHeader(stringResource(R.string.settings_section_appearance))
         ThemeModeRow(selected = theme.mode, onSelect = onThemeModeChange)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

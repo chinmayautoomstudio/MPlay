@@ -1,6 +1,6 @@
 # Metronome and BPM detection
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-06
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-07
 
 ## Summary
 
@@ -141,6 +141,7 @@ Resets after 2 s without a tap, keeps the last 8 taps, needs at least 4. BPM = 6
 - `AudioTrack` creation failure is silent.
 - Call detection can take up to 500 ms.
 - `stop()` can block the main thread up to 500 ms per thread join.
+- Signing out stops the metronome (`di/AuthEffects` calls `MetronomeController.stop()`); "Sync with song" is not yet limited to Pro (planned for the plans milestone).
 
 ## Change history
 
@@ -150,3 +151,4 @@ Resets after 2 s without a tap, keeps the last 8 taps, needs at least 4. BPM = 6
 | 2026-10-06 | - | Time signature detection (MT18-MT21): `MeterDetector`, `detectRhythm()`, meter columns in `song_tempos` (schema v5), apply/Undo snackbar, suggestion chip. |
 | 2026-10-06 | - | Sync with the song: `BeatGrid`, exact-start decoding, grid columns in `song_tempos` (schema v6), `BeatClock.align`, `MetronomeEngine.heardFrame`, `SongSync`, `MusicTimeline`, "Sync with song" chip. |
 | 2026-10-06 | - | UI redesign: `BpmDial` ring, slider, action tiles, Sound mute toggle (`setUserMuted`), sound settings sheet, Time signature and Accent cards, Custom time signature dialog; same layout in the tab and the Now Playing sheet. |
+| 2026-10-07 | - | The metronome stops on sign-out. See [accounts](accounts.md). |

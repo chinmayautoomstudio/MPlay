@@ -1,0 +1,111 @@
+# Accounts and Google sign-in
+
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-07
+
+## Summary
+
+MP3 Studio requires a Google account (PRD v3.2, AU1-AU11). On first launch, and after logging out, the app shows only the sign-in screen with "Continue with Google"; there is no guest mode and no email or password. While signed out, nothing plays: the widget, the media notification, Bluetooth and headset buttons do nothing. Settings shows the account (photo, name, email) with Edit name and Log out.
+
+## Key files
+
+Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
+
+| File | Role |
+|---|---|
+| `data/account/AuthRepository.kt` | Single source of truth: `state: StateFlow<AuthState>`, `awaitReady()`, sign-in, `signOut()`, `verifyAccount()`, `reduce()`. |
+| `data/account/AuthState.kt` | `AuthState` (`Loading`, `SignedOut`, `SignedIn`) and `AccountUser`. |
+| `data/account/AuthBackend.kt`, `SupabaseAuthBackend.kt` | What the repository needs from the server, and the supabase-kt implementation (`SessionStatus` mapping, `IDToken` sign-in, `profiles.disabled` check). |
+| `data/account/SecureSessionStore.kt` | supabase-kt `SessionManager` that stores the session in DataStore `auth_session`, encrypted with Tink AES-256-GCM under an Android Keystore key. |
+| `data/account/GoogleSignIn.kt` | Credential Manager `GetSignInWithGoogleOption` with the hashed nonce; returns the Google ID token. |
+| `data/account/Nonce.kt` | Raw nonce (32 random bytes, URL-safe Base64) and its SHA-256 hex. |
+| `data/account/AuthErrors.kt` | `AuthError` and the mapping from exceptions and GoTrue codes. |
+| `data/account/Profile.kt`, `ProfileRepository.kt` | The user's `profiles` row; `refresh()`, `updateDisplayName()`, `clear()`. |
+| `ui/auth/SignInScreen.kt`, `AuthViewModel.kt` | Sign-in screen, error snackbar, foreground account check. |
+| `ui/auth/SignedInViewModelScope.kt` | `ViewModelStore` for signed-in screens, cleared on sign-out. |
+| `ui/settings/AccountSection.kt`, `AccountViewModel.kt` | Account card in Settings, edit-name and log-out dialogs. |
+| `di/AuthEffects.kt` | App-wide reactions to sign-in and sign-out (separation, metronome, sing-along, profile, widget). |
+| `playback/SignedInMediaButtonReceiver.kt` | Media button receiver that doesn't start playback while signed out. |
+
+## How it works
+
+### Startup gate
+
+1. `MPlayApp.onCreate` (main process) calls `authRepository.start()`, which collects the supabase-kt session status. The state is `Loading` until the saved session has been read.
+2. `MainActivity` keeps the splash screen until the theme is loaded and the state isn't `Loading`.
+3. `SignedOut` shows `SignInScreen`. `SignedIn` provides a `ViewModelStoreOwner` from `SignedInViewModelScope.storeFor(userId)` as `LocalViewModelStoreOwner` around `MPlayRoot`, so the playback, library and other screen ViewModels belong to that user. Signing out (or another user signing in) clears the store; rotation keeps it.
+
+### Signing in
+
+`AuthViewModel.signInWithGoogle(activity)`:
+
+1. `Nonce.generate()`; Google gets `Nonce.sha256Hex(raw)`, Supabase gets the raw value.
+2. `GoogleSignIn.requestIdToken()` shows the Google account sheet (`GetSignInWithGoogleOption` with `GOOGLE_WEB_CLIENT_ID`).
+3. `auth.signInWith(IDToken) { provider = Google; nonce = raw }`. On the server, the `handle_new_user` trigger creates the profile on first sign-in (see [backend](../backend.md)).
+4. `verifyAccount()` signs out again if the profile is disabled.
+
+Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings). A cancelled sheet shows nothing.
+
+### Staying signed in
+
+- supabase-kt refreshes the token automatically (`alwaysAutoRefresh`). A refresh that fails while offline keeps the user signed in with the stored session's user (`AuthRepository.reduce`), so the app works offline.
+- `MainActivity.onStart` calls `AuthViewModel.verifyAccount()`: it refreshes the session and reads `profiles.disabled`. Codes `user_banned` (disabled) and `session_not_found`, `session_expired`, `refresh_token_not_found`, `refresh_token_already_used`, `user_not_found` (revoked) sign the user out with a message. Network errors are ignored. It then refreshes the profile.
+
+### Signed out (PRD AU4)
+
+- `PlaybackService` rejects every controller and refuses resumption while signed out, and stops and clears the player on sign-out, keeping the saved queue ([playback](playback.md)).
+- `SignedInMediaButtonReceiver` doesn't start the service for headset or widget play buttons.
+- The widget shows "Sign in to MP3 Studio" without controls ([widget](widget.md)).
+- `AuthEffects`, after a real sign-out (not on a cold start without a session): cancels a sing-along session, stops the metronome, clears the profile and calls `SeparationController.onSignedOut()`, which cancels the WorkManager job so the song returns to the queue ([vocal separation](vocal-separation.md)). On sign-in it calls `onSignedIn()` to resume the queue. It refreshes the widget on both.
+- `TrimEditorActivity` finishes itself on sign-out.
+
+### Account card and log out
+
+`AccountSection` (top of Settings) shows the photo (Coil, with a person icon as placeholder), name and email. The profile row wins; the Google account details cover it until it loads. Edit name updates `profiles.display_name` (max 80 characters, trimmed) and shows an error in the dialog if it fails. Log out asks for confirmation, then runs `AuthRepository.signOut()` on the application scope (local sign-out falls back to clearing the session if the server can't be reached).
+
+## Data and persistence
+
+- DataStore `auth_session`, key `session`: the supabase-kt `UserSession` as JSON, encrypted with Tink (associated data `mp3studio.auth.session`) and stored as Base64. If it can't be decrypted it is deleted and the user signs in again.
+- SharedPreferences `auth_keyset_prefs`: the Tink keyset `auth_keyset`, wrapped by the Keystore key `mp3studio_auth_master_key`.
+- Both are excluded from cloud backup and device transfer (`backup_rules.xml`, `data_extraction_rules.xml`), since the Keystore key can't move with them.
+- No Room tables. Server tables are in [backend](../backend.md).
+
+### Build configuration
+
+`app/build.gradle.kts` reads `local.properties` (gitignored) into `BuildConfig`:
+
+| Property | `BuildConfig` field |
+|---|---|
+| `supabase.url` | `SUPABASE_URL` |
+| `supabase.key` | `SUPABASE_KEY` (anon key) |
+| `google.webClientId` | `GOOGLE_WEB_CLIENT_ID` (OAuth Web client ID, also configured in GoTrue) |
+
+`check<Variant>BackendConfig` fails release builds when any is blank and warns in debug. Without them the sign-in button shows "Sign-in isn't set up in this build of MP3 Studio." Google sign-in also needs Android OAuth clients registered for the package with the debug and release SHA-1 fingerprints.
+
+## Manifest, permissions and notifications
+
+- `INTERNET` and `ACCESS_NETWORK_STATE`. `USE_BIOMETRIC` and `USE_FINGERPRINT`, merged in by `androidx.credentials`, are removed with `tools:node="remove"`.
+- `android:networkSecurityConfig="@xml/network_security_config"` blocks cleartext traffic.
+- `playback.SignedInMediaButtonReceiver` replaces Media3's `MediaButtonReceiver` in the manifest.
+- No new notifications.
+
+## Tests
+
+- `data/account/AuthErrorsTest.kt`: GoTrue code mapping, exception classification (including wrapped causes), which errors end the session.
+- `data/account/NonceTest.kt`: SHA-256 hex, nonce length and alphabet.
+- `data/account/AuthRepositoryTest.kt`: `reduce()` (offline refresh keeps the user), `verifyAccount()` with a fake backend (disabled, revoked, offline, active).
+- `supabase/tests/rls_test.sql`: server-side access rules ([backend](../backend.md#testing-rls)).
+- No tests for `SecureSessionStore` (needs the Keystore), the Credential Manager flow, the screens or `AuthEffects`.
+
+## Known limitations and TODOs
+
+- Requires Google Play services; phones without them can't sign in.
+- The terms URL (`about_terms_url`, `https://autoomstudio.com/terms`) is a placeholder until the page exists.
+- The launcher icon is still the MPlay icon.
+- If GoTrue still allows email or phone sign-up, someone could create an account through the API; disable them on the server ([backend](../backend.md#auth-settings)).
+- An account disabled by an Admin is noticed on the next foreground check, not instantly.
+
+## Change history
+
+| Date | Commit | Change |
+|---|---|---|
+| 2026-10-07 | - | Mandatory Google sign-in, encrypted session store, signed-out blocking, Account card (M1). |

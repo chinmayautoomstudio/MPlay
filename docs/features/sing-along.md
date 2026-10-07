@@ -1,10 +1,10 @@
 # Sing-along recording
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-06
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-07
 
 ## Summary
 
-Sing-along records the user singing over a song's instrumental stem (the song must be separated first). MPlay plays the instrumental and records the voice in step with it. Afterwards the user can listen back, adjust voice level, music level and timing, and save a stereo M4A to `Music/MPlay Recordings`, where it appears in the library. Everything stays on the phone, and the microphone is only used while recording. Requirement IDs SA1-SA18 refer to section 6.2 of `MPlay PRD v3.1.md`.
+Sing-along records the user singing over a song's instrumental stem (the song must be separated first). MPlay plays the instrumental and records the voice in step with it. Afterwards the user can listen back, adjust voice level, music level and timing, and save a stereo M4A to `Music/MP3 Studio Recordings`, where it appears in the library. Everything stays on the phone, and the microphone is only used while recording. Requirement IDs SA1-SA18 refer to section 6.2 of `MPlay PRD v3.1.md`.
 
 ## Key files
 
@@ -77,7 +77,7 @@ Mono 16-bit at 44.1 kHz, 1024-frame reads, on an urgent-audio thread. Sources tr
 ### Saving
 
 - Renders on `Dispatchers.Default` to `cacheDir/singalong/mix-<millis>.m4a`: AAC-LC, 44.1 kHz stereo, 192 kbps (`AacFileWriter` from `:separation`).
-- Android 10+: MediaStore insert into `Music/MPlay Recordings/` with `IS_PENDING`, `IS_MUSIC = 1`, title and artist.
+- Android 10+: MediaStore insert into `Music/MP3 Studio Recordings/` with `IS_PENDING`, `IS_MUSIC = 1`, title and artist.
 - Android 8-9: write `.<name>.partial`, rename, scan.
 - Names: `"<title> - Sing along"`, sanitised, max 100 characters, `(2)`, `(3)` suffix on collision.
 - Space check: `(seconds + 1) * (88,200 + 2 * 24,000) bytes + 20 MiB`; Start is disabled if short.
@@ -101,7 +101,7 @@ The sheet warns when no headphones are connected (music will leak into the mic) 
 ## Data and persistence
 
 - Temp: `cacheDir/singalong/` (`voice-*.pcm`, `mix-*.m4a`), cleaned on cancel/close/save and by `cleanUpLeftovers()` at startup (also removes abandoned pending MediaStore rows on Android 11+).
-- Output: `Music/MPlay Recordings/*.m4a` (exempt from the library's 30 s minimum).
+- Output: `Music/MP3 Studio Recordings/*.m4a` (exempt from the library's 30 s minimum).
 - DataStore: `singalong_note_seen`. Mix settings and options are not persisted. No Room tables.
 
 ## Manifest, permissions and notifications
@@ -132,3 +132,4 @@ The sheet warns when no headphones are connected (music will leak into the mic) 
 |---|---|---|
 | 2026-10-06 | `e13b2f7` | Sing-along recording added: session, recorder, mixer, preview, export, `RecordingService`, Now Playing chip and sheet, overlay. |
 | 2026-10-06 | - | Recording and saving animations (`SingAlongAnimations.kt`): state transitions, blinking dot, voice rings, scrolling waveform, rolling timer, saving ring, animated saved check; off with system animations. |
+| 2026-10-07 | - | Recordings folder renamed to `Music/MP3 Studio Recordings`; the old `Music/MPlay Recordings/` stays exempt from the 30 s minimum. A running session is cancelled on sign-out (`di/AuthEffects`). |

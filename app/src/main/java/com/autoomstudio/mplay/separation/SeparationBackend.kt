@@ -10,4 +10,7 @@ interface SeparationBackend {
      * Safe to call at any time, including while a job is running.
      */
     suspend fun schedule()
+
+    /** Stops the running job (it goes back to the queue) and drops waiting work, for example on sign-out. */
+    suspend fun cancel()
 }

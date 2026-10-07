@@ -1,0 +1,51 @@
+# Supabase CLI configuration for the MP3 Studio backend.
+# Local stack: `supabase start`. Link to the hosted project: `supabase link --project-ref <ref>`.
+# Secrets come from the environment (see docs/backend.md), never from this file.
+
+project_id = "mp3-studio"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[db.seed]
+enabled = false
+
+[auth]
+enabled = true
+site_url = "mp3studio://auth-callback"
+additional_redirect_urls = ["mp3studio://auth-callback"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+[auth.rate_limit]
+# Per IP, per 5 minutes.
+sign_in_sign_ups = 30
+token_refresh = 150
+
+# Google is the only sign-in method; email and password are off.
+[auth.email]
+enable_signup = false
+enable_confirmations = false
+
+[auth.sms]
+enable_signup = false
+
+[auth.external.google]
+enabled = true
+# The Web OAuth client ID. Android sends ID tokens issued for it via Credential Manager.
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+redirect_uri = ""
+# The app sends a hashed nonce to Google and the raw nonce to Supabase, so the check stays on.
+skip_nonce_check = false

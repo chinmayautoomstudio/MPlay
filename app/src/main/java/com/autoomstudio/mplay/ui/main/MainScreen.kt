@@ -111,6 +111,7 @@ import com.autoomstudio.mplay.ui.separation.SeparationViewModel
 import com.autoomstudio.mplay.ui.separation.SeparatorUi
 import com.autoomstudio.mplay.ui.separation.separationMessageText
 import com.autoomstudio.mplay.ui.settings.AboutScreen
+import com.autoomstudio.mplay.ui.settings.AccountSection
 import com.autoomstudio.mplay.ui.settings.LicensesScreen
 import com.autoomstudio.mplay.ui.settings.SettingsScreen
 import com.autoomstudio.mplay.ui.trim.TrimEditorActivity
@@ -518,6 +519,7 @@ fun MainScreen(
                                     onReviewDuplicates = { settingsPage = SettingsPage.Duplicates },
                                     onOpenAbout = { settingsPage = SettingsPage.About },
                                     modifier = contentModifier,
+                                    accountSection = { header -> AccountSection(sectionHeader = header) },
                                     separationSection = { header ->
                                         SeparationSettingsSection(
                                             state = separationState,

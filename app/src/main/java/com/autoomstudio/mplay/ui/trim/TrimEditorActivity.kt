@@ -9,8 +9,13 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.autoomstudio.mplay.MPlayApp
+import com.autoomstudio.mplay.data.account.AuthState
 import com.autoomstudio.mplay.data.model.Song
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import com.autoomstudio.mplay.ui.settings.SettingsViewModel
 import com.autoomstudio.mplay.ui.theme.MPlayAppTheme
 
@@ -24,6 +29,12 @@ class TrimEditorActivity : ComponentActivity() {
         if (IntentCompat.getParcelableExtra(intent, EXTRA_URI, Uri::class.java) == null) {
             finish()
             return
+        }
+        // Only reachable from the signed-in app; close it so the sign-in screen underneath shows.
+        val auth = (application as MPlayApp).container.authRepository
+        lifecycleScope.launch {
+            auth.state.first { it is AuthState.SignedOut }
+            finish()
         }
         setContent {
             val theme = settingsViewModel.theme.collectAsStateWithLifecycle().value ?: return@setContent

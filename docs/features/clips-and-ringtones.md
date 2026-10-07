@@ -1,10 +1,10 @@
 # Clips and ringtones
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-06
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-07
 
 ## Summary
 
-From the song menu, **Cut and save** or **Set as ringtone** opens a full-screen trim editor with a waveform, two drag handles, 0.1 s nudge buttons and a looping preview. Cut and save asks for a name and saves an `.m4a` clip to `Music/MPlay Clips`. Set as ringtone saves a clip and makes it the ringtone, notification or alarm sound. Both offer Undo.
+From the song menu, **Cut and save** or **Set as ringtone** opens a full-screen trim editor with a waveform, two drag handles, 0.1 s nudge buttons and a looping preview. Cut and save asks for a name and saves an `.m4a` clip to `Music/MP3 Studio Clips`. Set as ringtone saves a clip and makes it the ringtone, notification or alarm sound. Both offer Undo.
 
 ## Key files
 
@@ -33,7 +33,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
 4. **Export:** Media3 Transformer with `ClippingConfiguration`, video removed, AAC at 192 kbps, `InAppMp4Muxer` (non-streamable to avoid a ~400 KB reservation). Output `cacheDir/clip-<millis>.m4a`. Cancellable.
 5. **Space check:** estimated clip size x2 plus 5 MB margin against the smaller of cache and external free space.
 6. **Save:**
-   - Android 10+: MediaStore insert into `Music/MPlay Clips/` with `IS_PENDING`, `IS_MUSIC = 1`, title and artist.
+   - Android 10+: MediaStore insert into `Music/MP3 Studio Clips/` with `IS_PENDING`, `IS_MUSIC = 1`, title and artist.
    - Android 8-9: file in the public Music folder with `(n)` collision suffix, then media scan.
 7. **Ringtone flow:** pick a type; if `Settings.System.canWrite()` is false, a dialog offers `ACTION_MANAGE_WRITE_SETTINGS` and retries on resume. The clip is saved, flagged `IS_RINGTONE` / `IS_NOTIFICATION` / `IS_ALARM`, and set as default. Undo restores the previous default URI. Without permission it shows a snackbar linking to sound settings.
 8. **Errors:** storage, permission, unsupported file, export failed and save failed each map to a `TrimError` message.
@@ -42,7 +42,7 @@ Constants (`TrimRange`): `MIN_CLIP_MS = 1000`, `NUDGE_MS = 100`, `RINGTONE_DEFAU
 
 ## Data and persistence
 
-- MediaStore rows/files under `Music/MPlay Clips/` (also shown in the library because `IS_MUSIC = 1`).
+- MediaStore rows/files under `Music/MP3 Studio Clips/` (also shown in the library because `IS_MUSIC = 1`).
 - System default sounds in `Settings.System`.
 - No DataStore keys or Room tables.
 
@@ -70,3 +70,4 @@ Constants (`TrimRange`): `MIN_CLIP_MS = 1000`, `NUDGE_MS = 100`, `RINGTONE_DEFAU
 | Date | Commit | Change |
 |---|---|---|
 | 2026-10-02 | `23e2ee1` | Clip editing, trim editor, ringtone setting. |
+| 2026-10-07 | - | Clips folder renamed to `Music/MP3 Studio Clips` (`ClipStore.CLIPS_FOLDER`); `LEGACY_CLIPS_RELATIVE_PATH` keeps old clips exempt from the 30 s minimum. `TrimEditorActivity` finishes on sign-out. |

@@ -1,8 +1,37 @@
 <resources>
-    <string name="app_name">MPlay</string>
+    <string name="app_name">MP3 Studio</string>
+
+    <string name="signin_title">Welcome to MP3 Studio</string>
+    <string name="signin_message">Sign in with your Google account to play your music and use the studio tools. Your account keeps your plan and free trial with you. Your music and recordings never leave your phone.</string>
+    <string name="signin_google">Continue with Google</string>
+    <string name="signin_in_progress">Signing in…</string>
+    <string name="signin_legal">By continuing you agree to the Terms of Service and Privacy Policy.</string>
+    <string name="signin_terms">Terms of Service</string>
+    <string name="signin_privacy">Privacy Policy</string>
+    <string name="auth_error_no_account">No Google account on this phone. Add one in Settings, then try again.</string>
+    <string name="auth_error_play_services">Google sign-in needs Google Play services, which is missing or out of date on this phone.</string>
+    <string name="auth_error_network">No internet connection. Connect and try again.</string>
+    <string name="auth_error_disabled">This account has been disabled. Contact connect@autoomstudio.com if you think this is a mistake.</string>
+    <string name="auth_error_session">Your session ended. Please sign in again.</string>
+    <string name="auth_error_not_configured">Sign-in isn\'t set up in this build of MP3 Studio.</string>
+    <string name="auth_error_unknown">Couldn\'t sign in. Please try again.</string>
+    <string name="widget_signed_out">Sign in to MP3 Studio</string>
+
+    <string name="account_section">Account</string>
+    <string name="account_photo_description">Profile photo</string>
+    <string name="account_edit_name">Edit name</string>
+    <string name="account_name_label">Name</string>
+    <string name="account_name_save">Save</string>
+    <string name="account_name_failed">Couldn\'t update your name. Check your connection and try again.</string>
+    <string name="account_log_out">Log out</string>
+    <string name="account_log_out_title">Log out?</string>
+    <string name="account_log_out_message">Playback stops and you\'ll need to sign in again to use MP3 Studio. Your music, playlists, stems and recordings stay on this phone.</string>
+    <string name="account_log_out_confirm">Log out</string>
+    <string name="about_terms">Terms of Service</string>
+    <string name="about_terms_url" translatable="false">https://autoomstudio.com/terms</string>
 
     <string name="permission_title">Allow access to your music</string>
-    <string name="permission_rationale">MPlay needs permission to read the audio files on this device so it can show and play your music. Nothing leaves your phone: MPlay works fully offline.</string>
+    <string name="permission_rationale">MP3 Studio needs permission to read the audio files on this device so it can show and play your music. Your music files never leave your phone.</string>
     <string name="permission_denied_permanently">Access to audio was denied. Open the app settings and allow Music and audio (or Storage) to continue.</string>
     <string name="permission_grant">Grant access</string>
     <string name="permission_open_settings">Open settings</string>
@@ -188,7 +217,7 @@
     <string name="trim_save">Save</string>
     <string name="trim_exporting">Creating clip…</string>
     <string name="trim_exporting_percent">Creating clip… %1$d%%</string>
-    <string name="trim_saving">Saving to Music/MPlay Clips…</string>
+    <string name="trim_saving">Saving to Music/MP3 Studio Clips…</string>
     <string name="trim_cancel_export">Cancel</string>
     <string name="trim_waveform_loading">Loading waveform</string>
     <string name="trim_waveform_failed">This file can\'t be read. It may be damaged or in a format this phone can\'t decode.</string>
@@ -198,26 +227,26 @@
     <string name="sound_notification">Notification sound</string>
     <string name="sound_alarm">Alarm sound</string>
 
-    <string name="write_settings_title">Allow MPlay to change sounds?</string>
-    <string name="write_settings_message">To set a clip as your ringtone, notification or alarm sound, turn on Modify system settings for MPlay on the next screen. MPlay only uses it to change the sound you pick.</string>
+    <string name="write_settings_title">Allow MP3 Studio to change sounds?</string>
+    <string name="write_settings_message">To set a clip as your ringtone, notification or alarm sound, turn on Modify system settings for MP3 Studio on the next screen. MP3 Studio only uses it to change the sound you pick.</string>
     <string name="write_settings_open">Open settings</string>
     <string name="write_settings_not_now">Not now</string>
 
     <string name="action_undo">Undo</string>
-    <string name="message_clip_saved">Saved to Music/MPlay Clips</string>
+    <string name="message_clip_saved">Saved to Music/MP3 Studio Clips</string>
     <string name="message_sound_set_ringtone">Set as phone ringtone</string>
     <string name="message_sound_set_notification">Set as notification sound</string>
     <string name="message_sound_set_alarm">Set as alarm sound</string>
-    <string name="message_sound_not_set">Clip saved to Music/MPlay Clips. To use it, choose it in Sound settings.</string>
+    <string name="message_sound_not_set">Clip saved to Music/MP3 Studio Clips. To use it, choose it in Sound settings.</string>
     <string name="message_open_sound_settings">Settings</string>
     <string name="message_clip_deleted">Clip deleted</string>
     <string name="message_sound_restored">Previous sound restored</string>
 
     <string name="error_unsupported_file">This file can\'t be cut. It may be damaged or in an unsupported format.</string>
     <string name="error_not_enough_storage">Not enough storage to save the clip.</string>
-    <string name="error_permission_denied">MPlay needs storage permission to save clips.</string>
+    <string name="error_permission_denied">MP3 Studio needs storage permission to save clips.</string>
     <string name="error_export_failed">Couldn\'t create the clip. Try again.</string>
-    <string name="error_save_failed">Couldn\'t save the clip to Music/MPlay Clips.</string>
+    <string name="error_save_failed">Couldn\'t save the clip to Music/MP3 Studio Clips.</string>
 
     <string name="song_info_artist">Artist</string>
     <string name="song_info_album">Album</string>
@@ -228,9 +257,9 @@
     <string name="unknown_title">Unknown title</string>
     <string name="unknown_artist">Unknown Artist</string>
 
-    <string name="widget_description">Control MPlay from your home screen</string>
+    <string name="widget_description">Control MP3 Studio from your home screen</string>
     <string name="widget_idle_title">Nothing playing</string>
-    <string name="widget_idle_message">Tap to open MPlay</string>
+    <string name="widget_idle_message">Tap to open MP3 Studio</string>
     <string name="widget_preview_title">Song title</string>
     <string name="widget_preview_artist">Artist</string>
 
@@ -243,8 +272,8 @@
     <string name="settings_dynamic_color_summary">Use colors from your wallpaper</string>
     <string name="settings_section_playback">Background playback</string>
     <string name="settings_battery_title">Battery optimization</string>
-    <string name="settings_battery_restricted">Some phones stop music in the background to save battery. If playback stops when the screen is off, turn off battery optimization for MPlay.</string>
-    <string name="settings_battery_unrestricted">MPlay is not battery optimized, so background playback won\'t be cut off.</string>
+    <string name="settings_battery_restricted">Some phones stop music in the background to save battery. If playback stops when the screen is off, turn off battery optimization for MP3 Studio.</string>
+    <string name="settings_battery_unrestricted">MP3 Studio is not battery optimized, so background playback won\'t be cut off.</string>
     <string name="settings_battery_open">Open battery settings</string>
     <string name="settings_section_library">Library</string>
     <string name="settings_hide_duplicates">Hide duplicate songs</string>
@@ -261,7 +290,7 @@
     <string name="duplicates_title">Review duplicates</string>
     <string name="duplicates_empty_title">No duplicates</string>
     <string name="duplicates_empty_message">Every song in your library appears only once.</string>
-    <string name="duplicates_intro">MPlay shows one copy of each group. Pick which copy to keep, or show a hidden copy again. Nothing is deleted unless you choose Delete.</string>
+    <string name="duplicates_intro">MP3 Studio shows one copy of each group. Pick which copy to keep, or show a hidden copy again. Nothing is deleted unless you choose Delete.</string>
     <string name="duplicates_kept">Shown</string>
     <string name="duplicates_hidden">Hidden</string>
     <string name="duplicates_restored">Shown (restored)</string>
@@ -272,9 +301,9 @@
     <string name="duplicates_bitrate">%1$d kbps</string>
     <string name="duplicates_lossless">Lossless</string>
     <string name="settings_licenses">Open-source licenses</string>
-    <string name="settings_licenses_summary">The separation model, ONNX Runtime and the libraries MPlay uses</string>
+    <string name="settings_licenses_summary">The separation model, ONNX Runtime and the libraries MP3 Studio uses</string>
     <string name="licenses_title">Open-source licenses</string>
-    <string name="licenses_intro">MPlay is built with these open-source projects. Tap one to read its license.</string>
+    <string name="licenses_intro">MP3 Studio is built with these open-source projects. Tap one to read its license.</string>
 
     <string name="nav_metronome">Metronome</string>
     <string name="metronome_title">Metronome</string>
@@ -331,11 +360,11 @@
     <string name="singalong_stop">Stop</string>
     <string name="singalong_retake">Retake</string>
     <string name="singalong_separate_first_title">Separate vocals first</string>
-    <string name="singalong_separate_first_text">Sing along plays the song without its vocals, so the song needs to be separated first. You can keep using MPlay while it\'s processed.</string>
+    <string name="singalong_separate_first_text">Sing along plays the song without its vocals, so the song needs to be separated first. You can keep using MP3 Studio while it\'s processed.</string>
     <string name="singalong_separate_button">Separate vocals</string>
     <string name="singalong_separating">Separating vocals… Sing along will be ready when it finishes.</string>
     <string name="singalong_cannot_separate">This phone can\'t separate vocals, so Sing along isn\'t available for this song.</string>
-    <string name="singalong_mic_rationale">MPlay needs the microphone to record you. It\'s used only while you record. Nothing leaves your phone.</string>
+    <string name="singalong_mic_rationale">MP3 Studio needs the microphone to record you. It\'s used only while you record. Nothing leaves your phone.</string>
     <string name="singalong_mic_allow">Allow microphone</string>
     <string name="singalong_mic_denied">Microphone access is off. Turn it on in settings to record.</string>
     <string name="singalong_open_settings">Open settings</string>
@@ -371,7 +400,7 @@
     <string name="singalong_saving">Saving…</string>
     <string name="singalong_saving_progress">Saving, %d%%</string>
     <string name="singalong_save_failed">Couldn\'t save the recording. Check your free storage and try again.</string>
-    <string name="singalong_saved">Saved \"%s\" to Music/MPlay Recordings</string>
+    <string name="singalong_saved">Saved \"%s\" to Music/MP3 Studio Recordings</string>
     <string name="singalong_done">Done</string>
     <string name="singalong_close">Close</string>
     <string name="singalong_fail_mic">Couldn\'t start the microphone. Another app may be using it.</string>
@@ -408,20 +437,20 @@
     <string name="metronome_double">×2</string>
     <string name="metronome_halve_description">Halve the tempo</string>
     <string name="metronome_double_description">Double the tempo</string>
-    <string name="settings_about_mplay">About MPlay</string>
+    <string name="settings_about_mplay">About MP3 Studio</string>
     <string name="settings_about_mplay_summary">Version, contact and privacy</string>
     <string name="about_version">Version %1$s (build %2$d)</string>
     <string name="about_made_by">Made by</string>
     <string name="about_company_name" translatable="false">Autoom Studio</string>
-    <string name="about_description">MPlay is an offline music player made by Autoom Studio, an AI automation and IT solutions company based in India.</string>
+    <string name="about_description">MP3 Studio is a music player and studio for the songs on your phone, made by Autoom Studio, an AI automation and IT solutions company based in India.</string>
     <string name="about_website_label">Website</string>
     <string name="about_website" translatable="false">https://autoomstudio.com/</string>
     <string name="about_website_display" translatable="false">autoomstudio.com</string>
     <string name="about_email_label">Email</string>
     <string name="about_email" translatable="false">connect@autoomstudio.com</string>
-    <string name="about_email_subject">MPlay %1$s feedback</string>
+    <string name="about_email_subject">MP3 Studio %1$s feedback</string>
     <string name="about_privacy_title">Privacy</string>
-    <string name="about_privacy_note">MPlay works fully offline, with no internet access, no accounts, no ads and no analytics. Your music and recordings stay on your phone. The microphone is used only when you record a sing-along.</string>
+    <string name="about_privacy_note">MP3 Studio has no ads. Your music, playlists, stems and recordings stay on your phone and are never uploaded. Signing in stores your Google account name, email and photo on our servers, along with your plan and feature usage. The microphone is used only when you record a sing-along.</string>
     <string name="about_privacy_policy">Privacy policy</string>
     <string name="about_privacy_url" translatable="false">https://autoomstudio.com/privacy-policy</string>
     <string name="about_copyright" translatable="false">© 2026 AUTOOM STUDIO (OPC) PRIVATE LIMITED. All rights reserved.</string>
@@ -436,7 +465,7 @@
     <string name="stem_mode_vocals">Vocals</string>
     <string name="stem_badge_description">Vocals separated</string>
     <string name="separation_notice_title">Separate vocals?</string>
-    <string name="separation_notice_message">Please be patient while MPlay separates your song into vocals and instrumental. This may take a little time.\n\nThe separation time depends on your phone’s processor and available resources. You can continue using MPlay while it works.</string>
+    <string name="separation_notice_message">Please be patient while MP3 Studio separates your song into vocals and instrumental. This may take a little time.\n\nThe separation time depends on your phone’s processor and available resources. You can continue using MP3 Studio while it works.</string>
     <plurals name="separation_notice_estimate">
         <item quantity="one">About %d minute for this song on your phone.</item>
         <item quantity="other">About %d minutes for this song on your phone.</item>
@@ -471,7 +500,7 @@
     </plurals>
     <string name="separation_notification_cancel">Cancel</string>
     <string name="separation_needs_app_title">Vocal separation paused</string>
-    <string name="separation_needs_app_message">Open MPlay to continue</string>
+    <string name="separation_needs_app_message">Open MP3 Studio to continue</string>
     <string name="separation_finished_title">Vocals separated</string>
     <string name="separation_all_failed_title">Separation failed</string>
     <plurals name="separation_finished_message">
@@ -500,7 +529,7 @@
     <string name="separation_paused_heat">Paused: phone is hot</string>
     <string name="separation_paused_time_limit">Paused by the system; resumes later</string>
     <string name="separation_paused_interrupted">Interrupted; starts again from the beginning</string>
-    <string name="separation_paused_needs_app">Paused until MPlay is opened</string>
+    <string name="separation_paused_needs_app">Paused until MP3 Studio is opened</string>
     <string name="separation_error_source_missing">The song file is gone</string>
     <string name="separation_error_unsupported">This format can\'t be decoded on this phone</string>
     <string name="separation_error_corrupt">The file is damaged</string>
@@ -518,9 +547,9 @@
     <string name="separation_export_vocals">Save vocals to Music</string>
     <string name="separation_size">%1$s · %2$s</string>
     <string name="message_stems_deleted">Stems deleted</string>
-    <string name="message_stem_exported">Saved to Music/MPlay Stems</string>
-    <string name="message_stem_export_failed">Couldn\'t save to Music/MPlay Stems</string>
-    <string name="message_stem_export_permission">MPlay needs storage permission to save stems.</string>
+    <string name="message_stem_exported">Saved to Music/MP3 Studio Stems</string>
+    <string name="message_stem_export_failed">Couldn\'t save to Music/MP3 Studio Stems</string>
+    <string name="message_stem_export_permission">MP3 Studio needs storage permission to save stems.</string>
 
     <string name="settings_section_separation">Vocal separation</string>
     <string name="settings_separation_queue">Separated songs and queue</string>
@@ -542,7 +571,7 @@
     <string name="settings_separation_import_model">Import model file</string>
     <string name="message_model_imported">Model imported</string>
     <string name="message_model_import_failed">Couldn\'t import the model file</string>
-    <string name="message_model_import_wrong_file">That file isn\'t the MPlay separation model (htdemucs.onnx)</string>
+    <string name="message_model_import_wrong_file">That file isn\'t the MP3 Studio separation model (htdemucs.onnx)</string>
     <string name="settings_separation_model_missing_title">AI model not installed</string>
     <string name="model_missing_title">AI model needed</string>
     <string name="model_missing_message">The AI Vocal Separator needs its model (%1$s), which isn\'t included in this build. Import the model file to continue.</string>

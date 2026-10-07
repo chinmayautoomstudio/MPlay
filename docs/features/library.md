@@ -1,6 +1,6 @@
 # Library
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-06 (`e13b2f7`)
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-07
 
 ## Summary
 
@@ -37,7 +37,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
 ### Query
 
 - Collection: `getContentUri(VOLUME_EXTERNAL)` on Android 10+, else `EXTERNAL_CONTENT_URI`. `BITRATE` only on Android 11+.
-- Filter: `IS_MUSIC != 0 OR NULL`, and duration at least 30 s (`MIN_DURATION_MS`) or NULL. Files in `Music/MPlay Clips/` and `Music/MPlay Recordings/` skip the length check.
+- Filter: `IS_MUSIC != 0 OR NULL`, and duration at least 30 s (`MIN_DURATION_MS`) or NULL. Files in `Music/MP3 Studio Clips/`, `Music/MP3 Studio Recordings/` and the pre-rename `Music/MPlay Clips/` and `Music/MPlay Recordings/` skip the length check (`SavedFolders.likePatterns`, tested in `data/library/SavedFoldersTest.kt`).
 - Sorted by title (case-insensitive). Track number is `TRACK % 1000`.
 - Album art: `content://media/external/audio/albumart/<albumId>`.
 - Missing title falls back to the file name; missing artist/album become "Unknown Artist"/"Unknown Album". Bitrate is estimated from size and duration when MediaStore has none.
@@ -97,3 +97,4 @@ Long-press starts selection; taps toggle. Bulk actions: add to playlist, play ne
 | 2026-10-02 | `eb0fb2f` | Library management: sorting, search, album/artist pages. |
 | 2026-10-03 | `da53339` | Song deletion and selection UI. |
 | 2026-10-06 | `e13b2f7` | `Music/MPlay Recordings/` exempt from the 30 s minimum; Metronome tab added to `MainScreen`; `SingAlongOverlay` hosted. |
+| 2026-10-07 | - | `data/library/SavedFolders.kt` builds the minimum-length exemption for the new MP3 Studio folders and the legacy MPlay ones. |

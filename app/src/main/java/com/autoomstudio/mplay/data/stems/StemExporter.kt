@@ -80,7 +80,7 @@ class StemExporter(private val context: Context) {
     }
 
     companion object {
-        const val STEMS_FOLDER = "MPlay Stems"
+        const val STEMS_FOLDER = "MP3 Studio Stems"
         val STEMS_RELATIVE_PATH = "${Environment.DIRECTORY_MUSIC}/$STEMS_FOLDER/"
         private const val MIME_TYPE = "audio/mp4"
     }

@@ -23,9 +23,15 @@
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
-    <!-- Merged in by WorkManager (used by Glance); MPlay never uses the network. -->
+    <!-- Sign-in and account data (Supabase over HTTPS). Audio never leaves the phone. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Merged in by androidx.credentials for biometric passkey prompts; Google sign-in doesn't use them. -->
     <uses-permission
-        android:name="android.permission.ACCESS_NETWORK_STATE"
+        android:name="android.permission.USE_BIOMETRIC"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.USE_FINGERPRINT"
         tools:node="remove" />
 
     <application
@@ -35,6 +41,7 @@
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
@@ -78,7 +85,7 @@
             android:foregroundServiceType="microphone" />
 
         <receiver
-            android:name="androidx.media3.session.MediaButtonReceiver"
+            android:name=".playback.SignedInMediaButtonReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />

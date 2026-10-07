@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-10-06
+> Last updated: 2026-10-07
 
 ## Modules
 
@@ -12,7 +12,7 @@ Defined in [`settings.gradle.kts`](../settings.gradle.kts).
 | `:separation` | Android library | DSP (STFT, FFT, resampling) and the ONNX Runtime HT-Demucs pipeline. Has its own unit tests. Only `:app` uses it. |
 | `:spike` | Application `com.autoomstudio.mplay.ai.spike` | Throwaway feasibility app for benchmarking separation on devices. Not shipped. |
 
-Other top-level folders: `models/` (the `htdemucs.onnx` model, gitignored, plus its committed `.sha256`), `tools/` (Python scripts to export the model and generate DSP test references), `logos/`, `mockup-design/`.
+Other top-level folders: `supabase/` (backend config, migrations and RLS tests, see [backend](backend.md)), `models/` (the `htdemucs.onnx` model, gitignored, plus its committed `.sha256`), `tools/` (Python scripts to export the model and generate DSP test references), `logos/`, `mockup-design/`.
 
 ## Build
 
@@ -20,14 +20,17 @@ Other top-level folders: `models/` (the `htdemucs.onnx` model, gitignored, plus 
 
 - `compileSdk 37`, `minSdk 26`, `targetSdk 37`, Java 17, Compose, KSP, Room Gradle plugin (schemas exported to `app/schemas/`).
 - `BuildConfig.MODEL_SHA256` comes from `models/htdemucs.onnx.sha256`. `BuildConfig.SEPARATION_ABIS` is `arm64-v8a,x86_64` in debug and `arm64-v8a` in release.
+- `BuildConfig.SUPABASE_URL`, `SUPABASE_KEY` and `GOOGLE_WEB_CLIENT_ID` come from `local.properties` (`supabase.url`, `supabase.key`, `google.webClientId`). See [accounts](features/accounts.md#build-configuration).
+- The Kotlin serialization plugin is applied (supabase-kt models).
 - Release signing reads an uncommitted `keystore.properties`. Release enables R8 optimisation.
 - `androidResources.noCompress += "onnx"` so the model can be memory-mapped from the APK.
 - ONNX Runtime native libraries are stripped for every ABI outside `SEPARATION_ABIS`.
 - Custom tasks:
   - `prepare<Variant>ModelAssets` (`PrepareModelAssets`): copies and SHA-256-checks the model. Release fails without it; debug only warns.
-  - `check<Variant>NoInternet` (`CheckNoInternetPermission`): fails `assemble`/`bundle` if `android.permission.INTERNET` appears in the merged manifest.
+  - `check<Variant>Permissions` (`CheckAllowedPermissions`): fails `assemble`/`bundle` if the merged manifest has a `uses-permission` outside `ALLOWED_PERMISSIONS` (plus the app's own `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`). Writes the list to `build/reports/permissions/<variant>.txt`.
+  - `check<Variant>BackendConfig` (`CheckBackendConfig`): fails release builds when a Supabase or Google setting is blank; warns in debug.
 
-Key libraries: Compose BOM 2026.09.00, Material 3, Media3 1.11.1 (ExoPlayer, Session, Transformer), Room 2.8.5, WorkManager 2.10.1, Glance 1.2.0, DataStore 1.2.1, Coil 3, Lottie 6.7.1, Coroutines 1.11.0, ONNX Runtime Android 1.22.0 (in `:separation`).
+Key libraries: Compose BOM 2026.09.00, Material 3, Media3 1.11.1 (ExoPlayer, Session, Transformer), Room 2.8.5, WorkManager 2.10.1, Glance 1.2.0, DataStore 1.2.1, Coil 3 (with `coil-network-okhttp` for profile photos), Lottie 6.7.1, Coroutines 1.11.0, ONNX Runtime Android 1.22.0 (in `:separation`), supabase-kt 3.8.0 (Auth, Postgrest) on Ktor OkHttp 3.5.1, Credential Manager 1.6.0 with `googleid` 1.2.1, Tink 1.23.0.
 
 ## Dependency injection
 
@@ -35,6 +38,7 @@ There is no DI framework. [`di/AppContainer.kt`](../app/src/main/java/com/autoom
 
 - `applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)` is used for writes that must outlive the screen or service that started them.
 - Nearly everything is a `lazy` singleton: repositories (songs, playlists, duplicates, stems), stores (session, library prefs, widget, `AppSettings`), `MPlayDatabase`, separation backend/controller, clip helpers, `songDeleter`, `tempoAnalyzer`, `metronomeController`, `recordingStore`, `singAlongSession`.
+- Accounts: `supabase` (`SupabaseClient` with Auth using the private `SecureSessionStore`, and Postgrest), `authRepository`, `profileRepository`, `googleSignIn`. `separationController` gets `isSignedIn = { authRepository.isSignedIn }`. See [accounts](features/accounts.md).
 - `musicPlaying: MutableStateFlow<Boolean>` is shared state: `PlaybackService` writes it, `MetronomeController` reads it.
 - A private `mainScope` (`Dispatchers.Main.immediate`) backs a private app-scoped `PlaybackController` (`restoresSession = false`) passed to `MetronomeController` as its `MusicTimeline`, for syncing with the song. It binds to `PlaybackService` only while sync is on.
 - Factories: `createWidgetStatePublisher()` and `createPlaybackController(scope)` return new instances per call.
@@ -49,12 +53,14 @@ companion object {
 }
 ```
 
-ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `SeparationViewModel`, `SettingsViewModel`, `MetronomeViewModel`, `SingAlongViewModel`, `TrimEditorViewModel`. State is exposed as `StateFlow` and collected with `collectAsStateWithLifecycle`; one-off events (snackbar messages) are `Flow`s.
+ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `SeparationViewModel`, `SettingsViewModel`, `MetronomeViewModel`, `SingAlongViewModel`, `TrimEditorViewModel`, `AuthViewModel`, `AccountViewModel`. State is exposed as `StateFlow` and collected with `collectAsStateWithLifecycle`; one-off events (snackbar messages) are `Flow`s.
+
+`SettingsViewModel` and `AuthViewModel` belong to `MainActivity`. Everything under `MPlayRoot` gets its ViewModels from `SignedInViewModelScope` (an activity ViewModel holding a separate `ViewModelStore` per user), provided as `LocalViewModelStoreOwner`. The store is cleared on sign-out, which releases the playback `MediaController` and all per-user state, and survives rotation.
 
 ## Startup
 
-1. `MPlayApp.onCreate` builds the container. In the main process only, it calls `separationController.start()` (resumes the separation queue) and `singAlongSession.cleanUpLeftovers()`. The `:separator` process skips both.
-2. `MainActivity.onCreate` keeps the splash screen until `SettingsViewModel.theme` has loaded (avoids a theme flash), then renders `MPlayAppTheme { MPlayRoot(...) }`.
+1. `MPlayApp.onCreate` builds the container. In the main process only, it calls `authRepository.start()` (reads the saved session), `separationController.start()`, `AuthEffects(...).start()` (resumes the separation queue after sign-in, stops background features on sign-out, refreshes the widget) and `singAlongSession.cleanUpLeftovers()`. The `:separator` process skips all of these.
+2. `MainActivity.onCreate` keeps the splash screen until `SettingsViewModel.theme` has loaded (avoids a theme flash) and `AuthState` is no longer `Loading`. Signed out, it renders `SignInScreen`; signed in, `MPlayAppTheme { MPlayRoot(...) }` inside the signed-in `ViewModelStoreOwner`. `onStart` runs `AuthViewModel.verifyAccount()` (disabled or revoked accounts are signed out). See [accounts](features/accounts.md).
 3. `handleIntent` (also from `onNewIntent`; the activity is `singleTop`) turns these into one-shot UI flags:
    - `EXTRA_OPEN_NOW_PLAYING` from the media notification and widget
    - `SeparationLinks.ACTION_OPEN_QUEUE` from the separation notification
@@ -101,15 +107,15 @@ flowchart LR
 
 | Component | Kind | Foreground type | Notes |
 |---|---|---|---|
-| `playback.PlaybackService` | `MediaSessionService`, exported | `mediaPlayback` | Owns ExoPlayer and MediaSession. See [playback](features/playback.md). |
+| `playback.PlaybackService` | `MediaSessionService`, exported | `mediaPlayback` | Owns ExoPlayer and MediaSession. Rejects all controllers while signed out and stops on sign-out. See [playback](features/playback.md). |
 | `metronome.MetronomeService` | Service | `mediaPlayback` | Separate so the metronome runs while music is paused. Notification ID 4201. |
 | `singalong.RecordingService` | Service | `microphone` | Only while a take is being prepared or recorded. Notification ID 4301. |
 | `SeparationWorker` (via WorkManager `SystemForegroundService`) | `CoroutineWorker` | `mediaProcessing` (35+) / `dataSync` (29-34) | Notification IDs 4101/4102. |
 | `separation.worker.SeparatorService` | Bound service, `:separator` process | none | Runs the model so a native crash or OOM never kills playback. |
-| `MediaButtonReceiver` | Receiver, exported | | Headset/widget play-pause. |
+| `playback.SignedInMediaButtonReceiver` | Receiver, exported | | Headset/widget play-pause; extends Media3's `MediaButtonReceiver` and doesn't start the service while signed out. |
 | `widget.MPlayWidgetReceiver` | Glance receiver, exported | | Home/lock screen widget. |
 | `separation.worker.CancelSeparationReceiver` | Receiver | | Cancel action on the separation notification. |
-| `ui.trim.TrimEditorActivity` | Activity | | Clip / ringtone editor. |
+| `ui.trim.TrimEditorActivity` | Activity | | Clip / ringtone editor. Finishes on sign-out. |
 
 ### How the UI talks to playback
 
@@ -130,7 +136,10 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | `RECORD_AUDIO` (+ optional `android.hardware.microphone` feature) | Sing-along |
 | `WAKE_LOCK` | Playback, WorkManager |
 | `WRITE_SETTINGS` | Setting ringtones |
-| `ACCESS_NETWORK_STATE` | Removed with `tools:node="remove"` |
+| `INTERNET`, `ACCESS_NETWORK_STATE` | Supabase sign-in and profile (cleartext blocked by `network_security_config.xml`) |
+| `USE_BIOMETRIC`, `USE_FINGERPRINT` | Merged in by `androidx.credentials`; removed with `tools:node="remove"` |
+
+`RECEIVE_BOOT_COMPLETED` (WorkManager) is also merged in. The allow-list in `app/build.gradle.kts` (`ALLOWED_PERMISSIONS`) must be extended deliberately for any new permission.
 
 ## Change history
 
@@ -141,3 +150,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-05 | `55e39e6`, `967eb22` | Separation: WorkManager worker, `:separation` module, `:separator` process, model build tasks. |
 | 2026-10-06 | `e13b2f7` | `MetronomeService`, `RecordingService`, `RECORD_AUDIO`, `FOREGROUND_SERVICE_MICROPHONE`, `EXTRA_OPEN_METRONOME`, Metronome tab, container additions. |
 | 2026-10-06 | - | App-scoped `PlaybackController` as the metronome's `MusicTimeline` (`mainScope` in `AppContainer`). |
+| 2026-10-07 | - | Accounts (M1): `INTERNET`/`ACCESS_NETWORK_STATE`, `CheckAllowedPermissions` and `CheckBackendConfig` tasks, Supabase and account entries in `AppContainer`, `AuthEffects`, sign-in gate and `SignedInViewModelScope` in `MainActivity`, `SignedInMediaButtonReceiver`, `supabase/` folder. |

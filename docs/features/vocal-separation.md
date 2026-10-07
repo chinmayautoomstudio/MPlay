@@ -1,10 +1,10 @@
 # AI vocal separation (stems)
 
-> Status: Shipped | Added in: 3.0 | Last updated: 2026-10-06
+> Status: Shipped | Added in: 3.0 | Last updated: 2026-10-07
 
 ## Summary
 
-MPlay splits any local song into vocals and an instrumental entirely on the phone, offline, using the HT-Demucs model on ONNX Runtime. Songs are queued from the song menu, multi-select, the Now Playing chip or the sing-along sheet, and processed one at a time in the background with a notification and an on-screen progress pill. Once ready, Now Playing switches between Original, Instrumental and Vocals without losing position, and either stem can be exported to `Music/MPlay Stems`.
+MPlay splits any local song into vocals and an instrumental entirely on the phone, offline, using the HT-Demucs model on ONNX Runtime. Songs are queued from the song menu, multi-select, the Now Playing chip or the sing-along sheet, and processed one at a time in the background with a notification and an on-screen progress pill. Once ready, Now Playing switches between Original, Instrumental and Vocals without losing position, and either stem can be exported to `Music/MP3 Studio Stems`.
 
 ## Key files
 
@@ -14,8 +14,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/` unless they st
 |---|---|
 | `separation/ModelImporter.kt` | Imports a user-picked `.onnx` into `filesDir/models/`, verifying `BuildConfig.MODEL_SHA256`. |
 | `separation/ModelProvider.kt` | `ModelState`, `BundledModelProvider`. |
-| `separation/SeparationController.kt` | UI entry point: `enqueue`, `cancel`, `retry`; eligibility, model and storage checks; `start()` at launch. |
-| `separation/SeparationBackend.kt`, `WorkManagerSeparationBackend.kt` | Eligibility and unique `"separation"` WorkManager job. |
+| `separation/SeparationController.kt` | UI entry point: `enqueue`, `cancel`, `retry`; eligibility, model and storage checks; `start()` at launch; `onSignedIn()` resumes the queue, `onSignedOut()` stops it. |
+| `separation/SeparationBackend.kt`, `WorkManagerSeparationBackend.kt` | Eligibility and unique `"separation"` WorkManager job (`schedule()`, `cancel()`). |
 | `separation/SeparationRules.kt` | `DeviceEligibility`, `UnsupportedReason`, `StorageEstimate`. |
 | `separation/SeparationEstimate.kt` | Rolling speed factor and "about N minutes" estimate. |
 | `separation/SeparationLinks.kt` | `ACTION_OPEN_QUEUE` deep link. |
@@ -26,7 +26,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/` unless they st
 | `separation/worker/SeparationNotifications.kt`, `CancelSeparationReceiver.kt` | Notifications and Cancel action. |
 | `data/stems/StemEntities.kt`, `StemDao.kt` | `stem_sets`, `separation_jobs`, state enums. |
 | `data/stems/StemRepository.kt` | Files on disk, queue, commit-by-rename, recovery, reconciliation, `stemUri()`. |
-| `data/stems/StemExporter.kt` | Export to `Music/MPlay Stems`. |
+| `data/stems/StemExporter.kt` | Export to `Music/MP3 Studio Stems`. |
 | `data/stems/StemMode.kt` | `Original`, `Instrumental`, `Vocals`. |
 | `ui/separation/SeparationViewModel.kt` | UI state, notice and model-missing requests, export, import. |
 | `ui/separation/SeparationScreen.kt` | Processing queue and ready list. |
@@ -77,7 +77,8 @@ flowchart LR
 ### Worker
 
 - Constraints from settings: requires charging, battery not low. Linear backoff 5 minutes. Policy `APPEND_OR_REPLACE` while running.
-- Starts with `recoverInterrupted()` (requeue `Running` jobs, delete leftovers).
+- Starts with `recoverInterrupted()` (requeue `Running` jobs, delete leftovers). Then, if `AuthRepository.awaitReady()` isn't `SignedIn`, it returns without touching the queue; it also re-checks `isSignedIn` before each song.
+- Separation needs a signed-in user (PRD AU1). Queued work resumes from `di/AuthEffects` via `SeparationController.onSignedIn()` once the saved session is read, not from `start()`. On sign-out `onSignedOut()` cancels the unique work, so the running song goes back to `Queued` and waits for the next sign-in.
 - Foreground type `MEDIA_PROCESSING` (API 35+) or `DATA_SYNC` (29-34). If Android 12+ refuses a background foreground start, jobs get `NeedsApp`.
 - Output goes to `filesDir/stems/.work/<jobId>/`, then `commit()` atomically renames to `stems/<songId>/` and writes `stem_sets` + marks `Done` in one transaction. The measured speed is recorded for estimates.
 - System stop reasons map to `TimeLimit`, `Charging`, `Battery` or `Interrupted` and requeue the job.
@@ -108,7 +109,7 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 
 - Room: `stem_sets`, `separation_jobs` (see [database.md](../database.md)).
 - Files: `filesDir/stems/<songId>/{vocals,instrumental}.m4a`, `filesDir/stems/.work/<jobId>/`, `filesDir/models/htdemucs.onnx`.
-- Exports: `Music/MPlay Stems/` (MediaStore on 10+, file copy + scan before).
+- Exports: `Music/MP3 Studio Stems/` (MediaStore on 10+, file copy + scan before).
 - DataStore: `stem_mode`, `separation_charging_only`, `separation_pause_low_battery`, `separation_notice_hidden`, `separation_speed_factor`.
 - BuildConfig: `MODEL_SHA256`, `SEPARATION_ABIS`.
 
@@ -149,3 +150,4 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 | 2026-10-06 | `e13b2f7` | Time estimate (`SeparationEstimate`), notice before every separation with "Don't show again", time notice in notification, pill and queue. |
 | 2026-10-06 | - | Simpler `separation_notice_message`: patience, processor and resources; dropped heat, quality and personal-use wording. |
 | 2026-10-06 | - | `MediaPcmSource(exactStart = true)` drops decoded audio before `startUs` (by buffer presentation time), for the metronome's beat grid. Separation doesn't use it. |
+| 2026-10-07 | - | Export folder renamed to `Music/MP3 Studio Stems`. The queue runs only while signed in (`onSignedIn`/`onSignedOut`, `SeparationBackend.cancel()`, worker auth check). See [accounts](accounts.md). |

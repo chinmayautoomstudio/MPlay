@@ -3,6 +3,7 @@ package com.autoomstudio.mplay
 import android.app.Application
 import android.os.Build
 import com.autoomstudio.mplay.di.AppContainer
+import com.autoomstudio.mplay.di.AuthEffects
 import java.io.File
 
 class MPlayApp : Application() {
@@ -14,7 +15,9 @@ class MPlayApp : Application() {
         container = AppContainer(this)
         // The separation model runs in a ":separator" process, which needs none of this.
         if (isMainProcess()) {
+            container.authRepository.start()
             container.separationController.start()
+            AuthEffects(this, container).start()
             container.singAlongSession.cleanUpLeftovers()
         }
     }

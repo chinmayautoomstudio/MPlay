@@ -1,6 +1,12 @@
 package com.autoomstudio.mplay.di
 
 import android.content.Context
+import com.autoomstudio.mplay.BuildConfig
+import com.autoomstudio.mplay.data.account.AuthRepository
+import com.autoomstudio.mplay.data.account.GoogleSignIn
+import com.autoomstudio.mplay.data.account.ProfileRepository
+import com.autoomstudio.mplay.data.account.SecureSessionStore
+import com.autoomstudio.mplay.data.account.SupabaseAuthBackend
 import com.autoomstudio.mplay.data.clip.ClipExporter
 import com.autoomstudio.mplay.data.clip.ClipStore
 import com.autoomstudio.mplay.data.clip.RingtoneSetter
@@ -30,6 +36,11 @@ import com.autoomstudio.mplay.singalong.RecordingStore
 import com.autoomstudio.mplay.singalong.SingAlongSession
 import com.autoomstudio.mplay.widget.WidgetStatePublisher
 import com.autoomstudio.mplay.widget.WidgetStateStore
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.postgrest.Postgrest
+import io.ktor.client.engine.okhttp.OkHttp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -81,6 +92,7 @@ class AppContainer(context: Context) {
             BundledModelProvider(appContext),
             appSettings,
             applicationScope,
+            isSignedIn = { authRepository.isSignedIn },
         )
     }
 
@@ -97,6 +109,32 @@ class AppContainer(context: Context) {
     val widgetStateStore: WidgetStateStore by lazy { WidgetStateStore(appContext) }
 
     val appSettings: AppSettings by lazy { AppSettings(appContext) }
+
+    private val sessionStore: SecureSessionStore by lazy { SecureSessionStore(appContext) }
+
+    /** Supabase (auth and Postgrest). A build without settings gets a placeholder URL and fails at sign-in. */
+    val supabase: SupabaseClient by lazy {
+        createSupabaseClient(
+            supabaseUrl = BuildConfig.SUPABASE_URL.ifBlank { "https://not-configured.invalid" },
+            supabaseKey = BuildConfig.SUPABASE_KEY.ifBlank { "not-configured" },
+        ) {
+            httpEngine = OkHttp.create()
+            install(Auth) {
+                sessionManager = sessionStore
+                autoLoadFromStorage = true
+                alwaysAutoRefresh = true
+            }
+            install(Postgrest)
+        }
+    }
+
+    val authRepository: AuthRepository by lazy {
+        AuthRepository(SupabaseAuthBackend(supabase, sessionStore), applicationScope)
+    }
+
+    val profileRepository: ProfileRepository by lazy { ProfileRepository(supabase) }
+
+    val googleSignIn: GoogleSignIn by lazy { GoogleSignIn(BuildConfig.GOOGLE_WEB_CLIENT_ID) }
 
     /** Whether MPlay's own player is audible right now, set by the playback service. */
     val musicPlaying = MutableStateFlow(false)
