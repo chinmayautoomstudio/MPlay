@@ -95,3 +95,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-08 | - | Settings tab replaced by the Profile tab (photo as the tab icon), Profile screen with category cards and separate settings pages; `SettingsScreen.kt` removed. |
 | 2026-10-08 | - | Compact Profile layout (one-row header, smaller avatar, cards and text) and a pencil-only Edit button. |
 | 2026-10-08 | - | Key `admin_activity_seen_at` for the Admin Activity bell ([admin](admin.md)). |
+| 2026-10-08 | - | `ProfileTabIcon` uses the same 24dp slot as other tab icons (ring drawn outside), so the "Profile" label lines up. |

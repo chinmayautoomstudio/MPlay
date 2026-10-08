@@ -42,6 +42,7 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 - `PlaybackController` implements `MusicTimeline` (song ID, playing, seeks, position snapshot with speed) and takes `restoresSession`; `AppContainer` gives the metronome its own instance. ([playback](features/playback.md), [architecture](architecture.md))
 
 ### Changed
+- The "Profile" label in the bottom navigation bar now lines up with the other tab labels. ([settings](features/settings-and-about.md))
 - Admin dashboard redesign: MP3 Studio wordmark header with an Admin chip and the Activity bell (the app top bar is hidden there), "Admin Dashboard" title, a stats card with six coloured tiles and a weekly usage row, three shortcut cards (Admins, AI Vocal Separator usage, Audit log), and a Users card with a pill search, filled filter chips and rows with initials avatars, a status dot, plan chip, weekly count and a "..." menu (View details, Make/Remove admin, Disable/Enable). ([admin](features/admin.md))
 - Profile screen is more compact so it fits on one phone screen: the back button and title share a row, and the avatar, subscription card, category rows and text are smaller. Edit is now a small pencil icon button. ([settings](features/settings-and-about.md))
 - `versionCode` 5 to 6 (`versionName` stays 3.1), so sideloaded builds with the Profile tab install as an update and can be told apart from earlier 3.1 builds. ([architecture](architecture.md))

@@ -43,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -197,12 +198,21 @@ fun ProfileScreen(
 /** The account photo used as the Profile tab icon, ringed in the primary color while selected. */
 @Composable
 fun ProfileTabIcon(avatarUrl: String?, selected: Boolean) {
+    val ring = MaterialTheme.colorScheme.primary
+    // Same 24dp slot as the other tab icons so the label lines up; the ring is drawn outside it.
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(30.dp)
-            .border(2.dp, if (selected) MaterialTheme.colorScheme.primary else Color.Transparent, CircleShape)
-            .padding(3.dp),
+            .size(24.dp)
+            .drawBehind {
+                if (selected) {
+                    drawCircle(
+                        color = ring,
+                        radius = size.minDimension / 2 + 2.5.dp.toPx(),
+                        style = Stroke(width = 2.dp.toPx()),
+                    )
+                }
+            },
     ) {
         Avatar(avatarUrl, size = 24.dp)
     }
