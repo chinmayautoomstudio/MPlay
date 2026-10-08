@@ -38,6 +38,8 @@ import com.autoomstudio.mp3studio.data.plan.Feature
 fun UpgradeSheet(
     feature: Feature,
     onDismiss: () -> Unit,
+    /** Set when the Free weekly separator limit was reached (PRD US7): the sheet leads with the reset date. */
+    limitResetsAt: Long? = null,
     viewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -61,14 +63,21 @@ fun UpgradeSheet(
             )
             Text(
                 stringResource(
-                    when (feature) {
-                        Feature.BpmDetector -> R.string.upgrade_title_bpm
-                        Feature.SingAlong -> R.string.upgrade_title_singalong
-                        Feature.UnlimitedSeparator -> R.string.upgrade_title_separator
+                    when {
+                        limitResetsAt != null -> R.string.upgrade_title_limit
+                        feature == Feature.BpmDetector -> R.string.upgrade_title_bpm
+                        feature == Feature.SingAlong -> R.string.upgrade_title_singalong
+                        else -> R.string.upgrade_title_separator
                     },
                 ),
                 style = MaterialTheme.typography.titleLarge,
             )
+            if (limitResetsAt != null) {
+                Text(
+                    stringResource(R.string.upgrade_limit_resets, FREE_WEEKLY_LIMIT, resetDay(limitResetsAt)),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
             if (state.stale) {
                 Text(
                     stringResource(R.string.plans_stale),
@@ -101,6 +110,9 @@ fun UpgradeSheet(
         }
     }
 }
+
+/** Matches `usage_summary` on the server and the "10 songs a week" row of the plan comparison. */
+private const val FREE_WEEKLY_LIMIT = 10
 
 @Composable
 private fun Benefit(text: String) {

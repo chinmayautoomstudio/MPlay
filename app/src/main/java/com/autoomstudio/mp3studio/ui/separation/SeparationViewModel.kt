@@ -63,6 +63,10 @@ data class NoticeRequest(val songs: List<Song>, val estimateMinutes: Int?)
 
 sealed interface SeparationMessage {
     data class Queued(val count: Int) : SeparationMessage
+
+    /** Some songs went over the Free weekly limit; the snackbar offers the plans. */
+    data class PartiallyQueued(val count: Int, val skipped: Int) : SeparationMessage
+    data object NeedsInternet : SeparationMessage
     data object NothingNew : SeparationMessage
     data class NotEnoughStorage(val requiredBytes: Long) : SeparationMessage
     data object Unavailable : SeparationMessage
@@ -124,6 +128,11 @@ class SeparationViewModel(
     /** Songs waiting for the model to be installed; the dialog explains what that takes. */
     val modelRequest: StateFlow<List<Song>?> = _modelRequest.asStateFlow()
 
+    private val _limitReachedAt = MutableStateFlow<Long?>(null)
+
+    /** When the Free weekly limit stopped a separation: the reset time to show in the upgrade sheet (PRD US7). */
+    val limitReachedAt: StateFlow<Long?> = _limitReachedAt.asStateFlow()
+
     private val _messages = Channel<SeparationMessage>(Channel.BUFFERED)
     val messages: Flow<SeparationMessage> = _messages.receiveAsFlow()
 
@@ -179,25 +188,43 @@ class SeparationViewModel(
     }
 
     private suspend fun enqueue(songs: List<Song>) {
-        val message = when (val result = controller.enqueue(songs)) {
+        report(controller.enqueue(songs), songs)
+    }
+
+    private suspend fun report(result: EnqueueResult, songs: List<Song>?) {
+        val message = when (result) {
             is EnqueueResult.Queued -> SeparationMessage.Queued(result.count)
+            is EnqueueResult.PartiallyQueued -> SeparationMessage.PartiallyQueued(result.count, result.skipped)
+            is EnqueueResult.LimitReached -> {
+                _limitReachedAt.value = result.resetsAt
+                return
+            }
+            EnqueueResult.NeedsInternet -> SeparationMessage.NeedsInternet
             EnqueueResult.NothingNew -> SeparationMessage.NothingNew
             is EnqueueResult.NotEnoughStorage -> SeparationMessage.NotEnoughStorage(result.requiredBytes)
-            is EnqueueResult.Unsupported -> SeparationMessage.Unavailable
+            is EnqueueResult.Unsupported, EnqueueResult.SignedOut -> SeparationMessage.Unavailable
             EnqueueResult.ModelNotInstalled -> {
-                _modelRequest.value = songs
+                if (songs != null) _modelRequest.value = songs else _messages.send(SeparationMessage.Unavailable)
                 return
             }
         }
         _messages.send(message)
     }
 
+    fun dismissLimitReached() {
+        _limitReachedAt.value = null
+    }
+
     fun cancel(jobId: Long) {
         viewModelScope.launch { controller.cancel(jobId) }
     }
 
+    /** Retrying reserves a new use; a refusal is shown like a new request's. A queued retry shows no message. */
     fun retry(jobId: Long) {
-        viewModelScope.launch { controller.retry(jobId) }
+        viewModelScope.launch {
+            val result = controller.retry(jobId)
+            if (result !is EnqueueResult.Queued && result != EnqueueResult.NothingNew) report(result, songs = null)
+        }
     }
 
     fun removeJob(jobId: Long) {

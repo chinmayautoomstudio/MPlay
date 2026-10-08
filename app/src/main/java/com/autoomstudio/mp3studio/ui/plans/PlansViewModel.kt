@@ -10,6 +10,7 @@ import com.autoomstudio.mp3studio.data.plan.EntitlementPolicy
 import com.autoomstudio.mp3studio.data.plan.Entitlements
 import com.autoomstudio.mp3studio.data.plan.Feature
 import com.autoomstudio.mp3studio.data.plan.Plan
+import com.autoomstudio.mp3studio.data.plan.SeparatorUsage
 import com.autoomstudio.mp3studio.data.plan.TrialClaim
 import com.autoomstudio.mp3studio.di.AppContainer
 import kotlinx.coroutines.channels.Channel
@@ -38,6 +39,8 @@ data class PlanUiState(
     val subscriptionNextBillingAt: Long?,
     val cancelAtPeriodEnd: Boolean,
     val checkedAt: Long?,
+    /** Free users' AI Vocal Separator uses this week; null on Trial and Pro. */
+    val usage: SeparatorUsage? = null,
 ) {
     fun unlocks(feature: Feature): Boolean = when (feature) {
         Feature.BpmDetector, Feature.SingAlong, Feature.UnlimitedSeparator -> plan != Plan.Free
@@ -58,6 +61,7 @@ data class PlanUiState(
             subscriptionNextBillingAt = entitlements?.subscriptionNextBillingAt,
             cancelAtPeriodEnd = entitlements?.cancelAtPeriodEnd ?: false,
             checkedAt = entitlements?.checkedAt,
+            usage = EntitlementPolicy.separatorUsage(entitlements, now),
         )
     }
 }

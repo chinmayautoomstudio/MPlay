@@ -1,6 +1,6 @@
 # AI vocal separation (stems)
 
-> Status: Shipped | Added in: 3.0 | Last updated: 2026-10-07
+> Status: Shipped | Added in: 3.0 | Last updated: 2026-10-08
 
 ## Summary
 
@@ -14,7 +14,10 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 |---|---|
 | `separation/ModelImporter.kt` | Imports a user-picked `.onnx` into `filesDir/models/`, verifying `BuildConfig.MODEL_SHA256`. |
 | `separation/ModelProvider.kt` | `ModelState`, `BundledModelProvider`. |
-| `separation/SeparationController.kt` | UI entry point: `enqueue`, `cancel`, `retry`; eligibility, model and storage checks; `start()` at launch; `onSignedIn()` resumes the queue, `onSignedOut()` stops it. |
+| `separation/SeparationController.kt` | UI entry point: `enqueue`, `cancel`, `retry` (returning `EnqueueResult`); eligibility, model, storage and usage checks; `start()` at launch; `onSignedIn()` resumes the queue, `onSignedOut()` stops it. |
+| `data/usage/SeparationUsageGate.kt` | Reserves one use per new or retried job on the server (`UsageDecision`). |
+| `data/usage/UsageBackend.kt` | `UsageBackend`, `SupabaseUsageBackend` (`reserve-separation`, `finish-separation`). |
+| `data/usage/UsageReporter.kt`, `UsageSyncWorker.kt` | Sends `usage_reports` outcomes; unique `"usage-sync"` WorkManager job with a network constraint. |
 | `separation/SeparationBackend.kt`, `WorkManagerSeparationBackend.kt` | Eligibility and unique `"separation"` WorkManager job (`schedule()`, `cancel()`). |
 | `separation/SeparationRules.kt` | `DeviceEligibility`, `UnsupportedReason`, `StorageEstimate`. |
 | `separation/SeparationEstimate.kt` | Rolling speed factor and "about N minutes" estimate. |
@@ -24,7 +27,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 | `separation/worker/SeparatorClient.kt`, `SeparatorProtocol.kt` | Messenger IPC client and message codes. |
 | `separation/worker/ThermalMonitor.kt`, `DeviceConditions.kt` | Heat levels, charging and battery checks. |
 | `separation/worker/SeparationNotifications.kt`, `CancelSeparationReceiver.kt` | Notifications and Cancel action. |
-| `data/stems/StemEntities.kt`, `StemDao.kt` | `stem_sets`, `separation_jobs`, state enums. |
+| `data/stems/StemEntities.kt`, `StemDao.kt` | `stem_sets`, `separation_jobs`, `usage_reports`, state enums; outcome transactions (`complete`, `fail`, `cancel`, `failActive`) also write the usage report. |
 | `data/stems/StemRepository.kt` | Files on disk, queue, commit-by-rename, recovery, reconciliation, `stemUri()`. |
 | `data/stems/StemExporter.kt` | Export to `Music/MP3 Studio Stems`. |
 | `data/stems/StemMode.kt` | `Original`, `Instrumental`, `Vocals`. |
@@ -55,7 +58,22 @@ flowchart LR
 
 ### Requesting
 
-`requestSeparation(songs)` shows `ModelMissingDialog` if no model is installed, then `SeparationNoticeDialog` (with a time estimate) unless "Don't show again" was ticked, then `controller.enqueue`. Enqueue checks eligibility (at least 5 GiB RAM, 64-bit ABI in `SEPARATION_ABIS`, not low-RAM, at least 1 GiB free), model presence and storage, and skips songs already done or active.
+`requestSeparation(songs)` shows `ModelMissingDialog` if no model is installed, then `SeparationNoticeDialog` (with a time estimate) unless "Don't show again" was ticked, then `controller.enqueue`. Enqueue checks eligibility (at least 5 GiB RAM, 64-bit ABI in `SEPARATION_ABIS`, not low-RAM, at least 1 GiB free), model presence, sign-in and storage, skips songs already done or active (`StemRepository.newSongs`), then reserves usage.
+
+### Weekly usage limit (PRD US1-US9, PL5)
+
+Free users get 10 songs per week, reset Monday 00:00 India Standard Time; Trial and Pro are unlimited. The server enforces it ([backend](../backend.md#edge-functions)).
+
+1. **Reserve.** `enqueue` gives each new song a UUID `jobRef` and calls `SeparationUsageGate.reserve`, which calls `reserve-separation`. Only granted songs are inserted, with `usageRef` and `usageUserId`. Results:
+   - all granted: `EnqueueResult.Queued`;
+   - some granted, in the picked order: `PartiallyQueued(count, skipped, resetsAt)`, a snackbar "Queued 3 songs. 2 skipped: weekly limit reached." with "See plans";
+   - none granted: `LimitReached(resetsAt)`, which opens `UpgradeSheet` with "Weekly limit reached" and the reset day;
+   - server unreachable: `NeedsInternet` for Free (or no cached plan). A cached Trial or Pro within the offline grace queues anyway, and the server records the use when it finishes.
+2. **Finish.** `StemDao.complete` writes a `completed` row to `usage_reports` in the same transaction as the stem set. `fail`, `cancel` (including the notification's Cancel) and `failActive` write `released`. Pauses and requeues keep the reservation.
+3. **Send.** `StemRepository` then calls `onUsageReported`, which schedules `UsageSyncWorker`. It needs a network, retries with exponential backoff and also runs after every sign-in. `UsageReporter` calls `finish-separation` per report and deletes it once sent; reports for another account are dropped.
+4. `retry(jobId)` reserves a new `jobRef` first, because failing or cancelling gave the old one back.
+
+Playing existing stems never calls the server (US4). Usage ("7/10 songs used this week. 3 remaining. Resets Mon, 12 Oct.") shows for Free users in the Settings section, the queue screen header, the time notice ("Uses 1 of your 3 remaining songs this week.") and Settings > Plans. It comes from the `entitlements` cache and the reserve and finish answers ([plans](plans.md)).
 
 ### Model
 
@@ -107,7 +125,8 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 
 ## Data and persistence
 
-- Room: `stem_sets`, `separation_jobs` (see [database.md](../database.md)).
+- Room: `stem_sets`, `separation_jobs` (with `usageRef`, `usageUserId`), `usage_reports` (see [database.md](../database.md)).
+- Server: `ai_usage` rows per request and outcome (see [backend](../backend.md)).
 - Files: `filesDir/stems/<songId>/{vocals,instrumental}.m4a`, `filesDir/stems/.work/<jobId>/`, `filesDir/models/htdemucs.onnx`.
 - Exports: `Music/MP3 Studio Stems/` (MediaStore on 10+, file copy + scan before).
 - DataStore: `stem_mode`, `separation_charging_only`, `separation_pause_low_battery`, `separation_notice_hidden`, `separation_speed_factor`.
@@ -123,6 +142,7 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 
 - App: `separation/SeparationEstimateTest.kt`, `separation/SeparationRulesTest.kt`, `separation/worker/HeatLevelsTest.kt`.
 - `:separation` module: `dsp/` (FFT, spectrogram vs reference, resampler, mixer) and `pipeline/` (adaptive model, segment plan, separator, stats).
+- Usage: `data/usage/SeparationUsageGateTest.kt`, `data/usage/UsageReporterTest.kt`, `data/plan/EntitlementPolicyTest.kt` (usage display); server `supabase/tests/usage_test.sql` and `supabase/functions/_shared/usage_test.ts`.
 - No tests for the repository, DAO, worker, IPC, importer, exporter or UI.
 
 ## Known limitations and TODOs
@@ -136,6 +156,8 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 - CPU only (no XNNPACK/NNAPI execution provider).
 - Exporting `Original` exports the instrumental.
 - `files/stems` and `files/models` aren't excluded from backup rules.
+- A reservation older than 48 hours stops holding a use on the server, but the job still counts if it completes later.
+- The limit is enforced when queueing; the model runs on the phone, so a modified app could skip the server (PRD risk: client checks bypassed).
 
 ## Change history
 
@@ -151,3 +173,4 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 | 2026-10-06 | - | Simpler `separation_notice_message`: patience, processor and resources; dropped heat, quality and personal-use wording. |
 | 2026-10-06 | - | `MediaPcmSource(exactStart = true)` drops decoded audio before `startUs` (by buffer presentation time), for the metronome's beat grid. Separation doesn't use it. |
 | 2026-10-07 | - | Export folder renamed to `Music/MP3 Studio Stems`. The queue runs only while signed in (`onSignedIn`/`onSignedOut`, `SeparationBackend.cancel()`, worker auth check). See [accounts](accounts.md). |
+| 2026-10-08 | - | M3 weekly usage limit: reserve before queueing, `completed`/`released` reports via `usage_reports` and `UsageSyncWorker`, new `EnqueueResult` values, usage display, limit sheet (Room schema v7). |

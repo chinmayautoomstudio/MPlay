@@ -70,6 +70,14 @@
     <string name="upgrade_benefit_singalong">Sing Along recording</string>
     <string name="upgrade_kept">Stems you already separated and BPMs already detected stay yours on every plan.</string>
     <string name="upgrade_see_plans">See plans</string>
+    <string name="upgrade_title_limit">Weekly limit reached</string>
+    <string name="upgrade_limit_resets">You\'ve used your %1$d free songs this week. They reset on %2$s.</string>
+    <string name="usage_title">AI Vocal Separator</string>
+    <string name="usage_summary">%1$d/%2$d songs used this week. %3$d remaining. Resets %4$s.</string>
+    <plurals name="separation_notice_usage">
+        <item quantity="one">Uses %1$d of your %2$d remaining song this week.</item>
+        <item quantity="other">Uses %1$d of your %2$d remaining songs this week.</item>
+    </plurals>
     <string name="upgrade_locked_description">Pro feature</string>
     <plurals name="trial_banner">
         <item quantity="one">Your free trial ends within a day.</item>
@@ -531,6 +539,11 @@
         <item quantity="one">Separating vocals. You can follow progress in the notification.</item>
         <item quantity="other">%d songs queued for separation</item>
     </plurals>
+    <plurals name="message_separation_partially_queued">
+        <item quantity="one">Queued %1$d song. %2$d skipped: weekly limit reached.</item>
+        <item quantity="other">Queued %1$d songs. %2$d skipped: weekly limit reached.</item>
+    </plurals>
+    <string name="message_separation_needs_internet">Connect to the internet to separate songs on the Free plan.</string>
     <string name="message_separation_nothing_new">Already separated or waiting</string>
     <string name="message_separation_no_storage">Not enough storage. About %1$s free space is needed.</string>
     <string name="message_separation_unavailable">Vocal separation isn\'t available on this phone</string>

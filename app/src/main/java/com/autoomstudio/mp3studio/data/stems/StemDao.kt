@@ -86,25 +86,69 @@ abstract class StemDao {
         "UPDATE separation_jobs SET state = 'Failed', remainingMs = NULL, error = :error, finishedAt = :now " +
             "WHERE id = :id AND state IN ('Queued', 'Running')",
     )
-    abstract suspend fun markFailed(id: Long, error: String, now: Long)
+    protected abstract suspend fun markFailed(id: Long, error: String, now: Long): Int
 
     @Query(
         "UPDATE separation_jobs SET state = 'Failed', remainingMs = NULL, error = :error, finishedAt = :now " +
             "WHERE state IN ('Queued', 'Running')",
     )
-    abstract suspend fun failAllActive(error: String, now: Long)
+    protected abstract suspend fun failAllActive(error: String, now: Long)
 
     @Query(
         "UPDATE separation_jobs SET state = 'Cancelled', remainingMs = NULL, finishedAt = :now " +
             "WHERE id = :id AND state IN ('Queued', 'Running')",
     )
-    abstract suspend fun cancel(id: Long, now: Long)
+    protected abstract suspend fun markCancelled(id: Long, now: Long): Int
 
+    /** Puts a failed or cancelled job back in the queue under a new usage reservation. */
     @Query(
         "UPDATE separation_jobs SET state = 'Queued', progress = 0, error = NULL, pauseReason = NULL, " +
-            "finishedAt = NULL, enqueuedAt = :now WHERE id = :id AND state IN ('Failed', 'Cancelled')",
+            "finishedAt = NULL, enqueuedAt = :now, usageRef = :usageRef, usageUserId = :usageUserId " +
+            "WHERE id = :id AND state IN ('Failed', 'Cancelled')",
     )
-    abstract suspend fun retry(id: Long, now: Long)
+    abstract suspend fun retry(id: Long, now: Long, usageRef: String?, usageUserId: String?)
+
+    @Query(
+        "INSERT OR REPLACE INTO usage_reports (jobRef, userId, outcome, createdAt) " +
+            "SELECT usageRef, usageUserId, :outcome, :now FROM separation_jobs " +
+            "WHERE id = :jobId AND usageRef IS NOT NULL AND usageUserId IS NOT NULL",
+    )
+    protected abstract suspend fun reportUsage(jobId: Long, outcome: String, now: Long)
+
+    @Query(
+        "INSERT OR REPLACE INTO usage_reports (jobRef, userId, outcome, createdAt) " +
+            "SELECT usageRef, usageUserId, 'released', :now FROM separation_jobs " +
+            "WHERE state IN ('Queued', 'Running') AND usageRef IS NOT NULL AND usageUserId IS NOT NULL",
+    )
+    protected abstract suspend fun releaseAllActive(now: Long)
+
+    @Query("SELECT * FROM usage_reports ORDER BY createdAt")
+    abstract suspend fun usageReports(): List<UsageReportEntity>
+
+    @Query("DELETE FROM usage_reports WHERE jobRef = :jobRef")
+    abstract suspend fun deleteUsageReport(jobRef: String)
+
+    /** Fails the job and gives its usage reservation back. Returns whether the job was still active. */
+    @Transaction
+    open suspend fun fail(id: Long, error: String, now: Long): Boolean {
+        val changed = markFailed(id, error, now) > 0
+        if (changed) reportUsage(id, RELEASED, now)
+        return changed
+    }
+
+    @Transaction
+    open suspend fun failActive(error: String, now: Long) {
+        releaseAllActive(now)
+        failAllActive(error, now)
+    }
+
+    /** Cancels the job and gives its usage reservation back. Returns whether the job was still active. */
+    @Transaction
+    open suspend fun cancel(id: Long, now: Long): Boolean {
+        val changed = markCancelled(id, now) > 0
+        if (changed) reportUsage(id, RELEASED, now)
+        return changed
+    }
 
     @Query("DELETE FROM separation_jobs WHERE state IN ('Done', 'Failed', 'Cancelled')")
     abstract suspend fun clearFinished()
@@ -112,10 +156,19 @@ abstract class StemDao {
     @Query("DELETE FROM separation_jobs WHERE id = :id AND state IN ('Done', 'Failed', 'Cancelled')")
     abstract suspend fun removeFinished(id: Long)
 
-    /** Records a finished separation and its job in one step, so a stem set never exists without its job done. */
+    /**
+     * Records a finished separation, its job and its usage report in one step, so a stem set never exists without
+     * its job done and the use counted.
+     */
     @Transaction
     open suspend fun complete(jobId: Long, stemSet: StemSetEntity, now: Long) {
         upsertStemSet(stemSet)
         markDone(jobId, now)
+        reportUsage(jobId, COMPLETED, now)
+    }
+
+    companion object {
+        const val COMPLETED = "completed"
+        const val RELEASED = "released"
     }
 }

@@ -11,6 +11,7 @@ import com.autoomstudio.mp3studio.data.duplicates.SongFingerprintEntity
 import com.autoomstudio.mp3studio.data.stems.SeparationJobEntity
 import com.autoomstudio.mp3studio.data.stems.StemDao
 import com.autoomstudio.mp3studio.data.stems.StemSetEntity
+import com.autoomstudio.mp3studio.data.stems.UsageReportEntity
 import com.autoomstudio.mp3studio.data.tempo.SongTempoEntity
 import com.autoomstudio.mp3studio.data.tempo.TempoDao
 
@@ -23,8 +24,9 @@ import com.autoomstudio.mp3studio.data.tempo.TempoDao
         StemSetEntity::class,
         SeparationJobEntity::class,
         SongTempoEntity::class,
+        UsageReportEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
@@ -32,6 +34,7 @@ import com.autoomstudio.mp3studio.data.tempo.TempoDao
         AutoMigration(from = 3, to = 4),
         AutoMigration(from = 4, to = 5),
         AutoMigration(from = 5, to = 6),
+        AutoMigration(from = 6, to = 7),
     ],
 )
 abstract class MPlayDatabase : RoomDatabase() {

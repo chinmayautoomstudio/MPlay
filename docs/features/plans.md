@@ -4,7 +4,7 @@
 
 ## Summary
 
-Every account is on Free, Trial or Pro (PRD v3.2 section 6.3, M2). The server decides the plan; the app caches it and locks BPM detection and Sing Along on Free, showing an upgrade sheet instead. New accounts get a one-time 30-day trial with everything in Pro, at most once per normalized email and per phone. Settings > Plans shows the plan, its dates and what each plan includes. Payments come in M4, so "Go Pro" is a disabled "Payments coming soon" button.
+Every account is on Free, Trial or Pro (PRD v3.2 section 6.3, M2). The server decides the plan; the app caches it and locks BPM detection and Sing Along on Free, showing an upgrade sheet instead. Free users can separate 10 songs a week (M3). New accounts get a one-time 30-day trial with everything in Pro, at most once per normalized email and per phone. Settings > Plans shows the plan, its dates and what each plan includes. Payments come in M4, so "Go Pro" is a disabled "Payments coming soon" button.
 
 ## Key files
 
@@ -12,8 +12,9 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 
 | File | Role |
 |---|---|
-| `data/plan/Entitlements.kt` | `Plan` (`Free`, `Trial`, `Pro`), `Feature` (`BpmDetector`, `SingAlong`, `UnlimitedSeparator`), `TrialClaim`, and the cached `Entitlements`. |
-| `data/plan/EntitlementPolicy.kt` | Pure rules: `effectivePlan()`, `canUse()`, `isStale()`, `trialDaysLeft()`, `GRACE_MS` (7 days), `TRIAL_REMINDER_DAYS` (3). |
+| `data/plan/Entitlements.kt` | `Plan` (`Free`, `Trial`, `Pro`), `Feature` (`BpmDetector`, `SingAlong`, `UnlimitedSeparator`), `TrialClaim`, the cached `Entitlements` and `SeparatorUsage`. |
+| `data/plan/EntitlementPolicy.kt` | Pure rules: `effectivePlan()`, `canUse()`, `isStale()`, `trialDaysLeft()`, `separatorUsage()`, `GRACE_MS` (7 days), `TRIAL_REMINDER_DAYS` (3). |
+| `ui/plans/UsageText.kt` | `usageSummary()` and `resetDay()` for the weekly separator usage. |
 | `data/plan/EntitlementsBackend.kt` | `SupabaseEntitlementsBackend` calls the `entitlements` Edge Function; `EntitlementsResponse` maps its JSON. |
 | `data/plan/EntitlementsCache.kt` | `DataStoreEntitlementsCache`, the last answer as JSON. |
 | `data/plan/EntitlementsRepository.kt` | `entitlements: StateFlow`, `refresh(userId)`, `canUse(feature, userId)`, `clear()`. |
@@ -57,14 +58,15 @@ sequenceDiagram
 - Gates:
   - Detect BPM (`MetronomeViewModel.detect` through `TempoDetectionGate`): a tempo cached in `song_tempos` still fills in on any plan; a new detection on Free fires `upgradeRequests` and `MetronomeSheet` shows the upgrade sheet. The button shows a lock icon on Free.
   - Sing Along chip on Now Playing: opens `SingAlongSheet` only when `SingAlong` is unlocked, otherwise the upgrade sheet; a lock icon shows on Free.
-  - AI Vocal Separator is not limited yet (weekly limit in M3).
+  - AI Vocal Separator: Free users get 10 songs a week, reserved on the server when queued (M3, see [vocal separation](vocal-separation.md#weekly-usage-limit-prd-us1-us9-pl5)). Running out opens the upgrade sheet with `limitResetsAt`: "Weekly limit reached" and the reset day.
+- Usage display (US6): `entitlements` also returns `usage` (`usage_summary`), cached as `Entitlements.usage` (`SeparatorUsage`) and updated by `EntitlementsRepository.updateUsage` from each reserve and finish answer. `EntitlementPolicy.separatorUsage` shows it only on Free and starts a fresh week once the cached `resetsAt` has passed. `PlanUiState.usage` feeds the Plans card, the separation Settings section, the queue screen and the time notice (`ui/plans/UsageText.kt`).
 - "See plans" in the upgrade sheet sets `PlansViewModel.openPlansRequest`; Now Playing closes its sheets and `MainScreen` collapses the player and opens Settings > Plans.
 - Account card: a Plan row ("Free trial, 23 days left", "Pro", "Free") that opens Plans.
 - Trial banner (TR6): in the last 3 days of the trial, a dismissible banner above the main content opens Plans; dismissing hides it until the app process restarts.
 
 ## Data and persistence
 
-- DataStore `entitlements`, key `entitlements_json`: the serialized `Entitlements` (user ID, plan, trial and subscription dates, trial claim, `serverTime`, `checkedAt`). Cleared on sign-out (PRD AU6). A cache for a different user ID unlocks nothing.
+- DataStore `entitlements`, key `entitlements_json`: the serialized `Entitlements` (user ID, plan, trial and subscription dates, trial claim, separator usage, `serverTime`, `checkedAt`). Cleared on sign-out (PRD AU6). A cache for a different user ID unlocks nothing.
 - Server tables `trials`, `trial_claims`, `subscriptions`: see [backend](../backend.md#tables). No Room changes.
 
 ## Manifest, permissions and notifications
@@ -73,7 +75,7 @@ None. Uses the existing `INTERNET` permission.
 
 ## Tests
 
-- `data/plan/EntitlementPolicyTest.kt`: access table for Free, Trial and Pro, no cache, ended trial, expired subscription with and without a trial, 7-day grace boundary, clock turned back, server time deciding end dates, days-left rounding.
+- `data/plan/EntitlementPolicyTest.kt`: access table for Free, Trial and Pro, no cache, ended trial, expired subscription with and without a trial, 7-day grace boundary, clock turned back, server time deciding end dates, days-left rounding, usage shown only on Free and rolled over after the reset.
 - `data/plan/EntitlementsRepositoryTest.kt`: refresh stores and maps the server answer, offline refresh keeps the cache, another account's cache unlocks nothing, clear, unknown plan values.
 - `data/tempo/TempoDetectionGateTest.kt`: cached tempo on Free, locked new detection, detection with BPM Detector.
 - `supabase/tests/plans_test.sql` (pgTAP, 16 checks): plan computation, claim idempotence, email and device reuse denied, disabled account, both functions not executable by `authenticated`.
@@ -86,10 +88,11 @@ None. Uses the existing `INTERNET` permission.
 - The device check trusts the `ANDROID_ID` hash the app sends; it changes after a factory reset and differs per Android user.
 - Accounts created before M2 get their trial at their first refresh after the functions are deployed.
 - The plan shown on screens is recomputed when the cache changes, not as time passes; the next foreground refresh catches up.
-- Payments (M4), the separator weekly limit (M3) and admin plan changes (M5) are not built yet.
+- Payments (M4) and admin plan changes (M5) are not built yet.
 
 ## Change history
 
 | Date | Commit | Change |
 |---|---|---|
 | 2026-10-08 | - | Plans and gating (M2): entitlements functions, trial with abuse checks, cache with 7-day grace, BPM and Sing Along gates, upgrade sheet, Plans screen, Account plan row, trial banner. |
+| 2026-10-08 | - | Usage limit (M3): `SeparatorUsage` in the cache, `separatorUsage()`, usage on the Plans card, limit-reached upgrade sheet. |

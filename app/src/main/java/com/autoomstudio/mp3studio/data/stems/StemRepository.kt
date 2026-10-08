@@ -31,6 +31,8 @@ class StemRepository(
     private val fingerprinter: FileFingerprinter,
     private val scope: CoroutineScope,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** Called after a job's usage outcome was recorded and should be sent to the server. */
+    private val onUsageReported: () -> Unit = {},
 ) {
     private val stemsDir = File(context.filesDir, STEMS_DIR)
     private val workRoot = File(stemsDir, WORK_DIR)
@@ -59,13 +61,20 @@ class StemRepository(
         return Uri.fromFile(File(path))
     }
 
-    /** Queues [songs] that aren't already separated or waiting. Returns how many were added. */
-    suspend fun enqueue(songs: List<Song>): Int {
+    /** The [songs] that aren't already separated or waiting, without duplicates, in the given order. */
+    suspend fun newSongs(songs: List<Song>): List<Song> {
         val ready = stemSets.value.keys
         val active = dao.activeSongIds().toSet()
+        return songs.distinctBy { it.id }.filter { it.id !in ready && it.id !in active }
+    }
+
+    /**
+     * Queues [songs] that aren't already separated or waiting, each with its usage reservation from [usageRefs]
+     * (by song id) made for [userId]. Returns how many were added.
+     */
+    suspend fun enqueue(songs: List<Song>, usageRefs: Map<Long, String> = emptyMap(), userId: String? = null): Int {
         val now = clock()
-        val jobs = songs.distinctBy { it.id }
-            .filter { it.id !in ready && it.id !in active }
+        val jobs = newSongs(songs)
             .map { song ->
                 SeparationJobEntity(
                     songId = song.id,
@@ -77,15 +86,24 @@ class StemRepository(
                     sourceDateModified = song.dateModified,
                     state = JobState.Queued.name,
                     enqueuedAt = now,
+                    usageRef = usageRefs[song.id],
+                    usageUserId = userId.takeIf { usageRefs[song.id] != null },
                 )
             }
         if (jobs.isNotEmpty()) dao.insertJobs(jobs)
         return jobs.size
     }
 
-    suspend fun cancel(jobId: Long) = dao.cancel(jobId, clock())
+    suspend fun cancel(jobId: Long) {
+        if (dao.cancel(jobId, clock())) onUsageReported()
+    }
 
-    suspend fun retry(jobId: Long) = dao.retry(jobId, clock())
+    suspend fun retry(jobId: Long, usageRef: String?, userId: String?) =
+        dao.retry(jobId, clock(), usageRef, userId.takeIf { usageRef != null })
+
+    suspend fun usageReports(): List<UsageReportEntity> = dao.usageReports()
+
+    suspend fun deleteUsageReport(jobRef: String) = dao.deleteUsageReport(jobRef)
 
     suspend fun removeFinished(jobId: Long) = dao.removeFinished(jobId)
 
@@ -96,7 +114,10 @@ class StemRepository(
     suspend fun queuedCount(): Int = dao.queuedCount()
 
     /** For when separation became unavailable with jobs waiting, for example a model that is no longer installed. */
-    suspend fun failQueued(error: JobError) = dao.failAllActive(error.name, clock())
+    suspend fun failQueued(error: JobError) {
+        dao.failActive(error.name, clock())
+        onUsageReported()
+    }
 
     /** Removes the database row first, so playback stops picking the files before they disappear. */
     suspend fun delete(songIds: List<Long>) {
@@ -192,7 +213,9 @@ class StemRepository(
 
     suspend fun setQueuedPauseReason(reason: PauseReason?) = dao.setQueuedPauseReason(reason?.name)
 
-    suspend fun markFailed(jobId: Long, error: JobError) = dao.markFailed(jobId, error.name, clock())
+    suspend fun markFailed(jobId: Long, error: JobError) {
+        if (dao.fail(jobId, error.name, clock())) onUsageReported()
+    }
 
     /**
      * Run when a worker starts: jobs left running were interrupted and start over, and anything on disk without
@@ -242,6 +265,7 @@ class StemRepository(
             )
         }
         dao.complete(job.id, set, clock())
+        onUsageReported()
     }
 
     private fun deleteFiles(set: StemSetEntity) {

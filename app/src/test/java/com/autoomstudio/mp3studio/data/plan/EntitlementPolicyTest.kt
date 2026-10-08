@@ -94,4 +94,27 @@ class EntitlementPolicyTest {
         assertNull(EntitlementPolicy.trialDaysLeft(entitlements(Plan.Pro), checkedAt))
         assertNull(EntitlementPolicy.trialDaysLeft(trial, checkedAt + 3 * day))
     }
+
+    private val usage = SeparatorUsage(
+        limit = 10,
+        used = 7,
+        reserved = 1,
+        remaining = 2,
+        resetsAt = checkedAt + 2 * day,
+        unlimited = false,
+    )
+
+    @Test
+    fun usageIsShownOnlyOnFree() {
+        assertEquals(usage, EntitlementPolicy.separatorUsage(entitlements(Plan.Free).copy(usage = usage), checkedAt))
+        assertNull(EntitlementPolicy.separatorUsage(entitlements(Plan.Pro).copy(usage = usage), checkedAt))
+        assertNull(EntitlementPolicy.separatorUsage(entitlements(Plan.Free), checkedAt))
+    }
+
+    @Test
+    fun usageStartsOverOnceTheCachedWeekEnds() {
+        val cached = entitlements(Plan.Free).copy(usage = usage)
+        val nextWeek = EntitlementPolicy.separatorUsage(cached, checkedAt + 3 * day)
+        assertEquals(usage.copy(used = 0, remaining = 9, resetsAt = usage.resetsAt + 7 * day), nextWeek)
+    }
 }

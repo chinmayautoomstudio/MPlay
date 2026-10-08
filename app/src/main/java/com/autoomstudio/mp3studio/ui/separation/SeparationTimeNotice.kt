@@ -29,6 +29,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.autoomstudio.mp3studio.R
+import com.autoomstudio.mp3studio.data.plan.SeparatorUsage
+import com.autoomstudio.mp3studio.ui.plans.resetDay
 
 /** The short "may take a while" line, shared by every separation progress surface (SN2, SN5). */
 @Composable
@@ -58,6 +60,8 @@ fun SeparationNoticeDialog(
     request: NoticeRequest,
     onConfirm: (dontShowAgain: Boolean) -> Unit,
     onDismiss: () -> Unit,
+    /** Free users' uses this week; null on Trial and Pro. */
+    usage: SeparatorUsage? = null,
 ) {
     var dontShowAgain by rememberSaveable { mutableStateOf(false) }
     AlertDialog(
@@ -84,6 +88,22 @@ fun SeparationNoticeDialog(
                     )
                 }
                 Text(stringResource(R.string.separation_notice_message))
+                if (usage != null) {
+                    Text(
+                        text = if (usage.remaining > 0) {
+                            pluralStringResource(
+                                R.plurals.separation_notice_usage,
+                                usage.remaining,
+                                minOf(request.songs.size, usage.remaining),
+                                usage.remaining,
+                            )
+                        } else {
+                            stringResource(R.string.upgrade_limit_resets, usage.limit, resetDay(usage.resetsAt))
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier

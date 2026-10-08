@@ -59,6 +59,15 @@ class EntitlementsRepository(
         return EntitlementPolicy.canUse(feature, current, clock())
     }
 
+    /** Takes the usage a reserve or finish answer carried, so the count on screen follows without a full refresh. */
+    suspend fun updateUsage(userId: String, usage: SeparatorUsage) {
+        loaded.await()
+        val current = _entitlements.value?.takeIf { it.userId == userId } ?: return
+        val updated = current.copy(usage = usage)
+        _entitlements.value = updated
+        cache.write(updated)
+    }
+
     /** On sign-out (PRD AU6). */
     suspend fun clear() {
         loaded.await()

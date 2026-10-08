@@ -38,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.autoomstudio.mp3studio.R
+import com.autoomstudio.mp3studio.data.plan.SeparatorUsage
 import com.autoomstudio.mp3studio.data.stems.JobError
 import com.autoomstudio.mp3studio.data.stems.JobState
 import com.autoomstudio.mp3studio.data.stems.PauseReason
@@ -47,6 +48,7 @@ import com.autoomstudio.mp3studio.data.stems.StemSetEntity
 import com.autoomstudio.mp3studio.ui.common.rememberWithLegacyStorage
 import com.autoomstudio.mp3studio.ui.components.ComingSoon
 import com.autoomstudio.mp3studio.ui.library.DetailBackButton
+import com.autoomstudio.mp3studio.ui.plans.usageSummary
 import kotlin.math.roundToInt
 
 /** The processing queue (AI25) and the separated songs with delete and export (AI16, AI23). */
@@ -57,6 +59,8 @@ fun SeparationScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     backEnabled: Boolean = true,
+    /** Free users' uses this week (PRD US6); null on Trial and Pro. */
+    usage: SeparatorUsage? = null,
 ) {
     BackHandler(enabled = backEnabled, onBack = onBack)
     val running = state.jobs.filter { it.state == JobState.Running.name }
@@ -86,6 +90,16 @@ fun SeparationScreen(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
+        }
+        if (usage != null) {
+            item(key = "usage") {
+                Text(
+                    text = usageSummary(usage),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp),
+                )
+            }
         }
         jobSection("processing", R.string.separation_section_processing, running) { RunningJobRow(it, viewModel) }
         jobSection("waiting", R.string.separation_section_waiting, waiting) { WaitingJobRow(it, viewModel) }

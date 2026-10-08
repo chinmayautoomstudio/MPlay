@@ -37,6 +37,7 @@ data class EntitlementsResponse(
     val trial: TrialDto? = null,
     val subscription: SubscriptionDto? = null,
     val trialClaim: ClaimDto? = null,
+    val usage: UsageDto? = null,
     val serverTime: String,
 ) {
     @Serializable
@@ -73,12 +74,24 @@ data class EntitlementsResponse(
             "unavailable" -> TrialClaim.Unavailable
             else -> null
         },
+        usage = usage?.toUsage(),
         serverTime = epochMillis(serverTime),
         checkedAt = checkedAt,
     )
-
-    private companion object {
-        /** Postgres sends `2026-10-08T05:42:40.359024+00:00`. */
-        fun epochMillis(value: String): Long = OffsetDateTime.parse(value).toInstant().toEpochMilli()
-    }
 }
+
+/** The server's `usage_summary`. */
+@Serializable
+data class UsageDto(
+    val limit: Int,
+    val used: Int,
+    val reserved: Int,
+    val remaining: Int,
+    val resetsAt: String,
+    val unlimited: Boolean,
+) {
+    fun toUsage() = SeparatorUsage(limit, used, reserved, remaining, epochMillis(resetsAt), unlimited)
+}
+
+/** Postgres sends `2026-10-08T05:42:40.359024+00:00`. */
+internal fun epochMillis(value: String): Long = OffsetDateTime.parse(value).toInstant().toEpochMilli()

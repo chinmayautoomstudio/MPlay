@@ -44,6 +44,23 @@ data class SeparationJobEntity(
     val error: String? = null,
     val enqueuedAt: Long,
     val finishedAt: Long? = null,
+    /** The `jobRef` of this job's AI Vocal Separator use on the server; null for jobs queued before usage limits. */
+    val usageRef: String? = null,
+    /** The account that reserved [usageRef]. */
+    val usageUserId: String? = null,
+)
+
+/**
+ * How a job with a [SeparationJobEntity.usageRef] ended, waiting to reach the server. Kept apart from the job so
+ * clearing the queue doesn't lose it.
+ */
+@Entity(tableName = "usage_reports")
+data class UsageReportEntity(
+    @PrimaryKey val jobRef: String,
+    val userId: String,
+    /** `completed` or `released`, as the server names them. */
+    val outcome: String,
+    val createdAt: Long,
 )
 
 enum class JobState { Queued, Running, Done, Failed, Cancelled }

@@ -91,8 +91,10 @@ import com.autoomstudio.mp3studio.ui.library.LibraryUiState
 import com.autoomstudio.mp3studio.ui.library.SongActions
 import com.autoomstudio.mp3studio.ui.library.SongInfoHost
 import com.autoomstudio.mp3studio.ui.library.rememberSongSelection
+import com.autoomstudio.mp3studio.data.plan.Feature
 import com.autoomstudio.mp3studio.ui.plans.PlansScreen
 import com.autoomstudio.mp3studio.ui.plans.PlansViewModel
+import com.autoomstudio.mp3studio.ui.plans.UpgradeSheet
 import com.autoomstudio.mp3studio.ui.playback.ExpandablePlayer
 import com.autoomstudio.mp3studio.ui.playback.MiniPlayerSlotHeight
 import com.autoomstudio.mp3studio.ui.playback.PlayerActions
@@ -262,19 +264,25 @@ fun MainScreen(
         separationViewModel.messages.collect { message ->
             val text = separationMessageText(context, message)
             val playInstrumental = message is SeparationMessage.Ready && message.songId == currentSongId
+            val partial = message is SeparationMessage.PartiallyQueued
             scope.launch {
                 snackbarHostState.currentSnackbarData?.dismiss()
                 val result = snackbarHostState.showSnackbar(
                     message = text,
                     actionLabel = when {
                         message is SeparationMessage.Queued -> resources.getString(R.string.action_view_queue)
+                        partial -> resources.getString(R.string.upgrade_see_plans)
                         playInstrumental -> resources.getString(R.string.message_separation_ready_action)
                         else -> null
                     },
-                    duration = if (message is SeparationMessage.Ready) SnackbarDuration.Long else SnackbarDuration.Short,
+                    duration = if (message is SeparationMessage.Ready || partial) SnackbarDuration.Long else SnackbarDuration.Short,
                 )
                 if (result == SnackbarResult.ActionPerformed) {
-                    if (playInstrumental) playerActions.setStemMode(StemMode.Instrumental) else openSeparation()
+                    when {
+                        playInstrumental -> playerActions.setStemMode(StemMode.Instrumental)
+                        partial -> plansViewModel.openPlans()
+                        else -> openSeparation()
+                    }
                 }
             }
         }
@@ -531,6 +539,7 @@ fun MainScreen(
                                         onBack = { settingsPage = SettingsPage.Main },
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
+                                        usage = plan.usage,
                                     )
                                     SettingsPage.About -> AboutScreen(
                                         onBack = { settingsPage = SettingsPage.Main },
@@ -569,6 +578,7 @@ fun MainScreen(
                                                 viewModel = separationViewModel,
                                                 onOpenQueue = { settingsPage = SettingsPage.Separation },
                                                 sectionHeader = header,
+                                                usage = plan.usage,
                                             )
                                         },
                                     )
@@ -688,6 +698,16 @@ fun MainScreen(
             request = request,
             onConfirm = separationViewModel::confirmNotice,
             onDismiss = separationViewModel::dismissNotice,
+            usage = plan.usage,
+        )
+    }
+    val limitReachedAt by separationViewModel.limitReachedAt.collectAsStateWithLifecycle()
+    limitReachedAt?.let { resetsAt ->
+        UpgradeSheet(
+            feature = Feature.UnlimitedSeparator,
+            onDismiss = separationViewModel::dismissLimitReached,
+            limitResetsAt = resetsAt,
+            viewModel = plansViewModel,
         )
     }
     val modelRequest by separationViewModel.modelRequest.collectAsStateWithLifecycle()

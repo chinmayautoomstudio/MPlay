@@ -38,6 +38,7 @@ There is no DI framework. [`di/AppContainer.kt`](../app/src/main/java/com/autoom
 - Nearly everything is a `lazy` singleton: repositories (songs, playlists, duplicates, stems), stores (session, library prefs, widget, `AppSettings`), `MPlayDatabase`, separation backend/controller, clip helpers, `songDeleter`, `tempoAnalyzer`, `metronomeController`, `recordingStore`, `singAlongSession`.
 - Accounts: `supabase` (`SupabaseClient` with Auth using the private `SecureSessionStore`, Postgrest and Functions), `authRepository`, `profileRepository`, `googleSignIn`, and `signedInUserId()`. `separationController` gets `isSignedIn = { authRepository.isSignedIn }`. See [accounts](features/accounts.md).
 - Plans: `entitlementsRepository` (`SupabaseEntitlementsBackend` with `DeviceId`, `DataStoreEntitlementsCache`). `MetronomeViewModel` gets a `TempoDetectionGate` over `tempoAnalyzer`. See [plans](features/plans.md).
+- Usage limit: a private `usageBackend` (`SupabaseUsageBackend`), `usageGate` (`SeparationUsageGate`, passed to `separationController` with `signedInUserId`) and `usageReporter` (`UsageReporter` over `stemRepository`'s `usage_reports`). `stemRepository` gets `onUsageReported = { UsageSyncWorker.schedule(...) }`. See [vocal separation](features/vocal-separation.md#weekly-usage-limit-prd-us1-us9-pl5).
 - `musicPlaying: MutableStateFlow<Boolean>` is shared state: `PlaybackService` writes it, `MetronomeController` reads it.
 - A private `mainScope` (`Dispatchers.Main.immediate`) backs a private app-scoped `PlaybackController` (`restoresSession = false`) passed to `MetronomeController` as its `MusicTimeline`, for syncing with the song. It binds to `PlaybackService` only while sync is on.
 - Factories: `createWidgetStatePublisher()` and `createPlaybackController(scope)` return new instances per call.
@@ -58,7 +59,7 @@ ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `Sepa
 
 ## Startup
 
-1. `MPlayApp.onCreate` builds the container. In the main process only, it calls `authRepository.start()` (reads the saved session), `separationController.start()`, `AuthEffects(...).start()` (resumes the separation queue after sign-in, stops background features on sign-out, refreshes the widget) and `singAlongSession.cleanUpLeftovers()`. The `:separator` process skips all of these.
+1. `MPlayApp.onCreate` builds the container. In the main process only, it calls `authRepository.start()` (reads the saved session), `separationController.start()`, `AuthEffects(...).start()` (refreshes the plan, schedules `UsageSyncWorker` and resumes the separation queue after sign-in, stops background features on sign-out, refreshes the widget) and `singAlongSession.cleanUpLeftovers()`. The `:separator` process skips all of these.
 2. `MainActivity.onCreate` keeps the splash screen until `SettingsViewModel.theme` has loaded (avoids a theme flash) and `AuthState` is no longer `Loading`. Signed out, it renders `SignInScreen`; signed in, `MPlayAppTheme { MPlayRoot(...) }` inside the signed-in `ViewModelStoreOwner`. `onStart` runs `AuthViewModel.verifyAccount()` (disabled or revoked accounts are signed out). See [accounts](features/accounts.md).
 3. `handleIntent` (also from `onNewIntent`; the activity is `singleTop`) turns these into one-shot UI flags:
    - `EXTRA_OPEN_NOW_PLAYING` from the media notification and widget
@@ -111,6 +112,7 @@ flowchart LR
 | `metronome.MetronomeService` | Service | `mediaPlayback` | Separate so the metronome runs while music is paused. Notification ID 4201. |
 | `singalong.RecordingService` | Service | `microphone` | Only while a take is being prepared or recorded. Notification ID 4301. |
 | `SeparationWorker` (via WorkManager `SystemForegroundService`) | `CoroutineWorker` | `mediaProcessing` (35+) / `dataSync` (29-34) | Notification IDs 4101/4102. |
+| `data.usage.UsageSyncWorker` | `CoroutineWorker`, unique `"usage-sync"`, needs a network | none | Sends separation outcomes to `finish-separation`; scheduled after each job ends and on sign-in. |
 | `separation.worker.SeparatorService` | Bound service, `:separator` process | none | Runs the model so a native crash or OOM never kills playback. |
 | `playback.SignedInMediaButtonReceiver` | Receiver, exported | | Headset/widget play-pause; extends Media3's `MediaButtonReceiver` and doesn't start the service while signed out. |
 | `widget.MPlayWidgetReceiver` | Glance receiver, exported | | Home/lock screen widget. |
@@ -154,3 +156,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-08 | - | Package rename: `applicationId`/`namespace` `com.autoomstudio.mp3studio`, `:separation` `com.autoomstudio.mp3studio.separation`, `:spike` `com.autoomstudio.mp3studio.spike` (app ID `com.autoomstudio.mp3studio.ai.spike`); sources moved to `com/autoomstudio/mp3studio/`; Room schema folder renamed. Class names (`MPlayApp`, `MPlayDatabase`) and `mplay.db` unchanged. |
 | 2026-10-08 | - | Removed the `:spike` feasibility app module (not shipped, no dependents). |
 | 2026-10-08 | - | Plans (M2): supabase-kt Functions, `entitlementsRepository` and `signedInUserId()` in `AppContainer`, `PlansViewModel`, `SettingsPage.Plans`, trial banner, `supabase/functions/`. |
+| 2026-10-08 | - | Usage limit (M3): `usageGate`, `usageReporter` and `UsageSyncWorker`; `SeparationController` takes `usageGate` and `signedInUserId` instead of `isSignedIn`. |

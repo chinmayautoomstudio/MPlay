@@ -27,7 +27,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.autoomstudio.mp3studio.R
+import com.autoomstudio.mp3studio.data.plan.SeparatorUsage
 import com.autoomstudio.mp3studio.separation.ModelState
+import com.autoomstudio.mp3studio.ui.plans.usageSummary
 import com.autoomstudio.mp3studio.separation.UnsupportedReason
 
 /** The Settings section (AI23, AI24); on unsupported phones it only explains why (AI2). */
@@ -37,6 +39,8 @@ fun SeparationSettingsSection(
     viewModel: SeparationViewModel,
     onOpenQueue: () -> Unit,
     sectionHeader: @Composable (String) -> Unit,
+    /** Free users' uses this week (PRD US6); null on Trial and Pro. */
+    usage: SeparatorUsage? = null,
 ) {
     val hasContent = state.stemSets.isNotEmpty() || state.jobs.isNotEmpty()
     val context = LocalContext.current
@@ -65,6 +69,13 @@ fun SeparationSettingsSection(
             },
             colors = listColors,
             modifier = Modifier.clickable(onClick = onOpenQueue),
+        )
+    }
+    if (state.available && usage != null) {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.usage_title)) },
+            supportingContent = { Text(usageSummary(usage)) },
+            colors = listColors,
         )
     }
     if (state.available) {
@@ -212,6 +223,13 @@ fun separationMessageText(context: android.content.Context, message: SeparationM
     return when (message) {
         is SeparationMessage.Queued ->
             res.getQuantityString(R.plurals.message_separation_queued, message.count, message.count)
+        is SeparationMessage.PartiallyQueued -> res.getQuantityString(
+            R.plurals.message_separation_partially_queued,
+            message.count,
+            message.count,
+            message.skipped,
+        )
+        SeparationMessage.NeedsInternet -> res.getString(R.string.message_separation_needs_internet)
         SeparationMessage.NothingNew -> res.getString(R.string.message_separation_nothing_new)
         is SeparationMessage.NotEnoughStorage -> res.getString(
             R.string.message_separation_no_storage,

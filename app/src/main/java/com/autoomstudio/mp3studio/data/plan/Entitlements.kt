@@ -25,6 +25,21 @@ data class Entitlements(
     val subscriptionNextBillingAt: Long? = null,
     val cancelAtPeriodEnd: Boolean = false,
     val trialClaim: TrialClaim? = null,
+    val usage: SeparatorUsage? = null,
     val serverTime: Long,
     val checkedAt: Long,
+)
+
+/**
+ * AI Vocal Separator uses this week (PRD US6), as last reported by the server. [reserved] are queued jobs holding a
+ * use; [resetsAt] is the next Monday 00:00 India Standard Time in epoch milliseconds.
+ */
+@Serializable
+data class SeparatorUsage(
+    val limit: Int,
+    val used: Int,
+    val reserved: Int,
+    val remaining: Int,
+    val resetsAt: Long,
+    val unlimited: Boolean,
 )

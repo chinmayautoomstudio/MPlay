@@ -110,6 +110,12 @@ private fun CurrentPlanCard(state: PlanUiState, refreshing: Boolean, onRefresh: 
             if (state.plan == Plan.Free && state.trialClaim == TrialClaim.Denied) {
                 Text(stringResource(R.string.plans_trial_used), style = MaterialTheme.typography.bodyMedium)
             }
+            state.usage?.let { usage ->
+                Text(
+                    stringResource(R.string.usage_title) + ": " + usageSummary(usage),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             if (state.stale) {
                 Text(
                     stringResource(R.string.plans_stale),

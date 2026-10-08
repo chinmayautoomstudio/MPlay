@@ -9,6 +9,9 @@ Each entry should say what changed and link to the feature doc. Use these groups
 Changes after 3.1 that haven't shipped in a version yet. `versionName` is still `3.1`.
 
 ### Added
+- AI Vocal Separator weekly limit (PRD v3.2 M3): Free users can separate 10 songs a week, resetting Monday 00:00 India Standard Time; Trial and Pro are unlimited. Each song reserves a use on the server when queued (Free users need internet for that). A use counts when the job completes; cancelled or failed jobs give it back, and the outcome is sent by `UsageSyncWorker` once online. Picking more songs than remain queues the first ones with a "skipped" snackbar; none left opens the upgrade sheet with "Weekly limit reached" and the reset day. Usage ("7/10 songs used this week. 3 remaining.") shows in Settings, the queue screen, the time notice and Settings > Plans. ([vocal separation](features/vocal-separation.md), [plans](features/plans.md))
+- Supabase `usage` migration (`usage_summary()`, `reserve_separation()`, `finish_separation()`, `denied` status in `ai_usage`, applied live) and Edge Functions `reserve-separation` and `finish-separation`; `entitlements` now also returns `usage`. pgTAP `usage_test.sql`, Deno `usage_test.ts`, admin usage SQL in the backend doc. ([backend](backend.md))
+- Unit tests: `SeparationUsageGateTest`, `UsageReporterTest`, usage cases in `EntitlementPolicyTest`. ([vocal separation](features/vocal-separation.md))
 - Plans and gating (PRD v3.2 M2): Free, Trial and Pro. The first sign-in claims a 30-day trial once per normalized email and device; new BPM detections and Sing Along need Trial or Pro and show an upgrade sheet otherwise (cached tempos and saved recordings stay usable). Settings > Plans with the current plan, dates and comparison table, a Plan row on the Account card, and a dismissible banner in the last 3 days of the trial. "Go Pro" is a disabled "Payments coming soon" button at ₹99 per month. The plan is cached in DataStore `entitlements` with a 7-day offline grace. ([plans](features/plans.md), [metronome](features/metronome.md), [sing-along](features/sing-along.md))
 - Supabase `plans` migration (`compute_entitlements()`, `claim_trial()`, service-role only, applied live) and Edge Functions `entitlements` and `claim-trial` with peppered email/device hashes (`TRIAL_HASH_PEPPER`); pgTAP `plans_test.sql` and Deno tests. The app adds the supabase-kt `functions-kt` dependency. ([backend](backend.md))
 - Unit tests: `EntitlementPolicyTest`, `EntitlementsRepositoryTest`, `TempoDetectionGateTest`. ([plans](features/plans.md))
@@ -54,6 +57,7 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 - Schema v4: new table `song_tempos`, `AutoMigration(3, 4)`. (`e13b2f7`, [database](database.md))
 - Schema v5: `song_tempos` gains nullable `beatsPerBar`, `beatUnit`, `meterConfidence`, `meterBpm`, `AutoMigration(4, 5)`. Existing rows are kept; rows without a meter are re-analyzed once on the next Detect. ([database](database.md), [metronome](features/metronome.md))
 - Schema v6: `song_tempos` gains nullable `downbeatMs`, `beatPeriodMs`, `AutoMigration(5, 6)`. Rows without a grid are re-analyzed once on the next Detect. ([database](database.md), [metronome](features/metronome.md))
+- Schema v7: new table `usage_reports`; `separation_jobs` gains nullable `usageRef`, `usageUserId`, `AutoMigration(6, 7)`. Jobs queued before v7 have no reservation and send no report. ([database](database.md), [vocal separation](features/vocal-separation.md))
 
 ## [3.1] - 2026-10-06
 

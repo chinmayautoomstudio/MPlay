@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient, type User } from "jsr:@supabase/supabase-js@2";
 import { normalizeEmail, pepperedHash, validDeviceId } from "./trial.ts";
+import type { Outcome, ReserveJob } from "./usage.ts";
 
 /** Service-role client. The key is in the functions container's environment and never leaves the server. */
 export function adminClient(): SupabaseClient {
@@ -63,4 +64,34 @@ export async function entitlements(admin: SupabaseClient, userId: string) {
   const { data, error } = await admin.rpc("compute_entitlements", { p_user: userId });
   if (error) throw error;
   return data as { disabled: boolean; trial: unknown } | null;
+}
+
+export async function usageSummary(admin: SupabaseClient, userId: string): Promise<unknown> {
+  const { data, error } = await admin.rpc("usage_summary", { p_user: userId });
+  if (error) throw error;
+  return data;
+}
+
+export async function reserveSeparation(admin: SupabaseClient, userId: string, jobs: ReserveJob[]) {
+  const { data, error } = await admin.rpc("reserve_separation", { p_user: userId, p_jobs: jobs });
+  if (error) throw error;
+  return data as { error?: string; granted?: string[]; denied?: string[]; usage?: unknown };
+}
+
+export async function finishSeparation(admin: SupabaseClient, userId: string, jobRef: string, outcome: Outcome) {
+  const { data, error } = await admin.rpc("finish_separation", {
+    p_user: userId,
+    p_job_ref: jobRef,
+    p_outcome: outcome,
+  });
+  if (error) throw error;
+  return data as { usage: unknown };
+}
+
+export async function readJson(req: Request): Promise<unknown> {
+  try {
+    return await req.json();
+  } catch {
+    return null;
+  }
 }

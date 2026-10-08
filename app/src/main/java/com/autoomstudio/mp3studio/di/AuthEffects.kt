@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.glance.appwidget.updateAll
 import com.autoomstudio.mp3studio.data.account.AuthState
+import com.autoomstudio.mp3studio.data.usage.UsageSyncWorker
 import com.autoomstudio.mp3studio.widget.MPlayWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +44,7 @@ class AuthEffects(private val context: Context, private val container: AppContai
 
     private suspend fun onSignedIn(userId: String) {
         scope.launch { container.entitlementsRepository.refresh(userId) }
+        UsageSyncWorker.schedule(context)
         container.separationController.onSignedIn()
     }
 

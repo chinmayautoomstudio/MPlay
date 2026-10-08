@@ -43,6 +43,24 @@ object EntitlementPolicy {
             effectivePlan(entitlements, now) != Plan.Free
     }
 
+    /**
+     * This week's separator usage to show a Free user (PRD US6); null on Trial or Pro, or before the first check.
+     * Once the cached week has ended, completed uses no longer count and the reset moves to the next Monday.
+     */
+    fun separatorUsage(entitlements: Entitlements?, now: Long): SeparatorUsage? {
+        if (effectivePlan(entitlements, now) != Plan.Free) return null
+        val usage = entitlements?.usage ?: return null
+        val serverNow = entitlements.serverTime + (now - entitlements.checkedAt).coerceAtLeast(0)
+        if (serverNow < usage.resetsAt) return usage
+        val weekMs = TimeUnit.DAYS.toMillis(7)
+        val weeksPassed = (serverNow - usage.resetsAt) / weekMs + 1
+        return usage.copy(
+            used = 0,
+            remaining = (usage.limit - usage.reserved).coerceAtLeast(0),
+            resetsAt = usage.resetsAt + weeksPassed * weekMs,
+        )
+    }
+
     /** Whole days left in a running trial, rounded up; null when the user isn't on Trial. */
     fun trialDaysLeft(entitlements: Entitlements?, now: Long): Int? {
         if (effectivePlan(entitlements, now) != Plan.Trial) return null

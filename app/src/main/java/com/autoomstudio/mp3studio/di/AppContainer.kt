@@ -24,6 +24,7 @@ import com.autoomstudio.mp3studio.data.library.SongRepository
 import com.autoomstudio.mp3studio.data.plan.DataStoreEntitlementsCache
 import com.autoomstudio.mp3studio.data.plan.DeviceId
 import com.autoomstudio.mp3studio.data.plan.EntitlementsRepository
+import com.autoomstudio.mp3studio.data.plan.Feature
 import com.autoomstudio.mp3studio.data.plan.SupabaseEntitlementsBackend
 import com.autoomstudio.mp3studio.data.playlist.MPlayDatabase
 import com.autoomstudio.mp3studio.data.playlist.PlaylistRepository
@@ -31,6 +32,12 @@ import com.autoomstudio.mp3studio.playback.PlaybackController
 import com.autoomstudio.mp3studio.data.settings.AppSettings
 import com.autoomstudio.mp3studio.data.stems.StemRepository
 import com.autoomstudio.mp3studio.data.tempo.SongTempoAnalyzer
+import com.autoomstudio.mp3studio.data.usage.SeparationUsageGate
+import com.autoomstudio.mp3studio.data.usage.SupabaseUsageBackend
+import com.autoomstudio.mp3studio.data.usage.UsageBackend
+import com.autoomstudio.mp3studio.data.usage.UsageReportStore
+import com.autoomstudio.mp3studio.data.usage.UsageReporter
+import com.autoomstudio.mp3studio.data.usage.UsageSyncWorker
 import com.autoomstudio.mp3studio.metronome.MetronomeController
 import com.autoomstudio.mp3studio.metronome.MusicTimeline
 import com.autoomstudio.mp3studio.playback.PlaybackSessionStore
@@ -83,7 +90,35 @@ class AppContainer(context: Context) {
     }
 
     val stemRepository: StemRepository by lazy {
-        StemRepository(appContext, database.stemDao(), FileFingerprinter(contentResolver), applicationScope)
+        StemRepository(
+            appContext,
+            database.stemDao(),
+            FileFingerprinter(contentResolver),
+            applicationScope,
+            onUsageReported = { UsageSyncWorker.schedule(appContext) },
+        )
+    }
+
+    private val usageBackend: UsageBackend by lazy { SupabaseUsageBackend(supabase) }
+
+    val usageGate: SeparationUsageGate by lazy {
+        SeparationUsageGate(
+            backend = usageBackend,
+            unlimitedOffline = { entitlementsRepository.canUse(Feature.UnlimitedSeparator, signedInUserId()) },
+            onUsage = { usage -> signedInUserId()?.let { entitlementsRepository.updateUsage(it, usage) } },
+        )
+    }
+
+    val usageReporter: UsageReporter by lazy {
+        UsageReporter(
+            store = object : UsageReportStore {
+                override suspend fun pending() = stemRepository.usageReports()
+                override suspend fun remove(jobRef: String) = stemRepository.deleteUsageReport(jobRef)
+            },
+            backend = usageBackend,
+            currentUserId = ::signedInUserId,
+            onUsage = entitlementsRepository::updateUsage,
+        )
     }
 
     val tempoAnalyzer: SongTempoAnalyzer by lazy {
@@ -99,7 +134,8 @@ class AppContainer(context: Context) {
             BundledModelProvider(appContext),
             appSettings,
             applicationScope,
-            isSignedIn = { authRepository.isSignedIn },
+            usageGate = usageGate,
+            signedInUserId = ::signedInUserId,
         )
     }
 

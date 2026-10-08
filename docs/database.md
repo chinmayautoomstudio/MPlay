@@ -1,12 +1,12 @@
 # Database
 
-> Last updated: 2026-10-06, schema version 6
+> Last updated: 2026-10-08, schema version 7
 
 ## Overview
 
 - Class: [`data/playlist/MPlayDatabase.kt`](../app/src/main/java/com/autoomstudio/mp3studio/data/playlist/MPlayDatabase.kt)
 - File: `mplay.db`, built with `Room.databaseBuilder(...)`. No destructive fallback and no manual migrations.
-- `exportSchema = true`. Schemas: [`app/schemas/com.autoomstudio.mp3studio.data.playlist.MPlayDatabase/`](../app/schemas/com.autoomstudio.mp3studio.data.playlist.MPlayDatabase/) `1.json` to `6.json`.
+- `exportSchema = true`. Schemas: [`app/schemas/com.autoomstudio.mp3studio.data.playlist.MPlayDatabase/`](../app/schemas/com.autoomstudio.mp3studio.data.playlist.MPlayDatabase/) `1.json` to `7.json`.
 - DAOs: `playlistDao()`, `duplicateDao()`, `stemDao()`, `tempoDao()`.
 
 Library songs are not stored here. They are read live from MediaStore, and every table refers to songs by MediaStore `_ID` without a foreign key.
@@ -21,8 +21,9 @@ Library songs are not stored here. They are read live from MediaStore, and every
 | 4 | `e13b2f7` (2026-10-06) | `AutoMigration(3, 4)` | `song_tempos` |
 | 5 | (2026-10-06) | `AutoMigration(4, 5)` | none; `song_tempos` gains `beatsPerBar`, `beatUnit`, `meterConfidence`, `meterBpm` |
 | 6 | (2026-10-06) | `AutoMigration(5, 6)` | none; `song_tempos` gains `downbeatMs`, `beatPeriodMs` |
+| 7 | (2026-10-08) | `AutoMigration(6, 7)` | `usage_reports`; `separation_jobs` gains `usageRef`, `usageUserId` |
 
-Every migration so far only added tables or nullable columns; no existing column has been changed. The 4-to-5 and 5-to-6 migrations are `ALTER TABLE song_tempos ADD COLUMN ... DEFAULT NULL`, so existing rows are kept.
+Every migration so far only added tables or nullable columns; no existing column has been changed. The 4-to-5, 5-to-6 and 6-to-7 column additions are `ALTER TABLE ... ADD COLUMN ... DEFAULT NULL`, so existing rows are kept.
 
 ## Tables
 
@@ -89,8 +90,21 @@ Primary key `(playlistId, songId)`; index on `playlistId`. A song can appear onl
 | `error` | TEXT, nullable | `SourceMissing`, `UnsupportedFormat`, `CorruptFile`, `OutOfMemory`, `LowStorage`, `ModelUnavailable`, `ModelFailed`, `Unknown` |
 | `enqueuedAt` | INTEGER | |
 | `finishedAt` | INTEGER, nullable | |
+| `usageRef` | TEXT, nullable (v7) | UUID `jobRef` of the job's AI Vocal Separator reservation; null for jobs queued before v7 |
+| `usageUserId` | TEXT, nullable (v7) | Supabase user that made the reservation |
 
 Indexes on `songId` and `state`.
+
+### `usage_reports` (v7), `UsageReportEntity`
+
+Job outcomes waiting to be sent to `finish-separation` ([vocal separation](features/vocal-separation.md#weekly-usage-limit-prd-us1-us9-pl5)). Kept apart from `separation_jobs` so clearing finished jobs doesn't lose them.
+
+| Column | Type | Notes |
+|---|---|---|
+| `jobRef` | TEXT | Primary key; the job's `usageRef` |
+| `userId` | TEXT | Reports for another signed-in account are dropped |
+| `outcome` | TEXT | `completed` or `released` |
+| `createdAt` | INTEGER | Epoch ms |
 
 ### `song_tempos` (v4, meter columns v5, grid columns v6), `SongTempoEntity`
 
@@ -115,7 +129,7 @@ Read and written through `TempoCache` ([`data/tempo/TempoCache.kt`](../app/src/m
 
 - **`PlaylistDao`**: observe playlists (by `name COLLATE NOCASE, id`) and entries (by `playlistId, position`); `insert`, `rename`, `delete` (cascades), `removeSongsEverywhere`; transactions `addSongs` (append, skip existing, returns count), `removeSongs`, `reorder` (uses `PlaylistQueries.applyVisibleOrder`).
 - **`DuplicateDao`**: observe/upsert/delete fingerprints; observe overrides; transaction `keep(songId, groupIds)`; `restore`; `hideAgain`.
-- **`StemDao`**: stem set CRUD; job queue queries (`nextQueued`, `queuedCount`, `activeSongIds`, `observeJobs`, `observeJobState`); guarded state transitions (`markRunning`, `updateProgress`, `requeue`, `requeueAllRunning`, `setQueuedPauseReason`, `markDone`, `markFailed`, `failAllActive`, `cancel`, `retry`, `clearFinished`, `removeFinished`); transaction `complete(jobId, stemSet, now)`.
+- **`StemDao`**: stem set CRUD; job queue queries (`nextQueued`, `queuedCount`, `activeSongIds`, `observeJobs`, `observeJobState`); guarded state transitions (`markRunning`, `updateProgress`, `requeue`, `requeueAllRunning`, `setQueuedPauseReason`, `markDone`, `retry` with a new `usageRef`, `clearFinished`, `removeFinished`); transactions that also write `usage_reports`: `complete(jobId, stemSet, now)` (`completed`), `fail`, `cancel` and `failActive` (`released`); `usageReports()`, `deleteUsageReport(jobRef)`.
 - **`TempoDao`**: `tempo(songId)`, `upsert(entry)`, `delete(songId)`.
 
 ## Changing the schema
