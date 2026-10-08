@@ -14,7 +14,7 @@ enum class UnsupportedReason {
     Storage,
 }
 
-/** Eligibility thresholds from the PRD; to be confirmed by the feasibility spike. */
+/** Eligibility thresholds from the PRD. */
 object DeviceEligibility {
     /** Phones sold with 6 GB report roughly 5.3 to 5.7 GiB of total memory. */
     const val MIN_TOTAL_RAM_BYTES = 5L * 1024 * 1024 * 1024

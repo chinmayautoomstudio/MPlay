@@ -10,8 +10,6 @@ Defined in [`settings.gradle.kts`](../settings.gradle.kts).
 |---|---|---|
 | `:app` | Application `com.autoomstudio.mp3studio` | The player. Everything user-facing. |
 | `:separation` | Android library | DSP (STFT, FFT, resampling) and the ONNX Runtime HT-Demucs pipeline. Has its own unit tests. Only `:app` uses it. |
-| `:spike` | Application `com.autoomstudio.mp3studio.ai.spike` | Throwaway feasibility app for benchmarking separation on devices. Not shipped. |
-
 Other top-level folders: `supabase/` (backend config, migrations and RLS tests, see [backend](backend.md)), `models/` (the `htdemucs.onnx` model, gitignored, plus its committed `.sha256`), `tools/` (Python scripts to export the model and generate DSP test references), `logos/`, `mockup-design/`.
 
 ## Build
@@ -152,3 +150,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-06 | - | App-scoped `PlaybackController` as the metronome's `MusicTimeline` (`mainScope` in `AppContainer`). |
 | 2026-10-07 | - | Accounts (M1): `INTERNET`/`ACCESS_NETWORK_STATE`, `CheckAllowedPermissions` and `CheckBackendConfig` tasks, Supabase and account entries in `AppContainer`, `AuthEffects`, sign-in gate and `SignedInViewModelScope` in `MainActivity`, `SignedInMediaButtonReceiver`, `supabase/` folder. |
 | 2026-10-08 | - | Package rename: `applicationId`/`namespace` `com.autoomstudio.mp3studio`, `:separation` `com.autoomstudio.mp3studio.separation`, `:spike` `com.autoomstudio.mp3studio.spike` (app ID `com.autoomstudio.mp3studio.ai.spike`); sources moved to `com/autoomstudio/mp3studio/`; Room schema folder renamed. Class names (`MPlayApp`, `MPlayDatabase`) and `mplay.db` unchanged. |
+| 2026-10-08 | - | Removed the `:spike` feasibility app module (not shipped, no dependents). |

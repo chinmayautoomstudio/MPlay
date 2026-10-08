@@ -27,7 +27,7 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 - `PlaybackController` implements `MusicTimeline` (song ID, playing, seeks, position snapshot with speed) and takes `restoresSession`; `AppContainer` gives the metronome its own instance. ([playback](features/playback.md), [architecture](architecture.md))
 
 ### Changed
-- Package renamed to `com.autoomstudio.mp3studio` everywhere: `applicationId` and `namespace` of `:app`, `:separation` (`com.autoomstudio.mp3studio.separation`) and `:spike` (app ID `com.autoomstudio.mp3studio.ai.spike`), all Kotlin packages, the Room schema folder, and internal intent and command strings (`com.autoomstudio.mp3studio.command.*`). It installs as a new app, so data from an old `com.autoomstudio.mplay` install doesn't carry over. Google Android OAuth clients must use the new package. ([architecture](architecture.md), [accounts](features/accounts.md))
+- Package renamed to `com.autoomstudio.mp3studio` everywhere: `applicationId` and `namespace` of `:app` and `:separation` (`com.autoomstudio.mp3studio.separation`), all Kotlin packages, the Room schema folder, and internal intent and command strings (`com.autoomstudio.mp3studio.command.*`). It installs as a new app, so data from an old `com.autoomstudio.mplay` install doesn't carry over. Google Android OAuth clients must use the new package. ([architecture](architecture.md), [accounts](features/accounts.md))
 - Renamed MPlay to MP3 Studio: all strings, the wordmark ("MP3" in neon plus " Studio"), and save folders `Music/MP3 Studio Clips`, `Music/MP3 Studio Recordings`, `Music/MP3 Studio Stems`. Files in the old `MPlay Clips` and `MPlay Recordings` folders stay exempt from the 30 s minimum (`SavedFolders`). Package name and launcher icon unchanged. ([library](features/library.md), [clips](features/clips-and-ringtones.md), [sing-along](features/sing-along.md), [vocal separation](features/vocal-separation.md))
 - The app now uses the network for accounts: `INTERNET` and `ACCESS_NETWORK_STATE`, cleartext blocked, `CheckNoInternetPermission` replaced by the `CheckAllowedPermissions` allow-list, new `CheckBackendConfig`, `BuildConfig` Supabase and Google settings from `local.properties`. `USE_BIOMETRIC`/`USE_FINGERPRINT` from `androidx.credentials` are removed. ([architecture](architecture.md))
 - Signed-in screens get their ViewModels from `SignedInViewModelScope`, cleared on sign-out. ([architecture](architecture.md))
@@ -43,6 +43,9 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 
 ### Fixed
 - Google sign-in no longer fails silently when Google rejects the chosen account (`[16] Account reauth failed`, reported as a cancellation): it shows "Google couldn't confirm this account on this phone" (`AuthError.AccountUnavailable`) and logs the exception. ([accounts](features/accounts.md))
+
+### Removed
+- `:spike` module (the separation feasibility/benchmark app; never shipped, nothing depended on it) and the `song` mode of `tools/make_reference.py` that only fed it. ([architecture](architecture.md))
 
 ### Database
 - Schema v4: new table `song_tempos`, `AutoMigration(3, 4)`. (`e13b2f7`, [database](database.md))

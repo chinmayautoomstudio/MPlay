@@ -133,7 +133,7 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 - Eligibility (including free storage) is computed once per app start.
 - `NeedsApp` doesn't reschedule until the app opens again.
 - No model download yet; the missing-model path only appears in debug builds without the model.
-- CPU only (XNNPACK/NNAPI only in `:spike`).
+- CPU only (no XNNPACK/NNAPI execution provider).
 - Exporting `Original` exports the instrumental.
 - `files/stems` and `files/models` aren't excluded from backup rules.
 
