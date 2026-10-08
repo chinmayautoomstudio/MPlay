@@ -57,7 +57,7 @@ companion object {
 }
 ```
 
-ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `SeparationViewModel`, `SettingsViewModel`, `MetronomeViewModel`, `SingAlongViewModel`, `TrimEditorViewModel`, `AuthViewModel`, `AccountViewModel`, `AdminViewModel`, `PlansViewModel` (shared by the main screen, Now Playing, the metronome sheet, the Account card and the Plans screen). State is exposed as `StateFlow` and collected with `collectAsStateWithLifecycle`; one-off events (snackbar messages) are `Flow`s.
+ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `SeparationViewModel`, `SettingsViewModel`, `MetronomeViewModel`, `SingAlongViewModel`, `TrimEditorViewModel`, `AuthViewModel`, `AccountViewModel`, `AdminViewModel`, `PlansViewModel` (shared by the main screen, Now Playing, the metronome sheet, the Profile screen and the Plans screen). State is exposed as `StateFlow` and collected with `collectAsStateWithLifecycle`; one-off events (snackbar messages) are `Flow`s.
 
 `SettingsViewModel` and `AuthViewModel` belong to `MainActivity`. Everything under `MPlayRoot` gets its ViewModels from `SignedInViewModelScope` (an activity ViewModel holding a separate `ViewModelStore` per user), provided as `LocalViewModelStoreOwner`. The store is cleared on sign-out, which releases the playback `MediaController` and all per-user state, and survives rotation.
 
@@ -75,8 +75,8 @@ ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `Sepa
 
 No Navigation-Compose. [`ui/main/MainScreen.kt`](../app/src/main/java/com/autoomstudio/mp3studio/ui/main/MainScreen.kt) holds state in `rememberSaveable` and swaps screens with `AnimatedContent` + `fadeThrough()`.
 
-- Bottom bar (`Destination`): `Library`, `Playlists`, `Metronome`, `Settings`.
-- Settings sub-pages (`SettingsPage`): `Main`, `Duplicates`, `Separation` (queue), `About`, `Licenses`, `Plans`, `Admin` (shown to admins; it keeps its own page stack in `AdminViewModel`). `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`.
+- Bottom bar (`Destination`): `Library`, `Playlists`, `Metronome`, `Profile` (its icon is the account photo, from `AccountViewModel`).
+- Profile sub-pages (`ProfilePage`): `Main` (the Profile screen; `MPlayTopBar` is hidden here), `EditProfile`, `Appearance`, `Library`, `Duplicates`, `Separation` (settings), `SeparationQueue`, `Playback`, `About`, `Licenses`, `Plans`, `Admin` (shown to admins; it keeps its own page stack in `AdminViewModel`). See [settings](features/settings-and-about.md). `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`.
 - The trial banner (last 3 days of the trial) sits above the screen content inside the scaffold.
 - Library back stack: route strings `album:<id>` / `artist:<name>`.
 - `ExpandablePlayer` is a draggable sheet from the mini player to Now Playing.
@@ -163,3 +163,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-08 | - | Usage limit (M3): `usageGate`, `usageReporter` and `UsageSyncWorker`; `SeparationController` takes `usageGate` and `signedInUserId` instead of `isSignedIn`. |
 | 2026-10-08 | - | Admin (M5): `adminBackend`, `AdminViewModel`, `SettingsPage.Admin`, `admin` Edge Function. |
 | 2026-10-08 | - | Hardening (M6): `AuthRepository` takes an `AccountDeletionBackend`; `delete-account` Edge Function; recorded that old MPlay installs are not migrated. |
+| 2026-10-08 | - | `Destination.Settings` became `Destination.Profile` and `SettingsPage` became `ProfilePage` (new Profile screen and settings sub-pages). |

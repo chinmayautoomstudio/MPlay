@@ -23,10 +23,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.LibraryMusic
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -118,15 +118,20 @@ import com.autoomstudio.mp3studio.ui.separation.SeparationNoticeDialog
 import com.autoomstudio.mp3studio.ui.singalong.SingAlongOverlay
 import com.autoomstudio.mp3studio.ui.separation.SeparationProgressPill
 import com.autoomstudio.mp3studio.ui.separation.SeparationScreen
-import com.autoomstudio.mp3studio.ui.separation.SeparationSettingsSection
 import com.autoomstudio.mp3studio.ui.separation.SeparationUiState
 import com.autoomstudio.mp3studio.ui.separation.SeparationViewModel
 import com.autoomstudio.mp3studio.ui.separation.SeparatorUi
 import com.autoomstudio.mp3studio.ui.separation.separationMessageText
 import com.autoomstudio.mp3studio.ui.settings.AboutScreen
-import com.autoomstudio.mp3studio.ui.settings.AccountSection
+import com.autoomstudio.mp3studio.ui.settings.AccountViewModel
+import com.autoomstudio.mp3studio.ui.settings.AppearanceSettingsScreen
+import com.autoomstudio.mp3studio.ui.settings.EditProfileScreen
+import com.autoomstudio.mp3studio.ui.settings.LibrarySettingsScreen
 import com.autoomstudio.mp3studio.ui.settings.LicensesScreen
-import com.autoomstudio.mp3studio.ui.settings.SettingsScreen
+import com.autoomstudio.mp3studio.ui.settings.PlaybackSettingsScreen
+import com.autoomstudio.mp3studio.ui.settings.ProfileScreen
+import com.autoomstudio.mp3studio.ui.settings.ProfileTabIcon
+import com.autoomstudio.mp3studio.ui.settings.SeparationSettingsScreen
 import com.autoomstudio.mp3studio.ui.trim.TrimEditorActivity
 import com.autoomstudio.mp3studio.ui.trim.TrimMode
 import kotlinx.coroutines.flow.Flow
@@ -145,7 +150,7 @@ private enum class Destination(
         Icons.AutoMirrored.Outlined.QueueMusic,
     ),
     Metronome(R.string.nav_metronome, MetronomeIcons.Default, MetronomeIcons.Default),
-    Settings(R.string.nav_settings, Icons.Filled.Settings, Icons.Outlined.Settings),
+    Profile(R.string.nav_profile, Icons.Filled.Person, Icons.Outlined.Person),
 }
 
 @Composable
@@ -186,18 +191,25 @@ fun MainScreen(
     onOpenMetronomeHandled: () -> Unit,
     modifier: Modifier = Modifier,
     plansViewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
+    accountViewModel: AccountViewModel = viewModel(factory = AccountViewModel.Factory),
 ) {
     var destination by rememberSaveable { mutableStateOf(Destination.Library) }
+    var previousDestination by rememberSaveable { mutableStateOf(Destination.Library) }
+    val account by accountViewModel.account.collectAsStateWithLifecycle()
     val allSongs = (libraryState as? LibraryUiState.Content)?.allSongs.orEmpty()
     val duplicates = (libraryState as? LibraryUiState.Content)?.duplicates ?: DuplicateIndex.EMPTY
     // Hidden duplicate copies can still be deleted from the review screen.
     val deletableSongs = remember(allSongs, duplicates) {
         (allSongs + duplicates.groups.flatMap { it.songs }).distinctBy { it.id }
     }
-    var settingsPage by rememberSaveable { mutableStateOf(SettingsPage.Main) }
+    var profilePage by rememberSaveable { mutableStateOf(ProfilePage.Main) }
+    val openProfile = {
+        if (destination != Destination.Profile) previousDestination = destination
+        destination = Destination.Profile
+    }
     val openSeparation = {
-        destination = Destination.Settings
-        settingsPage = SettingsPage.Separation
+        openProfile()
+        profilePage = ProfilePage.SeparationQueue
     }
     LaunchedEffect(openSeparationRequest) {
         if (openSeparationRequest) {
@@ -214,8 +226,8 @@ fun MainScreen(
         }
     }
     val openPlans = {
-        destination = Destination.Settings
-        settingsPage = SettingsPage.Plans
+        openProfile()
+        profilePage = ProfilePage.Plans
     }
     val openPlansRequest by plansViewModel.openPlansRequest.collectAsStateWithLifecycle()
     LaunchedEffect(openPlansRequest) {
@@ -414,7 +426,7 @@ fun MainScreen(
                             }
                         },
                     )
-                } else {
+                } else if (destination != Destination.Profile || profilePage != ProfilePage.Main) {
                     MPlayTopBar(
                         showActions = destination == Destination.Library,
                         searchActive = searchActive && destination == Destination.Library,
@@ -451,9 +463,13 @@ fun MainScreen(
                     }
                     MPlayNavigationBar(
                         selected = destination,
+                        avatarUrl = account?.avatarUrl,
                         onSelect = {
                             if (it != Destination.Library && searchActive) closeSearch()
-                            if (it != destination) selection.clear()
+                            if (it != destination) {
+                                selection.clear()
+                                previousDestination = destination
+                            }
                             destination = it
                         },
                         modifier = Modifier.graphicsLayer {
@@ -519,86 +535,115 @@ fun MainScreen(
 
                             Destination.Metronome -> MetronomeScreen(modifier = contentModifier)
 
-                            Destination.Settings -> AnimatedContent(
-                                targetState = settingsPage,
+                            Destination.Profile -> AnimatedContent(
+                                targetState = profilePage,
                                 transitionSpec = { fadeThrough() },
-                                label = "settingsPage",
+                                label = "profilePage",
                             ) { page ->
-                                val pageBackEnabled = screenBackEnabled && settingsPage == page
+                                val pageBackEnabled = screenBackEnabled && profilePage == page
+                                val backToMain = { profilePage = ProfilePage.Main }
                                 when (page) {
-                                    SettingsPage.Duplicates -> ReviewDuplicatesScreen(
-                                        duplicates = duplicates,
-                                        actions = duplicateActions,
-                                        onDeleteHidden = { songs -> deleteSongIds = songs.map { it.id }.toLongArray() },
-                                        onBack = { settingsPage = SettingsPage.Main },
+                                    ProfilePage.Main -> ProfileScreen(
+                                        themeMode = themeSettings.mode,
+                                        onBack = {
+                                            destination = previousDestination.takeUnless { it == Destination.Profile }
+                                                ?: Destination.Library
+                                        },
+                                        onOpenEdit = { profilePage = ProfilePage.EditProfile },
+                                        onOpenPlans = { profilePage = ProfilePage.Plans },
+                                        onOpenAdmin = { profilePage = ProfilePage.Admin },
+                                        onOpenAppearance = { profilePage = ProfilePage.Appearance },
+                                        onOpenLibrary = { profilePage = ProfilePage.Library },
+                                        onOpenSeparation = { profilePage = ProfilePage.Separation },
+                                        onOpenPlayback = { profilePage = ProfilePage.Playback },
+                                        onOpenAbout = { profilePage = ProfilePage.About },
+                                        modifier = contentModifier,
+                                        accountViewModel = accountViewModel,
+                                        plansViewModel = plansViewModel,
+                                    )
+                                    ProfilePage.EditProfile -> EditProfileScreen(
+                                        onBack = backToMain,
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                        viewModel = accountViewModel,
+                                    )
+                                    ProfilePage.Appearance -> AppearanceSettingsScreen(
+                                        theme = themeSettings,
+                                        onThemeModeChange = onThemeModeChange,
+                                        onDynamicColorChange = onDynamicColorChange,
+                                        onBack = backToMain,
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
                                     )
-                                    SettingsPage.Separation -> SeparationScreen(
+                                    ProfilePage.Library -> LibrarySettingsScreen(
+                                        hideDuplicates = duplicateActions.hideDuplicates,
+                                        onHideDuplicatesChange = duplicateActions.onHideDuplicatesChange,
+                                        duplicateGroupCount = duplicates.groups.size,
+                                        onReviewDuplicates = { profilePage = ProfilePage.Duplicates },
+                                        onBack = backToMain,
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                    )
+                                    ProfilePage.Duplicates -> ReviewDuplicatesScreen(
+                                        duplicates = duplicates,
+                                        actions = duplicateActions,
+                                        onDeleteHidden = { songs -> deleteSongIds = songs.map { it.id }.toLongArray() },
+                                        onBack = { profilePage = ProfilePage.Library },
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                    )
+                                    ProfilePage.Separation -> SeparationSettingsScreen(
                                         state = separationState,
                                         viewModel = separationViewModel,
-                                        onBack = { settingsPage = SettingsPage.Main },
+                                        onOpenQueue = { profilePage = ProfilePage.SeparationQueue },
+                                        onBack = backToMain,
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
                                         usage = plan.usage,
                                     )
-                                    SettingsPage.About -> AboutScreen(
-                                        onBack = { settingsPage = SettingsPage.Main },
-                                        onOpenLicenses = { settingsPage = SettingsPage.Licenses },
+                                    ProfilePage.SeparationQueue -> SeparationScreen(
+                                        state = separationState,
+                                        viewModel = separationViewModel,
+                                        onBack = { profilePage = ProfilePage.Separation },
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                        usage = plan.usage,
+                                    )
+                                    ProfilePage.Playback -> PlaybackSettingsScreen(
+                                        onBack = backToMain,
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                    )
+                                    ProfilePage.About -> AboutScreen(
+                                        onBack = backToMain,
+                                        onOpenLicenses = { profilePage = ProfilePage.Licenses },
                                         onMessage = showMessage,
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
                                     )
-                                    SettingsPage.Licenses -> LicensesScreen(
-                                        onBack = { settingsPage = SettingsPage.About },
+                                    ProfilePage.Licenses -> LicensesScreen(
+                                        onBack = { profilePage = ProfilePage.About },
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
                                     )
-                                    SettingsPage.Plans -> PlansScreen(
-                                        onBack = { settingsPage = SettingsPage.Main },
+                                    ProfilePage.Plans -> PlansScreen(
+                                        onBack = backToMain,
                                         onMessage = showMessage,
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
                                     )
-                                    SettingsPage.Admin -> AdminScreen(
-                                        onBack = { settingsPage = SettingsPage.Main },
+                                    ProfilePage.Admin -> AdminScreen(
+                                        onBack = backToMain,
                                         onMessage = showMessage,
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
-                                    )
-                                    SettingsPage.Main -> SettingsScreen(
-                                        theme = themeSettings,
-                                        onThemeModeChange = onThemeModeChange,
-                                        onDynamicColorChange = onDynamicColorChange,
-                                        hideDuplicates = duplicateActions.hideDuplicates,
-                                        onHideDuplicatesChange = duplicateActions.onHideDuplicatesChange,
-                                        duplicateGroupCount = duplicates.groups.size,
-                                        onReviewDuplicates = { settingsPage = SettingsPage.Duplicates },
-                                        onOpenAbout = { settingsPage = SettingsPage.About },
-                                        modifier = contentModifier,
-                                        accountSection = { header ->
-                                            AccountSection(
-                                                sectionHeader = header,
-                                                onOpenPlans = openPlans,
-                                                onOpenAdmin = { settingsPage = SettingsPage.Admin },
-                                            )
-                                        },
-                                        separationSection = { header ->
-                                            SeparationSettingsSection(
-                                                state = separationState,
-                                                viewModel = separationViewModel,
-                                                onOpenQueue = { settingsPage = SettingsPage.Separation },
-                                                sectionHeader = header,
-                                                usage = plan.usage,
-                                            )
-                                        },
                                     )
                                 }
                             }
                         }
                     }
                 }
-                val onQueueScreen = destination == Destination.Settings && settingsPage == SettingsPage.Separation
+                val onQueueScreen = destination == Destination.Profile && profilePage == ProfilePage.SeparationQueue
                 SeparationProgressPill(
                     job = separationState.runningJob.takeUnless { onQueueScreen },
                     onClick = openSeparation,
@@ -729,7 +774,20 @@ fun MainScreen(
     SingAlongOverlay()
 }
 
-private enum class SettingsPage { Main, Duplicates, Separation, About, Licenses, Plans, Admin }
+private enum class ProfilePage {
+    Main,
+    EditProfile,
+    Appearance,
+    Library,
+    Duplicates,
+    Separation,
+    SeparationQueue,
+    Playback,
+    About,
+    Licenses,
+    Plans,
+    Admin,
+}
 
 /** Last days of the free trial (PRD TR6); tapping it opens Plans. */
 @Composable
@@ -762,6 +820,7 @@ private fun TrialBanner(daysLeft: Int, onOpenPlans: () -> Unit, onDismiss: () ->
 @Composable
 private fun MPlayNavigationBar(
     selected: Destination,
+    avatarUrl: String?,
     onSelect: (Destination) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -772,10 +831,14 @@ private fun MPlayNavigationBar(
                 selected = isSelected,
                 onClick = { onSelect(item) },
                 icon = {
-                    Icon(
-                        imageVector = if (isSelected) item.selectedIcon else item.icon,
-                        contentDescription = null,
-                    )
+                    if (item == Destination.Profile) {
+                        ProfileTabIcon(avatarUrl = avatarUrl, selected = isSelected)
+                    } else {
+                        Icon(
+                            imageVector = if (isSelected) item.selectedIcon else item.icon,
+                            contentDescription = null,
+                        )
+                    }
                 },
                 label = { Text(stringResource(item.label)) },
                 colors = NavigationBarItemDefaults.colors(

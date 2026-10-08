@@ -1,10 +1,10 @@
 # Settings, About, theme and shared components
 
-> Status: Shipped | Added in: 1.0 (About in 3.1) | Last updated: 2026-10-08
+> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-08
 
 ## Summary
 
-The Settings tab starts with the Account card (Google photo, name, email, Edit name, Log out; see [accounts](accounts.md)), then covers appearance (System/Light/Dark, dynamic colour on Android 12+), library (hide and review duplicates), vocal separation, background playback (battery optimisation) and About. About MP3 Studio shows the version, Autoom Studio links, a privacy note, the privacy policy and terms links, and open-source licenses. The UI uses the "Neon Midnight" purple palette, or wallpaper colours.
+The last bottom tab is Profile, and its icon is the account photo. The Profile screen shows the photo, name, email and an Edit button ([accounts](accounts.md)), a subscription card, an Admin card (admins only), then cards for Appearance (System/Light/Dark, dynamic colour on Android 12+), Library (hide and review duplicates), Vocal Separation, Background Playback (battery optimisation) and About, and finally Log out. Each card opens its own page. About MP3 Studio shows the version, Autoom Studio links, a privacy note, the privacy policy and terms links, and open-source licenses. The UI uses the "Neon Midnight" purple palette, or wallpaper colours.
 
 ## Key files
 
@@ -14,8 +14,9 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 |---|---|
 | `data/settings/AppSettings.kt` | DataStore `app_settings`; `ThemeMode`, `ThemeSettings`, `SeparationSettings`; all app-wide keys. |
 | `ui/settings/SettingsViewModel.kt` | `theme: StateFlow<ThemeSettings?>` (null until loaded), theme setters, `claimNotificationPrompt()`. |
-| `ui/settings/SettingsScreen.kt` | Settings list, account and separation section slots, battery item, About entry. |
-| `ui/settings/AccountSection.kt`, `AccountViewModel.kt` | Account card with the Plan row; documented in [accounts](accounts.md) and [plans](plans.md). |
+| `ui/settings/ProfileScreen.kt` | Profile tab: header, identity row, subscription card, category cards, Log out; `ProfileTabIcon` for the bottom bar. |
+| `ui/settings/SettingsPages.kt` | Sub-pages `AppearanceSettingsScreen`, `LibrarySettingsScreen`, `SeparationSettingsScreen`, `PlaybackSettingsScreen`, and the shared `SubPageHeader`. |
+| `ui/settings/EditProfileScreen.kt`, `AccountViewModel.kt` | Edit page (photo, name, Delete account), shared `Avatar` and `LogOutDialog`; documented in [accounts](accounts.md). |
 | `ui/settings/AboutScreen.kt` | Logos, version/build, website, email, privacy note, privacy policy, terms, licenses. |
 | `ui/settings/LicensesScreen.kt` | Hand-maintained license list and detail view. |
 | `ui/theme/Color.kt`, `Theme.kt`, `Type.kt`, `Motion.kt` | Palette, `MPlayAppTheme`, typography, motion durations and transitions. |
@@ -23,6 +24,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 ## How it works
 
+- `MainScreen` keeps `ProfilePage` (`Main`, `EditProfile`, `Appearance`, `Library`, `Duplicates`, `Separation`, `SeparationQueue`, `Playback`, `About`, `Licenses`, `Plans`, `Admin`). Sub-pages go back to `Main`, except Duplicates (back to Library), the separation queue (back to Separation) and Licenses (back to About). `MPlayTopBar` is hidden on `Main`, because the Profile screen draws its own back button and "Profile" title. That back button returns to the tab that was open before Profile.
+- The subscription card shows "MP3 Studio" plus the plan name (Free, Trial or Pro). Below that it shows the days left in the trial, or the days until the Pro subscription expires or renews; Free users see an upgrade hint. Tapping it opens Plans. The Profile cards use theme colours, so they follow light and dark mode.
 - `MPlayAppTheme` decides dark/light from the setting (or system), or dark when `forceDark` is set (`MainActivity` sets it while signed out, so the sign-in screen is always dark), runs edge-to-edge with matching bar icons, and uses dynamic colour on API 31+ when enabled, otherwise `NeonDarkColors` / `NeonLightColors`.
 - `MainActivity` keeps the splash screen until the theme has loaded.
 - The battery item re-checks `isIgnoringBatteryOptimizations` on resume and opens system settings.
@@ -88,3 +91,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-07 | - | Renamed to MP3 Studio (strings, wordmark). Account card at the top of Settings, Terms link and new privacy text in About, DataStore `auth_session`. |
 | 2026-10-08 | - | Plan row on the Account card, Settings > Plans page, DataStore `entitlements` ([plans](plans.md)). |
 | 2026-10-08 | - | `MPlayAppTheme(forceDark)` for the always-dark sign-in screen ([accounts](accounts.md)). |
+| 2026-10-08 | - | Settings tab replaced by the Profile tab (photo as the tab icon), Profile screen with category cards and separate settings pages; `SettingsScreen.kt` removed. |

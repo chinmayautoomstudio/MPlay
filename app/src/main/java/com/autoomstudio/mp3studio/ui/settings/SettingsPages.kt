@@ -7,9 +7,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -36,33 +37,56 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import com.autoomstudio.mp3studio.BuildConfig
 import com.autoomstudio.mp3studio.R
+import com.autoomstudio.mp3studio.data.plan.SeparatorUsage
 import com.autoomstudio.mp3studio.data.settings.ThemeMode
 import com.autoomstudio.mp3studio.data.settings.ThemeSettings
+import com.autoomstudio.mp3studio.ui.library.DetailBackButton
+import com.autoomstudio.mp3studio.ui.separation.SeparationSettingsSection
+import com.autoomstudio.mp3studio.ui.separation.SeparationUiState
+import com.autoomstudio.mp3studio.ui.separation.SeparationViewModel
+
+/** Back arrow and title at the top of a Profile sub-page. */
+@Composable
+internal fun SubPageHeader(title: String, onBack: () -> Unit) {
+    DetailBackButton(onBack = onBack)
+    Text(
+        text = title,
+        style = MaterialTheme.typography.headlineSmall,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+    )
+}
 
 @Composable
-fun SettingsScreen(
+private fun SubPage(
+    title: String,
+    onBack: () -> Unit,
+    backEnabled: Boolean,
+    modifier: Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    BackHandler(enabled = backEnabled, onBack = onBack)
+    Column(
+        modifier
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 16.dp),
+    ) {
+        SubPageHeader(title, onBack)
+        content()
+    }
+}
+
+@Composable
+fun AppearanceSettingsScreen(
     theme: ThemeSettings,
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
-    hideDuplicates: Boolean,
-    onHideDuplicatesChange: (Boolean) -> Unit,
-    duplicateGroupCount: Int,
-    onReviewDuplicates: () -> Unit,
-    onOpenAbout: () -> Unit,
+    onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    accountSection: @Composable (sectionHeader: @Composable (String) -> Unit) -> Unit = {},
-    separationSection: @Composable (sectionHeader: @Composable (String) -> Unit) -> Unit = {},
+    backEnabled: Boolean = true,
 ) {
-    Column(
-        modifier = modifier
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 8.dp),
-    ) {
-        accountSection { SectionHeader(it) }
-
-        SectionHeader(stringResource(R.string.settings_section_appearance))
+    SubPage(stringResource(R.string.profile_appearance), onBack, backEnabled, modifier) {
         ThemeModeRow(selected = theme.mode, onSelect = onThemeModeChange)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ListItem(
@@ -77,8 +101,20 @@ fun SettingsScreen(
                 ),
             )
         }
+    }
+}
 
-        SectionHeader(stringResource(R.string.settings_section_library))
+@Composable
+fun LibrarySettingsScreen(
+    hideDuplicates: Boolean,
+    onHideDuplicatesChange: (Boolean) -> Unit,
+    duplicateGroupCount: Int,
+    onReviewDuplicates: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    backEnabled: Boolean = true,
+) {
+    SubPage(stringResource(R.string.profile_library), onBack, backEnabled, modifier) {
         ListItem(
             headlineContent = { Text(stringResource(R.string.settings_hide_duplicates)) },
             supportingContent = { Text(stringResource(R.string.settings_hide_duplicates_summary)) },
@@ -108,35 +144,39 @@ fun SettingsScreen(
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
             modifier = Modifier.clickable(onClick = onReviewDuplicates),
         )
+    }
+}
 
-        separationSection { SectionHeader(it) }
-
-        SectionHeader(stringResource(R.string.settings_section_playback))
-        BatteryOptimizationItem()
-
-        SectionHeader(stringResource(R.string.settings_section_about))
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.settings_about_mplay)) },
-            supportingContent = {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.settings_version, BuildConfig.VERSION_NAME))
-                    Text(stringResource(R.string.settings_about_mplay_summary))
-                }
-            },
-            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-            modifier = Modifier.clickable(onClick = onOpenAbout),
+@Composable
+fun SeparationSettingsScreen(
+    state: SeparationUiState,
+    viewModel: SeparationViewModel,
+    onOpenQueue: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    backEnabled: Boolean = true,
+    usage: SeparatorUsage? = null,
+) {
+    SubPage(stringResource(R.string.profile_separation), onBack, backEnabled, modifier) {
+        SeparationSettingsSection(
+            state = state,
+            viewModel = viewModel,
+            onOpenQueue = onOpenQueue,
+            sectionHeader = {},
+            usage = usage,
         )
     }
 }
 
 @Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
-    )
+fun PlaybackSettingsScreen(
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    backEnabled: Boolean = true,
+) {
+    SubPage(stringResource(R.string.profile_playback), onBack, backEnabled, modifier) {
+        BatteryOptimizationItem()
+    }
 }
 
 @Composable

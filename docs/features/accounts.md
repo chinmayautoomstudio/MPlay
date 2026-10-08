@@ -4,7 +4,7 @@
 
 ## Summary
 
-MP3 Studio requires a Google account (PRD v3.2, AU1-AU11). On first launch, and after logging out, the app shows only the sign-in screen with "Continue with Google"; there is no guest mode and no email or password. While signed out, nothing plays: the widget, the media notification, Bluetooth and headset buttons do nothing. Settings shows the account (photo, name, email) with Edit name, Log out and Delete account.
+MP3 Studio requires a Google account (PRD v3.2, AU1-AU11). On first launch, and after logging out, the app shows only the sign-in screen with "Continue with Google"; there is no guest mode and no email or password. While signed out, nothing plays: the widget, the media notification, Bluetooth and headset buttons do nothing. The Profile tab, whose icon is the account photo, shows the photo, name and email. Its Edit page has the name field and Delete account, and Log out is at the bottom of the Profile screen.
 
 ## Key files
 
@@ -24,7 +24,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `ui/auth/SignInScreen.kt`, `AuthViewModel.kt` | Sign-in screen (logo, title, Google button, legal links), error snackbar, foreground account check. |
 | `ui/auth/SignInBackdrop.kt` | Sign-in background (`SignInBackdrop`), animated hero (`SignInHero`) and the screen's palette (`SignInColors`). |
 | `ui/auth/SignedInViewModelScope.kt` | `ViewModelStore` for signed-in screens, cleared on sign-out. |
-| `ui/settings/AccountSection.kt`, `AccountViewModel.kt` | Account card in Settings, edit-name, log-out and delete-account dialogs. |
+| `ui/settings/ProfileScreen.kt` | Profile header (photo, name, email, Edit), Admin card, Log out ([settings](settings-and-about.md)). |
+| `ui/settings/EditProfileScreen.kt`, `AccountViewModel.kt` | Edit page (photo, name field, Delete account), `Avatar`, log-out and delete-account dialogs. |
 | `di/AuthEffects.kt` | App-wide reactions to sign-in and sign-out (separation, metronome, sing-along, profile, widget). |
 | `playback/SignedInMediaButtonReceiver.kt` | Media button receiver that doesn't start playback while signed out. |
 
@@ -72,13 +73,13 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `Auth
 - `AuthEffects`, after a real sign-out (not on a cold start without a session): cancels a sing-along session, stops the metronome, clears the profile and the cached plan (`EntitlementsRepository.clear()`, PRD AU6) and calls `SeparationController.onSignedOut()`, which cancels the WorkManager job so the song returns to the queue ([vocal separation](vocal-separation.md)). On sign-in it refreshes the plan and calls `onSignedIn()` to resume the queue. It refreshes the widget on both.
 - `TrimEditorActivity` finishes itself on sign-out.
 
-### Account card, log out and delete
+### Profile, edit, log out and delete
 
-`AccountSection` (top of Settings) shows the photo (Coil, with a person icon as placeholder), name and email, and a Plan row that opens Settings > Plans ([plans](plans.md)). Admins also get an Admin row that opens the [Admin](admin.md) screens. The profile row wins; the Google account details cover it until it loads. Edit name updates `profiles.display_name` (max 80 characters, trimmed) and shows an error in the dialog if it fails. Log out asks for confirmation, then runs `AuthRepository.signOut()` on the application scope (local sign-out falls back to clearing the session if the server can't be reached).
+The Profile tab icon (`ProfileTabIcon`) and the `ProfileScreen` header show the photo (`Avatar`: Coil, with a person icon as placeholder), name and email. Below them, the subscription card opens Profile > Plans ([plans](plans.md)), and admins get an Admin card that opens the [Admin](admin.md) screens. The profile row wins; the Google account details cover it until it loads. Edit opens `EditProfileScreen`, where Save updates `profiles.display_name` (max 80 characters, trimmed) and shows an error under the field if it fails. Log out (the last card on the Profile screen) asks for confirmation, then runs `AuthRepository.signOut()` on the application scope (local sign-out falls back to clearing the session if the server can't be reached).
 
 ### Delete account (PRD AU9, PR4)
 
-Delete account (under Log out, in the error color) opens a dialog that says what is deleted (account, plan, trial, AI Vocal Separator history; no second trial on signing up again) and what stays on the phone (music, playlists, stems, recordings). Delete is enabled only after typing `DELETE`.
+Delete account (at the bottom of the Edit page, in the error color) opens a dialog that says what is deleted (account, plan, trial, AI Vocal Separator history; no second trial on signing up again) and what stays on the phone (music, playlists, stems, recordings). Delete is enabled only after typing `DELETE`.
 
 1. `AccountViewModel.deleteAccount()` runs on the application scope and calls `AuthRepository.deleteAccount()`.
 2. `SupabaseAccountDeletionBackend` posts `{"confirm": "DELETE"}` to the `delete-account` Edge Function, which calls `delete_account()` for the user in the token. That deletes the `auth.users` row; the foreign keys delete the profile, subscriptions, trial and usage, and keep `trial_claims` and `payment_events` without the user ID ([backend](../backend.md)).
@@ -147,3 +148,4 @@ Delete account (under Log out, in the error color) opens a dialog that says what
 | 2026-10-08 | - | M5: invited emails become Admin on first sign-in; Admin row on the Account card for admins. |
 | 2026-10-08 | - | M6: Delete account (dialog, `delete-account` function, local sign-out), deletion tests; old MPlay installs are not migrated. |
 | 2026-10-08 | - | Redesigned, always-dark sign-in screen with animated hero, glowing logo and Google pill button (`SignInBackdrop.kt`). |
+| 2026-10-08 | - | Account card replaced by the Profile tab (photo as tab icon) and an Edit page; Delete account moved into Edit, Log out below About. |
