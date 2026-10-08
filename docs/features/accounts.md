@@ -4,7 +4,7 @@
 
 ## Summary
 
-MP3 Studio requires a Google account (PRD v3.2, AU1-AU11). On first launch, and after logging out, the app shows only the sign-in screen with "Continue with Google"; there is no guest mode and no email or password. While signed out, nothing plays: the widget, the media notification, Bluetooth and headset buttons do nothing. Settings shows the account (photo, name, email) with Edit name and Log out.
+MP3 Studio requires a Google account (PRD v3.2, AU1-AU11). On first launch, and after logging out, the app shows only the sign-in screen with "Continue with Google"; there is no guest mode and no email or password. While signed out, nothing plays: the widget, the media notification, Bluetooth and headset buttons do nothing. Settings shows the account (photo, name, email) with Edit name, Log out and Delete account.
 
 ## Key files
 
@@ -12,7 +12,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 | File | Role |
 |---|---|
-| `data/account/AuthRepository.kt` | Single source of truth: `state: StateFlow<AuthState>`, `awaitReady()`, sign-in, `signOut()`, `verifyAccount()`, `reduce()`. |
+| `data/account/AuthRepository.kt` | Single source of truth: `state: StateFlow<AuthState>`, `awaitReady()`, sign-in, `signOut()`, `deleteAccount()`, `verifyAccount()`, `reduce()`. |
+| `data/account/AccountDeletion.kt` | `AccountDeletionBackend` and `SupabaseAccountDeletionBackend` (calls the `delete-account` Edge Function), `DeletionError`, `deletionErrorOf()`. |
 | `data/account/AuthState.kt` | `AuthState` (`Loading`, `SignedOut`, `SignedIn`) and `AccountUser`. |
 | `data/account/AuthBackend.kt`, `SupabaseAuthBackend.kt` | What the repository needs from the server, and the supabase-kt implementation (`SessionStatus` mapping, `IDToken` sign-in, `profiles.disabled` check). |
 | `data/account/SecureSessionStore.kt` | supabase-kt `SessionManager` that stores the session in DataStore `auth_session`, encrypted with Tink AES-256-GCM under an Android Keystore key. |
@@ -22,7 +23,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `data/account/Profile.kt`, `ProfileRepository.kt` | The user's `profiles` row; `refresh()`, `updateDisplayName()`, `clear()`. |
 | `ui/auth/SignInScreen.kt`, `AuthViewModel.kt` | Sign-in screen, error snackbar, foreground account check. |
 | `ui/auth/SignedInViewModelScope.kt` | `ViewModelStore` for signed-in screens, cleared on sign-out. |
-| `ui/settings/AccountSection.kt`, `AccountViewModel.kt` | Account card in Settings, edit-name and log-out dialogs. |
+| `ui/settings/AccountSection.kt`, `AccountViewModel.kt` | Account card in Settings, edit-name, log-out and delete-account dialogs. |
 | `di/AuthEffects.kt` | App-wide reactions to sign-in and sign-out (separation, metronome, sing-along, profile, widget). |
 | `playback/SignedInMediaButtonReceiver.kt` | Media button receiver that doesn't start playback while signed out. |
 
@@ -58,9 +59,18 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `Auth
 - `AuthEffects`, after a real sign-out (not on a cold start without a session): cancels a sing-along session, stops the metronome, clears the profile and the cached plan (`EntitlementsRepository.clear()`, PRD AU6) and calls `SeparationController.onSignedOut()`, which cancels the WorkManager job so the song returns to the queue ([vocal separation](vocal-separation.md)). On sign-in it refreshes the plan and calls `onSignedIn()` to resume the queue. It refreshes the widget on both.
 - `TrimEditorActivity` finishes itself on sign-out.
 
-### Account card and log out
+### Account card, log out and delete
 
 `AccountSection` (top of Settings) shows the photo (Coil, with a person icon as placeholder), name and email, and a Plan row that opens Settings > Plans ([plans](plans.md)). Admins also get an Admin row that opens the [Admin](admin.md) screens. The profile row wins; the Google account details cover it until it loads. Edit name updates `profiles.display_name` (max 80 characters, trimmed) and shows an error in the dialog if it fails. Log out asks for confirmation, then runs `AuthRepository.signOut()` on the application scope (local sign-out falls back to clearing the session if the server can't be reached).
+
+### Delete account (PRD AU9, PR4)
+
+Delete account (under Log out, in the error color) opens a dialog that says what is deleted (account, plan, trial, AI Vocal Separator history; no second trial on signing up again) and what stays on the phone (music, playlists, stems, recordings). Delete is enabled only after typing `DELETE`.
+
+1. `AccountViewModel.deleteAccount()` runs on the application scope and calls `AuthRepository.deleteAccount()`.
+2. `SupabaseAccountDeletionBackend` posts `{"confirm": "DELETE"}` to the `delete-account` Edge Function, which calls `delete_account()` for the user in the token. That deletes the `auth.users` row; the foreign keys delete the profile, subscriptions, trial and usage, and keep `trial_claims` and `payment_events` without the user ID ([backend](../backend.md)).
+3. On success `AuthBackend.signOutLocally()` clears the session on the phone only (the server no longer knows it), the state becomes `SignedOut`, `AuthEffects` clears the profile and plan as for a log-out, and `UsageReporter.forget()` drops the account's pending usage reports.
+4. Refusals keep the user signed in and show in the dialog: `LastAdmin` ("You're the only admin..."), `ActiveSubscription` (a renewing paid subscription, from M4), `Offline`, `Other`.
 
 ## Data and persistence
 
@@ -95,7 +105,10 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `Auth
 
 - `data/account/AuthErrorsTest.kt`: GoTrue code mapping, exception classification (including wrapped causes and `[16]` reauth failures versus real cancels), which errors end the session.
 - `data/account/NonceTest.kt`: SHA-256 hex, nonce length and alphabet.
-- `data/account/AuthRepositoryTest.kt`: `reduce()` (offline refresh keeps the user), `verifyAccount()` with a fake backend (disabled, revoked, offline, active).
+- `data/account/AuthRepositoryTest.kt`: `reduce()` (offline refresh keeps the user), `verifyAccount()` with a fake backend (disabled, revoked, offline, active), `deleteAccount()` (local sign-out only on success, refusal keeps the user).
+- `data/account/AccountDeletionTest.kt`: refusal codes from 409 bodies, other statuses, network failures.
+- `supabase/tests/abuse_test.sql`: `delete_account()` removes the user's rows, keeps trial claims and payments, refuses the last Admin and renewing subscriptions; no second trial after deleting.
+- Checked live on 2026-10-08: the last-admin refusal in the app, and a full deletion through the Edge Function with a throwaway user.
 - `supabase/tests/rls_test.sql`: server-side access rules ([backend](../backend.md#testing-rls)).
 - No tests for `SecureSessionStore` (needs the Keystore), the Credential Manager flow, the screens or `AuthEffects`.
 
@@ -106,6 +119,9 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `Auth
 - The launcher icon is still the MPlay icon.
 - If GoTrue still allows email or phone sign-up, someone could create an account through the API; disable them on the server ([backend](../backend.md#auth-settings)).
 - An account disabled by an Admin (Disable account on the Admin user page) is noticed on the next foreground check, not instantly.
+- Deleting doesn't revoke the Google grant; signing in again with the same Google account creates a new, empty account (without a trial).
+- A deleted account's access token stays valid until it expires (up to an hour) but every call fails, because the user no longer exists.
+- MP3 Studio uses a new application ID (`com.autoomstudio.mp3studio`), so old MPlay (`com.autoomstudio.mplay`) installs don't upgrade in place and their data isn't migrated (decided in M6; see [architecture](../architecture.md)).
 
 ## Change history
 
@@ -115,3 +131,4 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `Auth
 | 2026-10-08 | - | Package is now `com.autoomstudio.mp3studio` (Android OAuth clients must use it). `[16] Account reauth failed` shows `AccountUnavailable` instead of failing silently; sign-in failures are logged. |
 | 2026-10-08 | - | M2: sign-in and foreground checks refresh the plan, sign-out clears it, Account card has a Plan row. |
 | 2026-10-08 | - | M5: invited emails become Admin on first sign-in; Admin row on the Account card for admins. |
+| 2026-10-08 | - | M6: Delete account (dialog, `delete-account` function, local sign-out), deletion tests; old MPlay installs are not migrated. |

@@ -48,6 +48,8 @@ class SupabaseAuthBackend(
         }
     }
 
+    override suspend fun signOutLocally() = client.auth.clearSession()
+
     override suspend fun refresh() = mapErrors { client.auth.refreshCurrentSession() }
 
     override suspend fun isDisabled(userId: String): Boolean = mapErrors {

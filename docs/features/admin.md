@@ -33,12 +33,13 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 - **Acting on yourself.** Changing your own role or Pro refreshes your own entitlements so Settings and gates update immediately. The Disable button is hidden on your own detail page.
 - **Adding admins.** Admins page > Add admin takes an email. If that email already has an account it is promoted (or reported as already an admin). Otherwise it is saved in `admin_invites`; when that Google account first signs in, `handle_new_user()` makes it an admin and removes the invite. Pending invites can be revoked.
 - **Granting Pro.** Writes a `subscriptions` row with `provider = 'admin'`, `provider_ref = 'admin:<user id>'`, `status = 'active'`, `payment_status = 'granted'` and the chosen end date (end of that day, local time). Changing the end date updates the same row. Removing Pro marks it `expired` now. The user's plan follows from the normal entitlement rules ([plans](plans.md)).
+- **Deleted accounts.** When a user deletes their account ([accounts](accounts.md#delete-account-prd-au9-pr4)), the audit log shows "A user deleted their account (Free plan)" by "the account owner". The entry has no email and doesn't open a user page, since the account no longer exists. The last enabled Admin can't delete their account.
 - **Search and paging.** The search box matches email or name (300 ms debounce) with a filter (All, Pro, Free trial, Free, Disabled, Admins); 50 users per page with "Load more". The audit log pages by entry id.
 
 ## Data and persistence
 
 - Nothing is stored on the phone besides the existing `entitlements` cache ([plans](plans.md)).
-- Server: `admin_invites`, `admin_audit_log` (actions `set_role`, `disable`, `enable`, `invite_admin`, `revoke_invite`, `invite_accepted`, `grant_pro`, `revoke_pro`), `subscriptions` rows with provider `admin`. See [backend.md](../backend.md).
+- Server: `admin_invites`, `admin_audit_log` (actions `set_role`, `disable`, `enable`, `invite_admin`, `revoke_invite`, `invite_accepted`, `grant_pro`, `revoke_pro`, and `account_deleted` written by `delete_account()` when a user deletes their own account), `subscriptions` rows with provider `admin`. See [backend.md](../backend.md).
 
 ## Manifest, permissions and notifications
 
@@ -63,3 +64,4 @@ None. Uses the existing network access.
 | Date | Commit | Change |
 |---|---|---|
 | 2026-10-08 | | Admin screens, invites, Pro grants and audit log (PRD v3.2 M5). |
+| 2026-10-08 | | M6: `account_deleted` audit entries; the store review account gets Pro from the Admin screens ([store review](../store-review.md)). |

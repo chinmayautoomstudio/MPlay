@@ -82,6 +82,7 @@ None. Uses the existing `INTERNET` permission.
 - `data/tempo/TempoDetectionGateTest.kt`: cached tempo on Free, locked new detection, detection with BPM Detector.
 - `supabase/tests/plans_test.sql` (pgTAP, 16 checks): plan computation, claim idempotence, email and device reuse denied, disabled account, both functions not executable by `authenticated`.
 - `supabase/functions/_shared/trial_test.ts` (Deno, 5 tests): email normalization, device ID validation, peppered hashing.
+- Checked by hand on the emulator on 2026-10-08 (M6): offline with a Trial cache keeps Trial; the date moved 8 days ahead offline shows Free and the Sing Along sheet says "You've been offline for more than 7 days"; a clock turned back behind the last check also shows Free; going online and returning to the app restores Trial (`AuthViewModel.verifyAccount` refresh).
 - Gaps: no UI tests for the upgrade sheet, Plans screen or banner; the Edge Functions' HTTP handling is only type-checked.
 
 ## Known limitations and TODOs
@@ -99,4 +100,5 @@ None. Uses the existing `INTERNET` permission.
 |---|---|---|
 | 2026-10-08 | - | Plans and gating (M2): entitlements functions, trial with abuse checks, cache with 7-day grace, BPM and Sing Along gates, upgrade sheet, Plans screen, Account plan row, trial banner. |
 | 2026-10-08 | - | Usage limit (M3): `SeparatorUsage` in the cache, `separatorUsage()`, usage on the Plans card, limit-reached upgrade sheet. |
+| 2026-10-08 | - | M6: offline grace checked end to end on the emulator. |
 | 2026-10-08 | - | Admin (M5): `Entitlements.isAdmin` from `role`, `PlanUiState.isAdmin`, admin Pro grants as `provider = 'admin'` subscriptions. |

@@ -71,9 +71,34 @@ class AuthRepositoryTest {
         assertEquals(AuthState.SignedIn(user), repository.state.value)
     }
 
-    private suspend fun signedInRepository(backend: FakeBackend): AuthRepository {
+    @Test
+    fun deletingSignsOutOnThePhoneOnly() = runBlocking {
+        val backend = FakeBackend()
+        var deleted = 0
+        val repository = signedInRepository(backend) { deleted++ }
+        assertEquals("u1", repository.deleteAccount())
+        assertEquals(1, deleted)
+        assertEquals(AuthState.SignedOut, repository.state.value)
+        assertEquals(1, backend.localSignOuts)
+        assertEquals(0, backend.signOuts)
+    }
+
+    @Test
+    fun aRefusedDeletionKeepsTheUserSignedIn() = runBlocking {
+        val backend = FakeBackend()
+        val repository = signedInRepository(backend) { throw AccountDeletionException(DeletionError.LastAdmin) }
+        val error = runCatching { repository.deleteAccount() }.exceptionOrNull()
+        assertEquals(DeletionError.LastAdmin, (error as AccountDeletionException).error)
+        assertEquals(AuthState.SignedIn(user), repository.state.value)
+        assertEquals(0, backend.localSignOuts)
+    }
+
+    private suspend fun signedInRepository(
+        backend: FakeBackend,
+        deletion: AccountDeletionBackend = AccountDeletionBackend {},
+    ): AuthRepository {
         backend.status.value = BackendStatus.Authenticated(user)
-        return AuthRepository(backend, scope).also {
+        return AuthRepository(backend, scope, deletion).also {
             it.start()
             withTimeout(5_000) { it.state.first { state -> state is AuthState.SignedIn } }
         }
@@ -85,12 +110,17 @@ class AuthRepositoryTest {
     ) : AuthBackend {
         override val status = MutableStateFlow<BackendStatus>(BackendStatus.Initializing)
         var signOuts = 0
+        var localSignOuts = 0
 
         override suspend fun signInWithGoogleIdToken(idToken: String, rawNonce: String) = Unit
 
         override suspend fun signOut() {
             signOuts++
             status.value = BackendStatus.NotAuthenticated
+        }
+
+        override suspend fun signOutLocally() {
+            localSignOuts++
         }
 
         override suspend fun refresh() {

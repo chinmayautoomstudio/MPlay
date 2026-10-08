@@ -16,7 +16,8 @@ MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.au
 - [CHANGELOG.md](CHANGELOG.md): every change, newest first. Work that hasn't shipped in a version yet goes under `Unreleased`.
 - [architecture.md](architecture.md): modules, dependency container, startup, navigation, services and processes.
 - [database.md](database.md): Room tables, DAOs, schema versions and migrations.
-- [backend.md](backend.md): Supabase project, server tables, Row Level Security, auth settings and migrations.
+- [backend.md](backend.md): Supabase project, server tables, Row Level Security, auth settings, migrations and the live test runner.
+- [store-review.md](store-review.md): the Google account and notes for app store reviewers.
 - `features/`: one file per feature area (listed below).
 - [templates/feature-template.md](templates/feature-template.md): skeleton for new feature docs.
 

@@ -62,7 +62,7 @@ The app has grown from a music player into a set of powerful tools, including an
 | Distribution | Both direct APK and Google Play are planned. Payments sit behind a provider interface: Razorpay (or UPI subscriptions) for the direct APK, Google Play Billing for the Play build. Two build flavors by distribution channel |
 | Payment verification | Payment results are confirmed on the server (Razorpay webhooks, Google Play purchase verification and real-time notifications). The app never trusts a client-side "payment successful" message |
 | Secrets | The Supabase service role key, payment secrets and webhook secrets exist only in server-side functions, never in the app |
-| App ID | The application ID stays the same so existing installs upgrade in place and keep their data. Only the display name changes |
+| App ID | The application ID stays the same so existing installs upgrade in place and keep their data. Only the display name changes. **Update 2026-10-08:** the ID was changed to `com.autoomstudio.mp3studio` with the rename; old MPlay installs are not migrated (accepted in M6) |
 | Time zone | Server times in UTC; dates shown to users in their local time; weekly reset boundary defined in India Standard Time |
 
 ## 6. Functional Requirements
@@ -332,5 +332,5 @@ Yearly plan, coupons and referral rewards, a web admin dashboard, trial-ending p
 - **Pricing:** Pro is ₹99 per month.
 - **Free separator limit:** 10 songs per week, counted on completion and enforced by the server.
 - **Trial:** 30 days, once per user, starting at the first Google sign-in.
-- **App ID:** Unchanged, so existing installs upgrade in place.
+- **App ID:** Unchanged, so existing installs upgrade in place. *Update 2026-10-08: changed to `com.autoomstudio.mp3studio`; MP3 Studio installs as a new app and old MPlay installs are not migrated (M6 decision).*
 - **Proposed defaults to confirm:** 7-day offline grace window; weekly reset on Monday 00:00 India Standard Time; Free users must be online to start a separation; already-separated stems and detected BPM values stay usable after the trial.

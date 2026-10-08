@@ -15,11 +15,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AdminPanelSettings
+import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -45,11 +48,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.SubcomposeAsyncImage
 import com.autoomstudio.mp3studio.R
+import com.autoomstudio.mp3studio.data.account.DeletionError
 import com.autoomstudio.mp3studio.data.account.ProfileRepository
 import com.autoomstudio.mp3studio.ui.plans.PlansViewModel
 import com.autoomstudio.mp3studio.ui.plans.planLabel
 
-/** The signed-in Google account at the top of Settings: photo, name, email, rename and log out (PRD AU5, AU6). */
+/** The signed-in Google account at the top of Settings: photo, name, email, rename, log out and delete (PRD AU5, AU6, AU9). */
 @Composable
 fun AccountSection(
     sectionHeader: @Composable (String) -> Unit,
@@ -63,6 +67,9 @@ fun AccountSection(
     val savingName by viewModel.savingName.collectAsStateWithLifecycle()
     var editingName by rememberSaveable { mutableStateOf(false) }
     var confirmingLogOut by rememberSaveable { mutableStateOf(false) }
+    var confirmingDelete by rememberSaveable { mutableStateOf(false) }
+    val deleting by viewModel.deleting.collectAsStateWithLifecycle()
+    val deleteError by viewModel.deleteError.collectAsStateWithLifecycle()
     val current = account ?: return
 
     sectionHeader(stringResource(R.string.account_section))
@@ -104,6 +111,26 @@ fun AccountSection(
             Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null, modifier = Modifier.size(18.dp))
             Text(stringResource(R.string.account_log_out), modifier = Modifier.padding(start = 8.dp))
         }
+    }
+    TextButton(
+        onClick = {
+            viewModel.clearDeleteError()
+            confirmingDelete = true
+        },
+        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        modifier = Modifier.padding(horizontal = 8.dp),
+    ) {
+        Icon(Icons.Outlined.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp))
+        Text(stringResource(R.string.account_delete), modifier = Modifier.padding(start = 8.dp))
+    }
+
+    if (confirmingDelete) {
+        DeleteAccountDialog(
+            deleting = deleting,
+            error = deleteError,
+            onDelete = viewModel::deleteAccount,
+            onDismiss = { confirmingDelete = false },
+        )
     }
 
     if (editingName) {
@@ -156,6 +183,60 @@ private fun Avatar(url: String?) {
         modifier = modifier,
         loading = { placeholder() },
         error = { placeholder() },
+    )
+}
+
+@Composable
+private fun DeleteAccountDialog(
+    deleting: Boolean,
+    error: DeletionError?,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val word = stringResource(R.string.account_delete_word)
+    var typed by rememberSaveable { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = { if (!deleting) onDismiss() },
+        title = { Text(stringResource(R.string.account_delete_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.account_delete_message))
+                OutlinedTextField(
+                    value = typed,
+                    onValueChange = { typed = it.take(word.length + 4) },
+                    label = { Text(stringResource(R.string.account_delete_type_label)) },
+                    singleLine = true,
+                    enabled = !deleting,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (deleting) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                if (error != null) {
+                    Text(
+                        stringResource(
+                            when (error) {
+                                DeletionError.LastAdmin -> R.string.account_delete_last_admin
+                                DeletionError.ActiveSubscription -> R.string.account_delete_subscription
+                                DeletionError.Offline -> R.string.account_delete_offline
+                                DeletionError.Other -> R.string.account_delete_failed
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onDelete,
+                enabled = !deleting && typed.trim() == word,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text(stringResource(R.string.account_delete_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !deleting) { Text(stringResource(android.R.string.cancel)) }
+        },
     )
 }
 

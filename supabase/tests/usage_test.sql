@@ -32,7 +32,8 @@ select public.reserve_separation(
 
 select is(jsonb_array_length((select v -> 'granted' from r)), 10, 'Free gets 10 reservations');
 select is((select v -> 'denied' from r), '["job-11", "job-12"]'::jsonb, 'The jobs past the limit are denied');
-select is((select count(*)::integer from public.ai_usage where status = 'denied'), 2, 'Denied requests are recorded');
+select is((select count(*)::integer from public.ai_usage
+           where user_id = '11111111-1111-1111-1111-111111111111' and status = 'denied'), 2, 'Denied requests are recorded');
 select is((select v -> 'usage' ->> 'remaining' from r), '0', 'Nothing remains');
 
 select is(

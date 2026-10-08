@@ -10,6 +10,9 @@ Defined in [`settings.gradle.kts`](../settings.gradle.kts).
 |---|---|---|
 | `:app` | Application `com.autoomstudio.mp3studio` | The player. Everything user-facing. |
 | `:separation` | Android library | DSP (STFT, FFT, resampling) and the ONNX Runtime HT-Demucs pipeline. Has its own unit tests. Only `:app` uses it. |
+
+The application ID changed from `com.autoomstudio.mplay` to `com.autoomstudio.mp3studio` with the rename. Android treats MP3 Studio as a new app, so old MPlay installs don't upgrade in place and their playlists, stems index and settings aren't carried over. This was accepted in M6 (MPlay had no wide distribution); there is no import from the old app.
+
 Other top-level folders: `supabase/` (backend config, migrations, Edge Functions and SQL tests, see [backend](backend.md)), `models/` (the `htdemucs.onnx` model, gitignored, plus its committed `.sha256`), `tools/` (Python scripts to export the model and generate DSP test references), `logos/`, `mockup-design/`.
 
 ## Build
@@ -36,7 +39,7 @@ There is no DI framework. [`di/AppContainer.kt`](../app/src/main/java/com/autoom
 
 - `applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)` is used for writes that must outlive the screen or service that started them.
 - Nearly everything is a `lazy` singleton: repositories (songs, playlists, duplicates, stems), stores (session, library prefs, widget, `AppSettings`), `MPlayDatabase`, separation backend/controller, clip helpers, `songDeleter`, `tempoAnalyzer`, `metronomeController`, `recordingStore`, `singAlongSession`.
-- Accounts: `supabase` (`SupabaseClient` with Auth using the private `SecureSessionStore`, Postgrest and Functions), `authRepository`, `profileRepository`, `googleSignIn`, and `signedInUserId()`. `separationController` gets `isSignedIn = { authRepository.isSignedIn }`. See [accounts](features/accounts.md).
+- Accounts: `supabase` (`SupabaseClient` with Auth using the private `SecureSessionStore`, Postgrest and Functions), `authRepository` (with `SupabaseAccountDeletionBackend` for Delete account), `profileRepository`, `googleSignIn`, and `signedInUserId()`. `separationController` gets `isSignedIn = { authRepository.isSignedIn }`. See [accounts](features/accounts.md).
 - Plans: `entitlementsRepository` (`SupabaseEntitlementsBackend` with `DeviceId`, `DataStoreEntitlementsCache`). `MetronomeViewModel` gets a `TempoDetectionGate` over `tempoAnalyzer`. See [plans](features/plans.md).
 - Usage limit: a private `usageBackend` (`SupabaseUsageBackend`), `usageGate` (`SeparationUsageGate`, passed to `separationController` with `signedInUserId`) and `usageReporter` (`UsageReporter` over `stemRepository`'s `usage_reports`). `stemRepository` gets `onUsageReported = { UsageSyncWorker.schedule(...) }`. See [vocal separation](features/vocal-separation.md#weekly-usage-limit-prd-us1-us9-pl5).
 - Admin: `adminBackend` (`SupabaseAdminBackend` over the `admin` Edge Function). `AdminViewModel` also gets `signedInUserId` and `entitlementsRepository.refresh`. See [admin](features/admin.md).
@@ -159,3 +162,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-08 | - | Plans (M2): supabase-kt Functions, `entitlementsRepository` and `signedInUserId()` in `AppContainer`, `PlansViewModel`, `SettingsPage.Plans`, trial banner, `supabase/functions/`. |
 | 2026-10-08 | - | Usage limit (M3): `usageGate`, `usageReporter` and `UsageSyncWorker`; `SeparationController` takes `usageGate` and `signedInUserId` instead of `isSignedIn`. |
 | 2026-10-08 | - | Admin (M5): `adminBackend`, `AdminViewModel`, `SettingsPage.Admin`, `admin` Edge Function. |
+| 2026-10-08 | - | Hardening (M6): `AuthRepository` takes an `AccountDeletionBackend`; `delete-account` Edge Function; recorded that old MPlay installs are not migrated. |

@@ -8,6 +8,7 @@ import com.autoomstudio.mp3studio.data.account.AuthState
 import com.autoomstudio.mp3studio.data.account.GoogleSignIn
 import com.autoomstudio.mp3studio.data.account.ProfileRepository
 import com.autoomstudio.mp3studio.data.account.SecureSessionStore
+import com.autoomstudio.mp3studio.data.account.SupabaseAccountDeletionBackend
 import com.autoomstudio.mp3studio.data.account.SupabaseAuthBackend
 import com.autoomstudio.mp3studio.data.admin.AdminBackend
 import com.autoomstudio.mp3studio.data.admin.SupabaseAdminBackend
@@ -184,7 +185,11 @@ class AppContainer(context: Context) {
     }
 
     val authRepository: AuthRepository by lazy {
-        AuthRepository(SupabaseAuthBackend(supabase, sessionStore), applicationScope)
+        AuthRepository(
+            SupabaseAuthBackend(supabase, sessionStore),
+            applicationScope,
+            SupabaseAccountDeletionBackend(supabase),
+        )
     }
 
     val profileRepository: ProfileRepository by lazy { ProfileRepository(supabase) }

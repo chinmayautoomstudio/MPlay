@@ -13,6 +13,9 @@ interface AuthBackend {
     /** Ends the session on the server when possible, and always on the phone. */
     suspend fun signOut()
 
+    /** Forgets the session on the phone only, for an account the server has already deleted. */
+    suspend fun signOutLocally()
+
     /** Refreshes the session; throws [AuthCodeException] if the server rejects it, an IOException when offline. */
     suspend fun refresh()
 

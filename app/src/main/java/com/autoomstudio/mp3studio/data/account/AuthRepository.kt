@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 class AuthRepository(
     private val backend: AuthBackend,
     private val scope: CoroutineScope,
+    private val deletion: AccountDeletionBackend,
 ) {
     private val _state = MutableStateFlow<AuthState>(AuthState.Loading)
     val state: StateFlow<AuthState> = _state.asStateFlow()
@@ -42,6 +43,19 @@ class AuthRepository(
     suspend fun signOut() {
         backend.signOut()
         _state.value = AuthState.SignedOut
+    }
+
+    /**
+     * Deletes the signed-in account on the server (PRD AU9), then signs out on the phone only, since the server no
+     * longer knows the session. Returns the deleted user's ID, or null when nobody was signed in. Throws
+     * [AccountDeletionException] and stays signed in when the server refused or couldn't be reached.
+     */
+    suspend fun deleteAccount(): String? {
+        val user = (_state.value as? AuthState.SignedIn)?.user ?: return null
+        deletion.deleteAccount()
+        backend.signOutLocally()
+        _state.value = AuthState.SignedOut
+        return user.id
     }
 
     /**

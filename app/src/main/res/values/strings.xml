@@ -28,6 +28,16 @@
     <string name="account_log_out_title">Log out?</string>
     <string name="account_log_out_message">Playback stops and you\'ll need to sign in again to use MP3 Studio. Your music, playlists, stems and recordings stay on this phone.</string>
     <string name="account_log_out_confirm">Log out</string>
+    <string name="account_delete">Delete account</string>
+    <string name="account_delete_title">Delete your account?</string>
+    <string name="account_delete_message">This permanently deletes your MP3 Studio account, plan, trial and AI Vocal Separator history. It can\'t be undone, and signing up again won\'t give you another free trial.\n\nYour music, playlists, stems and recordings stay on this phone.</string>
+    <string name="account_delete_type_label">Type DELETE to confirm</string>
+    <string name="account_delete_word" translatable="false">DELETE</string>
+    <string name="account_delete_confirm">Delete</string>
+    <string name="account_delete_last_admin">You\'re the only admin. Make someone else an admin before deleting your account.</string>
+    <string name="account_delete_subscription">Cancel your Pro subscription before deleting your account.</string>
+    <string name="account_delete_offline">Connect to the internet to delete your account.</string>
+    <string name="account_delete_failed">Couldn\'t delete your account. Try again later.</string>
     <string name="plan_free">Free</string>
     <string name="plan_trial">Free trial</string>
     <string name="plan_pro">Pro</string>
@@ -185,6 +195,8 @@
     <string name="admin_audit_revoke_invite">Revoked the admin invite for %s</string>
     <string name="admin_audit_grant_pro">Granted Pro to %1$s until %2$s</string>
     <string name="admin_audit_revoke_pro">Removed Pro from %s</string>
+    <string name="admin_audit_account_deleted">A user deleted their account (%s plan)</string>
+    <string name="admin_audit_account_owner">the account owner</string>
     <string name="admin_audit_other">%1$s: %2$s</string>
     <string name="admin_audit_by">By %1$s, %2$s</string>
     <string name="admin_unknown_user">a deleted user</string>

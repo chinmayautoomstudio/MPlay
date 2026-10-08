@@ -229,19 +229,25 @@ internal fun AdminAuditScreen(viewModel: AdminViewModel, onBack: () -> Unit, mod
         item { DetailBackButton(onBack = onBack) }
         item { PageTitle(stringResource(R.string.admin_open_audit)) }
         items(audit.entries, key = { it.id }) { entry ->
+            val deleted = entry.action == ACCOUNT_DELETED
             ListItem(
                 headlineContent = { Text(auditText(context, entry)) },
                 supportingContent = {
                     Text(
                         stringResource(
                             R.string.admin_audit_by,
-                            entry.actorEmail ?: stringResource(R.string.admin_unknown_user),
+                            if (deleted) {
+                                stringResource(R.string.admin_audit_account_owner)
+                            } else {
+                                entry.actorEmail ?: stringResource(R.string.admin_unknown_user)
+                            },
                             formatDateTime(context, entry.createdAt),
                         ),
                     )
                 },
                 colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
-                modifier = entry.targetId?.let { id -> Modifier.clickable { viewModel.open(AdminPage.User(id)) } }
+                modifier = entry.targetId?.takeUnless { deleted }
+                    ?.let { id -> Modifier.clickable { viewModel.open(AdminPage.User(id)) } }
                     ?: Modifier,
             )
         }
@@ -258,6 +264,9 @@ internal fun AdminAuditScreen(viewModel: AdminViewModel, onBack: () -> Unit, mod
         }
     }
 }
+
+/** Logged by the user deleting their own account; the account no longer exists, so the entry doesn't open it. */
+private const val ACCOUNT_DELETED = "account_deleted"
 
 private fun auditText(context: Context, entry: AuditEntry): String {
     val res = context.resources
@@ -276,6 +285,16 @@ private fun auditText(context: Context, entry: AuditEntry): String {
         "revoke_invite" -> res.getString(R.string.admin_audit_revoke_invite, target)
         "grant_pro" -> res.getString(R.string.admin_audit_grant_pro, target, formatDate(context, detail("until")))
         "revoke_pro" -> res.getString(R.string.admin_audit_revoke_pro, target)
+        ACCOUNT_DELETED -> res.getString(
+            R.string.admin_audit_account_deleted,
+            res.getString(
+                when (detail("plan")) {
+                    "pro" -> R.string.plan_pro
+                    "trial" -> R.string.plan_trial
+                    else -> R.string.plan_free
+                },
+            ),
+        )
         else -> res.getString(R.string.admin_audit_other, entry.action, target)
     }
 }

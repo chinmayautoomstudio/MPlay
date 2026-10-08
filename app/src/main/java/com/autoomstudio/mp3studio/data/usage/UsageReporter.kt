@@ -50,4 +50,9 @@ class UsageReporter(
         }
         allSent
     }
+
+    /** Drops the reports of a deleted account; its jobs no longer exist on the server. */
+    suspend fun forget(userId: String) = mutex.withLock {
+        store.pending().filter { it.userId == userId }.forEach { store.remove(it.jobRef) }
+    }
 }

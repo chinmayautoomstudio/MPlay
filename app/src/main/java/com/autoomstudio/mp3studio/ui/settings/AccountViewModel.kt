@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.autoomstudio.mp3studio.MPlayApp
+import com.autoomstudio.mp3studio.data.account.AccountDeletionException
 import com.autoomstudio.mp3studio.data.account.AuthState
+import com.autoomstudio.mp3studio.data.account.DeletionError
 import com.autoomstudio.mp3studio.di.AppContainer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -70,6 +72,36 @@ class AccountViewModel(private val container: AppContainer) : ViewModel() {
     /** Runs on the application scope: signing out clears this ViewModel before the call returns. */
     fun signOut() {
         container.applicationScope.launch { auth.signOut() }
+    }
+
+    private val _deleting = MutableStateFlow(false)
+    val deleting: StateFlow<Boolean> = _deleting.asStateFlow()
+
+    /** Why the last delete attempt kept the account; cleared when a new attempt starts. */
+    private val _deleteError = MutableStateFlow<DeletionError?>(null)
+    val deleteError: StateFlow<DeletionError?> = _deleteError.asStateFlow()
+
+    /**
+     * Deletes the account (PRD AU9). Runs on the application scope like [signOut], because success signs out and
+     * clears this ViewModel.
+     */
+    fun deleteAccount() {
+        if (_deleting.value) return
+        _deleting.value = true
+        _deleteError.value = null
+        container.applicationScope.launch {
+            try {
+                auth.deleteAccount()?.let { container.usageReporter.forget(it) }
+            } catch (e: AccountDeletionException) {
+                _deleteError.value = e.error
+            } finally {
+                _deleting.value = false
+            }
+        }
+    }
+
+    fun clearDeleteError() {
+        _deleteError.value = null
     }
 
     companion object {
