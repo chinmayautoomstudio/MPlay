@@ -58,9 +58,11 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -80,6 +82,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.model.Song
 import com.autoomstudio.mp3studio.data.stems.StemMode
@@ -103,7 +106,11 @@ import com.autoomstudio.mp3studio.ui.separation.SeparatorChip
 import com.autoomstudio.mp3studio.ui.separation.SeparatorUi
 import com.autoomstudio.mp3studio.ui.singalong.SingAlongChip
 import com.autoomstudio.mp3studio.ui.singalong.SingAlongSheet
+import com.autoomstudio.mp3studio.ui.plans.PlansViewModel
+import com.autoomstudio.mp3studio.ui.plans.UpgradeSheet
+import com.autoomstudio.mp3studio.data.plan.Feature
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.launch
 
 /** Full player layout without its own background; the surrounding card draws it. */
 @Composable
@@ -120,11 +127,23 @@ fun NowPlayingContent(
     songActions: SongActions? = null,
     suggestedSleepMinutes: Int = SleepTimer.DEFAULT_MINUTES,
     separator: SeparatorUi? = null,
+    plansViewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
 ) {
     BackHandler(enabled = backEnabled, onBack = onCollapse)
     var showSleepSheet by rememberSaveable { mutableStateOf(false) }
     var showMetronomeSheet by rememberSaveable { mutableStateOf(false) }
     var showSingAlongSheet by rememberSaveable { mutableStateOf(false) }
+    var showSingAlongUpgrade by rememberSaveable { mutableStateOf(false) }
+    val plan by plansViewModel.state.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    val openPlansRequest by plansViewModel.openPlansRequest.collectAsStateWithLifecycle()
+    // The main screen leaves Now Playing for Settings > Plans; sheets opened here must not stay on top.
+    LaunchedEffect(openPlansRequest) {
+        if (openPlansRequest) {
+            showMetronomeSheet = false
+            showSingAlongSheet = false
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -275,7 +294,19 @@ fun NowPlayingContent(
                             SeparatorChip(ui = separator, title = state.title, modifier = chipModifier)
                         }
                         if (song != null) {
-                            SingAlongChip(onClick = { showSingAlongSheet = true }, modifier = chipModifier)
+                            SingAlongChip(
+                                onClick = {
+                                    scope.launch {
+                                        if (plansViewModel.canUse(Feature.SingAlong)) {
+                                            showSingAlongSheet = true
+                                        } else {
+                                            showSingAlongUpgrade = true
+                                        }
+                                    }
+                                },
+                                locked = !plan.unlocks(Feature.SingAlong),
+                                modifier = chipModifier,
+                            )
                         }
                     }
                     Text(
@@ -323,6 +354,9 @@ fun NowPlayingContent(
             position = position,
             onDismiss = { showSingAlongSheet = false },
         )
+    }
+    if (showSingAlongUpgrade) {
+        UpgradeSheet(feature = Feature.SingAlong, onDismiss = { showSingAlongUpgrade = false })
     }
 }
 

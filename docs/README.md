@@ -8,7 +8,7 @@ MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.au
 | minSdk / targetSdk / compileSdk | 26 / 37 / 37 |
 | Modules | `:app`, `:separation` (DSP + ONNX pipeline) |
 | Database | Room `mplay.db`, schema version 6 |
-| Network | Supabase Auth and PostgREST only (`INTERNET`, `ACCESS_NETWORK_STATE`, no cleartext). The build fails if any permission outside `ALLOWED_PERMISSIONS` is merged into the manifest. |
+| Network | Supabase Auth, PostgREST and Edge Functions only (`INTERNET`, `ACCESS_NETWORK_STATE`, no cleartext). The build fails if any permission outside `ALLOWED_PERMISSIONS` is merged into the manifest. |
 | Backend | Self-hosted Supabase, see [backend.md](backend.md) |
 
 ## How these docs are organised
@@ -36,6 +36,7 @@ MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.au
 | Metronome and BPM detection | [features/metronome.md](features/metronome.md) | Unreleased |
 | Sing-along recording | [features/sing-along.md](features/sing-along.md) | Unreleased |
 | Accounts and Google sign-in | [features/accounts.md](features/accounts.md) | Unreleased |
+| Plans, trial and feature gates | [features/plans.md](features/plans.md) | Unreleased |
 
 ## Product requirement documents
 

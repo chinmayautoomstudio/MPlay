@@ -1,6 +1,6 @@
 # Sing-along recording
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-07
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-08
 
 ## Summary
 
@@ -21,7 +21,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `singalong/RecordingStore.kt` | MediaStore save, space check, pending-row cleanup. |
 | `singalong/RecordingNames.kt` | Name suggestion, sanitising, de-duplication. |
 | `singalong/RecordingService.kt` | Microphone foreground service with Stop action. |
-| `ui/singalong/SingAlongSheet.kt` | `SingAlongChip` and setup sheet. |
+| `ui/singalong/SingAlongSheet.kt` | `SingAlongChip` (lock icon when the plan doesn't include it) and setup sheet. |
 | `ui/singalong/SingAlongDevices.kt` | Mic permission state and audio routing (headphones, Bluetooth mic). |
 | `ui/singalong/SingAlongOverlay.kt` | Full-screen dialog for all session states. |
 | `ui/singalong/SingAlongAnimations.kt` | Overlay animations: `PulsingDot`, `VoiceRings`, `LiveWaveform`, `RollingTimer`, `SavingRing`, `SavedCheck`, `StaggeredIn`, `ShakeOnEnter`. |
@@ -51,6 +51,8 @@ stateDiagram-v2
 ```
 
 ### Starting a take
+
+Plan gate (PRD v3.2): the Sing Along chip opens the setup sheet only when `Feature.SingAlong` is unlocked (Trial or Pro); on Free it opens `UpgradeSheet` and shows a lock icon. Saved recordings stay playable on any plan. See [plans](plans.md).
 
 1. Requires an instrumental stem (`stemRepository.stemUri(song.id, Instrumental)`), otherwise `Failed(NoStems)`. The sheet offers to separate first.
 2. Starts `RecordingService`, connects its own `PlaybackController`, and waits up to 5 s for the song to be current.
@@ -133,3 +135,4 @@ The sheet warns when no headphones are connected (music will leak into the mic) 
 | 2026-10-06 | `e13b2f7` | Sing-along recording added: session, recorder, mixer, preview, export, `RecordingService`, Now Playing chip and sheet, overlay. |
 | 2026-10-06 | - | Recording and saving animations (`SingAlongAnimations.kt`): state transitions, blinking dot, voice rings, scrolling waveform, rolling timer, saving ring, animated saved check; off with system animations. |
 | 2026-10-07 | - | Recordings folder renamed to `Music/MP3 Studio Recordings`; the old `Music/MPlay Recordings/` stays exempt from the 30 s minimum. A running session is cancelled on sign-out (`di/AuthEffects`). |
+| 2026-10-08 | - | Sing Along needs Trial or Pro: the chip opens the upgrade sheet on Free. See [plans](plans.md). |

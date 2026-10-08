@@ -1,6 +1,6 @@
 # Metronome and BPM detection
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-07
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-08
 
 ## Summary
 
@@ -30,7 +30,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `ui/metronome/MetronomeControls.kt` | Shared layout: header, dial, tempo slider, Tap tempo tile (`ActionTile`), Sound / Start-Stop / Settings row, sound settings sheet, Time signature card (presets, Custom dialog, beats-per-bar stepper), Accent card; `MetronomeCard`. |
 | `ui/metronome/MetronomeScreen.kt` | Metronome tab. |
 | `ui/metronome/MetronomePlayerUi.kt` | `MetronomeChip`, `MetronomeSheet` (Detect BPM / ÷2 / ×2 row, result card with "Looks like 3/4. Use it?" pill, Undo snackbar, "Sync with song" tile), `MetronomeMiniIndicator`. |
-| `ui/metronome/MetronomeViewModel.kt` | Controller wrapper, tap tempo, detection states, applying/undoing the detected meter (`MeterApplied`), starting sync and `toggleSync()`. |
+| `ui/metronome/MetronomeViewModel.kt` | Controller wrapper, tap tempo, detection states (through `TempoDetectionGate`), `upgradeRequests`, applying/undoing the detected meter (`MeterApplied`), starting sync and `toggleSync()`. |
+| `data/tempo/TempoDetectionGate.kt` | `TempoSource` and the plan gate for new detections; see [plans](plans.md). |
 | `ui/components/MetronomeIcons.kt` | Metronome vector icon. |
 | `app/src/main/res/drawable/ic_notification_metronome.xml` | Notification icon. |
 
@@ -68,6 +69,7 @@ Resets after 2 s without a tap, keeps the last 8 taps, needs at least 4. BPM = 6
 2. `TempoDetector`: Hann window 1024 / hop 128, log-compressed spectral flux, moving-average removal and Gaussian smoothing, then normalised autocorrelation. Lags for 40-240 BPM are scored with a comb (`acf[lag] + 0.5 * acf[2 * lag]`) and a log-Gaussian prior around 120 BPM, refined by parabolic interpolation, folded into 60-200 BPM and rounded to 0.1.
 3. Confidence: High if score at least 0.3, Medium at least 0.12, otherwise Low. Returns null for silence or under 400 envelope frames.
 4. The result sets the metronome BPM; half/double buttons scale it.
+5. Plan gate (PRD v3.2): `MetronomeViewModel` runs Detect through `TempoDetectionGate`. A cached result (`SongTempoAnalyzer.cached`) is used on any plan; a new analysis needs `Feature.BpmDetector` (Trial or Pro), otherwise `upgradeRequests` fires and the sheet shows `UpgradeSheet`. The Detect button shows a lock icon on Free. See [plans](plans.md).
 
 ### Time signature detection (MT18-MT21)
 
@@ -152,3 +154,4 @@ Resets after 2 s without a tap, keeps the last 8 taps, needs at least 4. BPM = 6
 | 2026-10-06 | - | Sync with the song: `BeatGrid`, exact-start decoding, grid columns in `song_tempos` (schema v6), `BeatClock.align`, `MetronomeEngine.heardFrame`, `SongSync`, `MusicTimeline`, "Sync with song" chip. |
 | 2026-10-06 | - | UI redesign: `BpmDial` ring, slider, action tiles, Sound mute toggle (`setUserMuted`), sound settings sheet, Time signature and Accent cards, Custom time signature dialog; same layout in the tab and the Now Playing sheet. |
 | 2026-10-07 | - | The metronome stops on sign-out. See [accounts](accounts.md). |
+| 2026-10-08 | - | New BPM detections need Trial or Pro (`TempoDetectionGate`, `SongTempoAnalyzer` implements `TempoSource`); cached tempos stay usable. See [plans](plans.md). |

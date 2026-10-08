@@ -30,7 +30,7 @@ class AuthEffects(private val context: Context, private val container: AppContai
                 .map { (it as? AuthState.SignedIn)?.user?.id }
                 .distinctUntilChanged()
                 .collect { userId ->
-                    if (userId != null) onSignedIn() else if (signedInBefore) onSignedOut()
+                    if (userId != null) onSignedIn(userId) else if (signedInBefore) onSignedOut()
                     signedInBefore = userId != null
                     try {
                         MPlayWidget().updateAll(context)
@@ -41,7 +41,8 @@ class AuthEffects(private val context: Context, private val container: AppContai
         }
     }
 
-    private suspend fun onSignedIn() {
+    private suspend fun onSignedIn(userId: String) {
+        scope.launch { container.entitlementsRepository.refresh(userId) }
         container.separationController.onSignedIn()
     }
 
@@ -49,6 +50,7 @@ class AuthEffects(private val context: Context, private val container: AppContai
         container.singAlongSession.cancel()
         container.metronomeController.stop()
         container.profileRepository.clear()
+        container.entitlementsRepository.clear()
         container.separationController.onSignedOut()
     }
 

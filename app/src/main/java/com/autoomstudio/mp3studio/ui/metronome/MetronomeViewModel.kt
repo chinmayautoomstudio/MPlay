@@ -8,7 +8,9 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.autoomstudio.mp3studio.MPlayApp
 import com.autoomstudio.mp3studio.data.model.Song
-import com.autoomstudio.mp3studio.data.tempo.SongTempoAnalyzer
+import com.autoomstudio.mp3studio.data.plan.Feature
+import com.autoomstudio.mp3studio.data.tempo.GatedDetection
+import com.autoomstudio.mp3studio.data.tempo.TempoDetectionGate
 import com.autoomstudio.mp3studio.metronome.BeatGrid
 import com.autoomstudio.mp3studio.metronome.BeatTick
 import com.autoomstudio.mp3studio.metronome.MeterEstimate
@@ -66,7 +68,7 @@ data class MeterApplied(
 
 class MetronomeViewModel(
     private val controller: MetronomeController,
-    private val tempoAnalyzer: SongTempoAnalyzer,
+    private val tempoGate: TempoDetectionGate,
 ) : ViewModel() {
 
     val state: StateFlow<MetronomeState> = controller.state
@@ -86,6 +88,11 @@ class MetronomeViewModel(
 
     /** One-shot events for the "Time signature set to …" snackbar. */
     val meterApplied: SharedFlow<MeterApplied> = _meterApplied.asSharedFlow()
+
+    private val _upgradeRequests = MutableSharedFlow<Feature>(extraBufferCapacity = 1)
+
+    /** Detect BPM was tapped for a song never analyzed while BPM Detector isn't in the plan (PRD flow 6). */
+    val upgradeRequests: SharedFlow<Feature> = _upgradeRequests.asSharedFlow()
 
     private var tapReset: Job? = null
     private var detectJob: Job? = null
@@ -110,7 +117,8 @@ class MetronomeViewModel(
 
     /**
      * Fills in the BPM from [song], instantly when it was detected before, and the time signature when it is at
-     * least fairly sure of it (MT18, MT19), then puts the clicks on the song's beats.
+     * least fairly sure of it (MT18, MT19), then puts the clicks on the song's beats. A new detection needs BPM
+     * Detector in the plan; otherwise [upgradeRequests] fires.
      */
     fun detect(song: Song) {
         if ((_detection.value as? TempoDetection.Running)?.songId == song.id) return
@@ -118,12 +126,18 @@ class MetronomeViewModel(
         _detection.value = TempoDetection.Running(song.id, 0f)
         detectJob = viewModelScope.launch {
             var shown = 0f
-            val rhythm = tempoAnalyzer.detect(song) { progress ->
+            val result = tempoGate.detect(song) { progress ->
                 if (progress - shown >= 0.01f) {
                     shown = progress
                     _detection.value = TempoDetection.Running(song.id, progress)
                 }
             }
+            if (result is GatedDetection.Locked) {
+                _detection.value = TempoDetection.Idle
+                _upgradeRequests.tryEmit(Feature.BpmDetector)
+                return@launch
+            }
+            val rhythm = (result as GatedDetection.Finished).rhythm
             if (rhythm == null) {
                 _detection.value = TempoDetection.Failed(song.id)
                 return@launch
@@ -208,8 +222,13 @@ class MetronomeViewModel(
 
         val Factory = viewModelFactory {
             initializer {
-                val app = this[APPLICATION_KEY] as MPlayApp
-                MetronomeViewModel(app.container.metronomeController, app.container.tempoAnalyzer)
+                val container = (this[APPLICATION_KEY] as MPlayApp).container
+                MetronomeViewModel(
+                    container.metronomeController,
+                    TempoDetectionGate(container.tempoAnalyzer) {
+                        container.entitlementsRepository.canUse(Feature.BpmDetector, container.signedInUserId())
+                    },
+                )
             }
         }
     }

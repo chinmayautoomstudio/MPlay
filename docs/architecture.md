@@ -10,7 +10,7 @@ Defined in [`settings.gradle.kts`](../settings.gradle.kts).
 |---|---|---|
 | `:app` | Application `com.autoomstudio.mp3studio` | The player. Everything user-facing. |
 | `:separation` | Android library | DSP (STFT, FFT, resampling) and the ONNX Runtime HT-Demucs pipeline. Has its own unit tests. Only `:app` uses it. |
-Other top-level folders: `supabase/` (backend config, migrations and RLS tests, see [backend](backend.md)), `models/` (the `htdemucs.onnx` model, gitignored, plus its committed `.sha256`), `tools/` (Python scripts to export the model and generate DSP test references), `logos/`, `mockup-design/`.
+Other top-level folders: `supabase/` (backend config, migrations, Edge Functions and SQL tests, see [backend](backend.md)), `models/` (the `htdemucs.onnx` model, gitignored, plus its committed `.sha256`), `tools/` (Python scripts to export the model and generate DSP test references), `logos/`, `mockup-design/`.
 
 ## Build
 
@@ -28,7 +28,7 @@ Other top-level folders: `supabase/` (backend config, migrations and RLS tests, 
   - `check<Variant>Permissions` (`CheckAllowedPermissions`): fails `assemble`/`bundle` if the merged manifest has a `uses-permission` outside `ALLOWED_PERMISSIONS` (plus the app's own `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`). Writes the list to `build/reports/permissions/<variant>.txt`.
   - `check<Variant>BackendConfig` (`CheckBackendConfig`): fails release builds when a Supabase or Google setting is blank; warns in debug.
 
-Key libraries: Compose BOM 2026.09.00, Material 3, Media3 1.11.1 (ExoPlayer, Session, Transformer), Room 2.8.5, WorkManager 2.10.1, Glance 1.2.0, DataStore 1.2.1, Coil 3 (with `coil-network-okhttp` for profile photos), Lottie 6.7.1, Coroutines 1.11.0, ONNX Runtime Android 1.22.0 (in `:separation`), supabase-kt 3.8.0 (Auth, Postgrest) on Ktor OkHttp 3.5.1, Credential Manager 1.6.0 with `googleid` 1.2.1, Tink 1.23.0.
+Key libraries: Compose BOM 2026.09.00, Material 3, Media3 1.11.1 (ExoPlayer, Session, Transformer), Room 2.8.5, WorkManager 2.10.1, Glance 1.2.0, DataStore 1.2.1, Coil 3 (with `coil-network-okhttp` for profile photos), Lottie 6.7.1, Coroutines 1.11.0, ONNX Runtime Android 1.22.0 (in `:separation`), supabase-kt 3.8.0 (Auth, Postgrest, Functions) on Ktor OkHttp 3.5.1, Credential Manager 1.6.0 with `googleid` 1.2.1, Tink 1.23.0.
 
 ## Dependency injection
 
@@ -36,7 +36,8 @@ There is no DI framework. [`di/AppContainer.kt`](../app/src/main/java/com/autoom
 
 - `applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)` is used for writes that must outlive the screen or service that started them.
 - Nearly everything is a `lazy` singleton: repositories (songs, playlists, duplicates, stems), stores (session, library prefs, widget, `AppSettings`), `MPlayDatabase`, separation backend/controller, clip helpers, `songDeleter`, `tempoAnalyzer`, `metronomeController`, `recordingStore`, `singAlongSession`.
-- Accounts: `supabase` (`SupabaseClient` with Auth using the private `SecureSessionStore`, and Postgrest), `authRepository`, `profileRepository`, `googleSignIn`. `separationController` gets `isSignedIn = { authRepository.isSignedIn }`. See [accounts](features/accounts.md).
+- Accounts: `supabase` (`SupabaseClient` with Auth using the private `SecureSessionStore`, Postgrest and Functions), `authRepository`, `profileRepository`, `googleSignIn`, and `signedInUserId()`. `separationController` gets `isSignedIn = { authRepository.isSignedIn }`. See [accounts](features/accounts.md).
+- Plans: `entitlementsRepository` (`SupabaseEntitlementsBackend` with `DeviceId`, `DataStoreEntitlementsCache`). `MetronomeViewModel` gets a `TempoDetectionGate` over `tempoAnalyzer`. See [plans](features/plans.md).
 - `musicPlaying: MutableStateFlow<Boolean>` is shared state: `PlaybackService` writes it, `MetronomeController` reads it.
 - A private `mainScope` (`Dispatchers.Main.immediate`) backs a private app-scoped `PlaybackController` (`restoresSession = false`) passed to `MetronomeController` as its `MusicTimeline`, for syncing with the song. It binds to `PlaybackService` only while sync is on.
 - Factories: `createWidgetStatePublisher()` and `createPlaybackController(scope)` return new instances per call.
@@ -51,7 +52,7 @@ companion object {
 }
 ```
 
-ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `SeparationViewModel`, `SettingsViewModel`, `MetronomeViewModel`, `SingAlongViewModel`, `TrimEditorViewModel`, `AuthViewModel`, `AccountViewModel`. State is exposed as `StateFlow` and collected with `collectAsStateWithLifecycle`; one-off events (snackbar messages) are `Flow`s.
+ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `SeparationViewModel`, `SettingsViewModel`, `MetronomeViewModel`, `SingAlongViewModel`, `TrimEditorViewModel`, `AuthViewModel`, `AccountViewModel`, `PlansViewModel` (shared by the main screen, Now Playing, the metronome sheet, the Account card and the Plans screen). State is exposed as `StateFlow` and collected with `collectAsStateWithLifecycle`; one-off events (snackbar messages) are `Flow`s.
 
 `SettingsViewModel` and `AuthViewModel` belong to `MainActivity`. Everything under `MPlayRoot` gets its ViewModels from `SignedInViewModelScope` (an activity ViewModel holding a separate `ViewModelStore` per user), provided as `LocalViewModelStoreOwner`. The store is cleared on sign-out, which releases the playback `MediaController` and all per-user state, and survives rotation.
 
@@ -70,10 +71,11 @@ ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `Sepa
 No Navigation-Compose. [`ui/main/MainScreen.kt`](../app/src/main/java/com/autoomstudio/mp3studio/ui/main/MainScreen.kt) holds state in `rememberSaveable` and swaps screens with `AnimatedContent` + `fadeThrough()`.
 
 - Bottom bar (`Destination`): `Library`, `Playlists`, `Metronome`, `Settings`.
-- Settings sub-pages (`SettingsPage`): `Main`, `Duplicates`, `Separation` (queue), `About`, `Licenses`.
+- Settings sub-pages (`SettingsPage`): `Main`, `Duplicates`, `Separation` (queue), `About`, `Licenses`, `Plans`. `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`.
+- The trial banner (last 3 days of the trial) sits above the screen content inside the scaffold.
 - Library back stack: route strings `album:<id>` / `artist:<name>`.
 - `ExpandablePlayer` is a draggable sheet from the mini player to Now Playing.
-- Overlays: `AddToPlaylistSheet`, `PlaylistNameDialog`, `DeleteSongsHost`, `SongInfoHost`, `SeparationNoticeDialog`, `ModelMissingDialog`, `SeparationProgressPill`, `SingAlongOverlay`, snackbars.
+- Overlays: `AddToPlaylistSheet`, `PlaylistNameDialog`, `DeleteSongsHost`, `SongInfoHost`, `SeparationNoticeDialog`, `ModelMissingDialog`, `SeparationProgressPill`, `SingAlongOverlay`, `UpgradeSheet` (from Now Playing and the metronome sheet), snackbars.
 - `TrimEditorActivity` is a separate activity.
 - Back handling is layered: expanded player, then selection, then current screen.
 
@@ -151,3 +153,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-07 | - | Accounts (M1): `INTERNET`/`ACCESS_NETWORK_STATE`, `CheckAllowedPermissions` and `CheckBackendConfig` tasks, Supabase and account entries in `AppContainer`, `AuthEffects`, sign-in gate and `SignedInViewModelScope` in `MainActivity`, `SignedInMediaButtonReceiver`, `supabase/` folder. |
 | 2026-10-08 | - | Package rename: `applicationId`/`namespace` `com.autoomstudio.mp3studio`, `:separation` `com.autoomstudio.mp3studio.separation`, `:spike` `com.autoomstudio.mp3studio.spike` (app ID `com.autoomstudio.mp3studio.ai.spike`); sources moved to `com/autoomstudio/mp3studio/`; Room schema folder renamed. Class names (`MPlayApp`, `MPlayDatabase`) and `mplay.db` unchanged. |
 | 2026-10-08 | - | Removed the `:spike` feasibility app module (not shipped, no dependents). |
+| 2026-10-08 | - | Plans (M2): supabase-kt Functions, `entitlementsRepository` and `signedInUserId()` in `AppContainer`, `PlansViewModel`, `SettingsPage.Plans`, trial banner, `supabase/functions/`. |

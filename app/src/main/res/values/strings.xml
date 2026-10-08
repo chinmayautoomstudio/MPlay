@@ -28,6 +28,54 @@
     <string name="account_log_out_title">Log out?</string>
     <string name="account_log_out_message">Playback stops and you\'ll need to sign in again to use MP3 Studio. Your music, playlists, stems and recordings stay on this phone.</string>
     <string name="account_log_out_confirm">Log out</string>
+    <string name="plan_free">Free</string>
+    <string name="plan_trial">Free trial</string>
+    <string name="plan_pro">Pro</string>
+    <string name="plan_row_label">Plan</string>
+    <plurals name="plan_trial_days_left">
+        <item quantity="one">Free trial, %d day left</item>
+        <item quantity="other">Free trial, %d days left</item>
+    </plurals>
+    <string name="plan_checking">Checking your plan…</string>
+    <string name="plans_title">Plans</string>
+    <string name="plans_current">Your plan</string>
+    <string name="plans_trial_ends">Trial ends %1$s</string>
+    <string name="plans_pro_renews">Renews %1$s</string>
+    <string name="plans_pro_ends">Pro until %1$s</string>
+    <string name="plans_trial_used">Your free trial has already been used.</string>
+    <string name="plans_checked">Last checked %1$s</string>
+    <string name="plans_stale">You\'ve been offline for more than 7 days. Go online so we can confirm your plan; Pro features are locked until then.</string>
+    <string name="plans_refresh">Refresh</string>
+    <string name="plans_refresh_failed">Couldn\'t reach the server. Check your connection and try again.</string>
+    <string name="plans_compare">What each plan includes</string>
+    <string name="plans_feature_player">Music player, playlists, widget</string>
+    <string name="plans_feature_tools">MP3 Cutter, Ringtone Maker, Metronome, Lofi mode</string>
+    <string name="plans_feature_separator">AI Vocal Separator</string>
+    <string name="plans_feature_bpm">BPM Detector (with time signature)</string>
+    <string name="plans_feature_singalong">Sing Along</string>
+    <string name="plans_separator_free">10 songs a week</string>
+    <string name="plans_unlimited">Unlimited</string>
+    <string name="plans_included">Included</string>
+    <string name="plans_not_included">Not included</string>
+    <string name="plans_trial_note">New accounts get a 30-day free trial with everything in Pro, once per person and phone.</string>
+    <string name="plans_no_ads">No ads on any plan. Your music and recordings never leave your phone.</string>
+    <string name="plans_price">₹99 per month</string>
+    <string name="plans_go_pro_soon">Payments coming soon</string>
+    <string name="upgrade_title_bpm">BPM Detector is a Pro feature</string>
+    <string name="upgrade_title_singalong">Sing Along is a Pro feature</string>
+    <string name="upgrade_title_separator">Unlimited separation is a Pro feature</string>
+    <string name="upgrade_message">Go Pro to unlock:</string>
+    <string name="upgrade_benefit_separator">Unlimited AI Vocal Separator</string>
+    <string name="upgrade_benefit_bpm">BPM and time signature detection</string>
+    <string name="upgrade_benefit_singalong">Sing Along recording</string>
+    <string name="upgrade_kept">Stems you already separated and BPMs already detected stay yours on every plan.</string>
+    <string name="upgrade_see_plans">See plans</string>
+    <string name="upgrade_locked_description">Pro feature</string>
+    <plurals name="trial_banner">
+        <item quantity="one">Your free trial ends within a day.</item>
+        <item quantity="other">Your free trial ends in %d days.</item>
+    </plurals>
+    <string name="trial_banner_dismiss">Dismiss</string>
     <string name="about_terms">Terms of Service</string>
     <string name="about_terms_url" translatable="false">https://autoomstudio.com/terms</string>
 

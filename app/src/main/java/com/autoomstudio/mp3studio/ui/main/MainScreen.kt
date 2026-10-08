@@ -11,20 +11,25 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.automirrored.outlined.QueueMusic
 import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -34,6 +39,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -56,9 +62,11 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.library.SongSortOrder
 import com.autoomstudio.mp3studio.data.model.Playlist
@@ -83,6 +91,8 @@ import com.autoomstudio.mp3studio.ui.library.LibraryUiState
 import com.autoomstudio.mp3studio.ui.library.SongActions
 import com.autoomstudio.mp3studio.ui.library.SongInfoHost
 import com.autoomstudio.mp3studio.ui.library.rememberSongSelection
+import com.autoomstudio.mp3studio.ui.plans.PlansScreen
+import com.autoomstudio.mp3studio.ui.plans.PlansViewModel
 import com.autoomstudio.mp3studio.ui.playback.ExpandablePlayer
 import com.autoomstudio.mp3studio.ui.playback.MiniPlayerSlotHeight
 import com.autoomstudio.mp3studio.ui.playback.PlayerActions
@@ -172,6 +182,7 @@ fun MainScreen(
     openMetronomeRequest: Boolean,
     onOpenMetronomeHandled: () -> Unit,
     modifier: Modifier = Modifier,
+    plansViewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
 ) {
     var destination by rememberSaveable { mutableStateOf(Destination.Library) }
     val allSongs = (libraryState as? LibraryUiState.Content)?.allSongs.orEmpty()
@@ -199,6 +210,20 @@ fun MainScreen(
             onOpenMetronomeHandled()
         }
     }
+    val openPlans = {
+        destination = Destination.Settings
+        settingsPage = SettingsPage.Plans
+    }
+    val openPlansRequest by plansViewModel.openPlansRequest.collectAsStateWithLifecycle()
+    LaunchedEffect(openPlansRequest) {
+        if (openPlansRequest) {
+            openPlans()
+            onShowNowPlayingChange(false)
+            plansViewModel.onOpenPlansHandled()
+        }
+    }
+    val plan by plansViewModel.state.collectAsStateWithLifecycle()
+    var trialBannerDismissed by rememberSaveable { mutableStateOf(false) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -435,100 +460,119 @@ fun MainScreen(
                     .fillMaxSize()
                     .padding(innerPadding),
             ) {
-                AnimatedContent(
-                    targetState = destination,
-                    transitionSpec = { fadeThrough() },
-                    label = "destination",
-                    modifier = Modifier.fillMaxSize(),
-                ) { shown ->
-                    // The outgoing screen stays composed during the transition and must not claim Back.
-                    // While selecting, Back clears the selection instead.
-                    val screenBackEnabled = contentBackEnabled && shown == destination && !selection.isActive
-                    when (shown) {
-                        Destination.Library -> LibraryScreen(
-                            state = libraryState,
-                            currentSongId = nowPlaying?.songId,
-                            isPlaying = nowPlaying?.isPlaying == true,
-                            isRefreshing = isRefreshing,
-                            onRefresh = onRefresh,
-                            searchQuery = searchQuery,
-                            onPlay = onPlay,
-                            onShuffle = onShuffle,
-                            actions = songActions,
-                            selection = selection,
-                            modifier = contentModifier,
-                            backEnabled = screenBackEnabled,
+                Column(Modifier.fillMaxSize()) {
+                    if (plan.showTrialReminder && !trialBannerDismissed) {
+                        TrialBanner(
+                            daysLeft = plan.trialDaysLeft ?: 0,
+                            onOpenPlans = openPlans,
+                            onDismiss = { trialBannerDismissed = true },
                         )
+                    }
+                    AnimatedContent(
+                        targetState = destination,
+                        transitionSpec = { fadeThrough() },
+                        label = "destination",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                    ) { shown ->
+                        // The outgoing screen stays composed during the transition and must not claim Back.
+                        // While selecting, Back clears the selection instead.
+                        val screenBackEnabled = contentBackEnabled && shown == destination && !selection.isActive
+                        when (shown) {
+                            Destination.Library -> LibraryScreen(
+                                state = libraryState,
+                                currentSongId = nowPlaying?.songId,
+                                isPlaying = nowPlaying?.isPlaying == true,
+                                isRefreshing = isRefreshing,
+                                onRefresh = onRefresh,
+                                searchQuery = searchQuery,
+                                onPlay = onPlay,
+                                onShuffle = onShuffle,
+                                actions = songActions,
+                                selection = selection,
+                                modifier = contentModifier,
+                                backEnabled = screenBackEnabled,
+                            )
 
-                        Destination.Playlists -> PlaylistsScreen(
-                            playlists = playlists,
-                            currentSongId = nowPlaying?.songId,
-                            isPlaying = nowPlaying?.isPlaying == true,
-                            playlistActions = playlistActions,
-                            songActions = songActions,
-                            onPlay = onPlay,
-                            onShuffle = onShuffle,
-                            selection = selection,
-                            modifier = contentModifier,
-                            backEnabled = screenBackEnabled,
-                        )
+                            Destination.Playlists -> PlaylistsScreen(
+                                playlists = playlists,
+                                currentSongId = nowPlaying?.songId,
+                                isPlaying = nowPlaying?.isPlaying == true,
+                                playlistActions = playlistActions,
+                                songActions = songActions,
+                                onPlay = onPlay,
+                                onShuffle = onShuffle,
+                                selection = selection,
+                                modifier = contentModifier,
+                                backEnabled = screenBackEnabled,
+                            )
 
-                        Destination.Metronome -> MetronomeScreen(modifier = contentModifier)
+                            Destination.Metronome -> MetronomeScreen(modifier = contentModifier)
 
-                        Destination.Settings -> AnimatedContent(
-                            targetState = settingsPage,
-                            transitionSpec = { fadeThrough() },
-                            label = "settingsPage",
-                        ) { page ->
-                            val pageBackEnabled = screenBackEnabled && settingsPage == page
-                            when (page) {
-                                SettingsPage.Duplicates -> ReviewDuplicatesScreen(
-                                    duplicates = duplicates,
-                                    actions = duplicateActions,
-                                    onDeleteHidden = { songs -> deleteSongIds = songs.map { it.id }.toLongArray() },
-                                    onBack = { settingsPage = SettingsPage.Main },
-                                    modifier = contentModifier,
-                                    backEnabled = pageBackEnabled,
-                                )
-                                SettingsPage.Separation -> SeparationScreen(
-                                    state = separationState,
-                                    viewModel = separationViewModel,
-                                    onBack = { settingsPage = SettingsPage.Main },
-                                    modifier = contentModifier,
-                                    backEnabled = pageBackEnabled,
-                                )
-                                SettingsPage.About -> AboutScreen(
-                                    onBack = { settingsPage = SettingsPage.Main },
-                                    onOpenLicenses = { settingsPage = SettingsPage.Licenses },
-                                    onMessage = showMessage,
-                                    modifier = contentModifier,
-                                    backEnabled = pageBackEnabled,
-                                )
-                                SettingsPage.Licenses -> LicensesScreen(
-                                    onBack = { settingsPage = SettingsPage.About },
-                                    modifier = contentModifier,
-                                    backEnabled = pageBackEnabled,
-                                )
-                                SettingsPage.Main -> SettingsScreen(
-                                    theme = themeSettings,
-                                    onThemeModeChange = onThemeModeChange,
-                                    onDynamicColorChange = onDynamicColorChange,
-                                    hideDuplicates = duplicateActions.hideDuplicates,
-                                    onHideDuplicatesChange = duplicateActions.onHideDuplicatesChange,
-                                    duplicateGroupCount = duplicates.groups.size,
-                                    onReviewDuplicates = { settingsPage = SettingsPage.Duplicates },
-                                    onOpenAbout = { settingsPage = SettingsPage.About },
-                                    modifier = contentModifier,
-                                    accountSection = { header -> AccountSection(sectionHeader = header) },
-                                    separationSection = { header ->
-                                        SeparationSettingsSection(
-                                            state = separationState,
-                                            viewModel = separationViewModel,
-                                            onOpenQueue = { settingsPage = SettingsPage.Separation },
-                                            sectionHeader = header,
-                                        )
-                                    },
-                                )
+                            Destination.Settings -> AnimatedContent(
+                                targetState = settingsPage,
+                                transitionSpec = { fadeThrough() },
+                                label = "settingsPage",
+                            ) { page ->
+                                val pageBackEnabled = screenBackEnabled && settingsPage == page
+                                when (page) {
+                                    SettingsPage.Duplicates -> ReviewDuplicatesScreen(
+                                        duplicates = duplicates,
+                                        actions = duplicateActions,
+                                        onDeleteHidden = { songs -> deleteSongIds = songs.map { it.id }.toLongArray() },
+                                        onBack = { settingsPage = SettingsPage.Main },
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                    )
+                                    SettingsPage.Separation -> SeparationScreen(
+                                        state = separationState,
+                                        viewModel = separationViewModel,
+                                        onBack = { settingsPage = SettingsPage.Main },
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                    )
+                                    SettingsPage.About -> AboutScreen(
+                                        onBack = { settingsPage = SettingsPage.Main },
+                                        onOpenLicenses = { settingsPage = SettingsPage.Licenses },
+                                        onMessage = showMessage,
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                    )
+                                    SettingsPage.Licenses -> LicensesScreen(
+                                        onBack = { settingsPage = SettingsPage.About },
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                    )
+                                    SettingsPage.Plans -> PlansScreen(
+                                        onBack = { settingsPage = SettingsPage.Main },
+                                        onMessage = showMessage,
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                    )
+                                    SettingsPage.Main -> SettingsScreen(
+                                        theme = themeSettings,
+                                        onThemeModeChange = onThemeModeChange,
+                                        onDynamicColorChange = onDynamicColorChange,
+                                        hideDuplicates = duplicateActions.hideDuplicates,
+                                        onHideDuplicatesChange = duplicateActions.onHideDuplicatesChange,
+                                        duplicateGroupCount = duplicates.groups.size,
+                                        onReviewDuplicates = { settingsPage = SettingsPage.Duplicates },
+                                        onOpenAbout = { settingsPage = SettingsPage.About },
+                                        modifier = contentModifier,
+                                        accountSection = { header ->
+                                            AccountSection(sectionHeader = header, onOpenPlans = openPlans)
+                                        },
+                                        separationSection = { header ->
+                                            SeparationSettingsSection(
+                                                state = separationState,
+                                                viewModel = separationViewModel,
+                                                onOpenQueue = { settingsPage = SettingsPage.Separation },
+                                                sectionHeader = header,
+                                            )
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -654,7 +698,35 @@ fun MainScreen(
     SingAlongOverlay()
 }
 
-private enum class SettingsPage { Main, Duplicates, Separation, About, Licenses }
+private enum class SettingsPage { Main, Duplicates, Separation, About, Licenses, Plans }
+
+/** Last days of the free trial (PRD TR6); tapping it opens Plans. */
+@Composable
+private fun TrialBanner(daysLeft: Int, onOpenPlans: () -> Unit, onDismiss: () -> Unit) {
+    Surface(
+        onClick = onOpenPlans,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp),
+        ) {
+            Icon(Icons.Outlined.WorkspacePremium, contentDescription = null, modifier = Modifier.size(20.dp))
+            Text(
+                pluralStringResource(R.plurals.trial_banner, daysLeft, daysLeft),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp),
+            )
+            IconButton(onClick = onDismiss) {
+                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.trial_banner_dismiss))
+            }
+        }
+    }
+}
 
 @Composable
 private fun MPlayNavigationBar(

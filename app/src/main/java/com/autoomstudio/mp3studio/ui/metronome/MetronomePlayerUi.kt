@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -40,7 +41,9 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -53,10 +56,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.model.Song
+import com.autoomstudio.mp3studio.data.plan.Feature
 import com.autoomstudio.mp3studio.metronome.MetronomeSettings
 import com.autoomstudio.mp3studio.metronome.SyncState
 import com.autoomstudio.mp3studio.metronome.TempoConfidence
 import com.autoomstudio.mp3studio.ui.components.MetronomeIcons
+import com.autoomstudio.mp3studio.ui.plans.PlansViewModel
+import com.autoomstudio.mp3studio.ui.plans.UpgradeSheet
 import kotlin.math.roundToInt
 
 /** The compact metronome control on Now Playing (MT12); shows the BPM while the metronome runs. */
@@ -94,11 +100,18 @@ fun MetronomeSheet(
     song: Song?,
     onDismiss: () -> Unit,
     viewModel: MetronomeViewModel = viewModel(factory = MetronomeViewModel.Factory),
+    plansViewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val tapCount by viewModel.tapCount.collectAsStateWithLifecycle()
     val detection by viewModel.detection.collectAsStateWithLifecycle()
     val sync by viewModel.sync.collectAsStateWithLifecycle()
+    val plan by plansViewModel.state.collectAsStateWithLifecycle()
+    var upgradeFeature by remember { mutableStateOf<Feature?>(null) }
+    LaunchedEffect(viewModel) {
+        viewModel.upgradeRequests.collect { upgradeFeature = it }
+    }
+    upgradeFeature?.let { feature -> UpgradeSheet(feature = feature, onDismiss = { upgradeFeature = null }) }
     // The sheet covers the main screen's snackbar, so it shows its own (MT19).
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalContext.current.resources
@@ -141,6 +154,7 @@ fun MetronomeSheet(
                             detection = songDetection,
                             bpm = state.settings.bpm,
                             canDetect = song != null,
+                            locked = !plan.unlocks(Feature.BpmDetector),
                             onDetect = { song?.let(viewModel::detect) },
                             onScale = viewModel::scaleBpm,
                             onApplyMeter = viewModel::applyMeter,
@@ -189,6 +203,7 @@ private fun DetectTempo(
     detection: TempoDetection,
     bpm: Int,
     canDetect: Boolean,
+    locked: Boolean,
     onDetect: () -> Unit,
     onScale: (Double) -> Unit,
     onApplyMeter: () -> Unit,
@@ -196,9 +211,19 @@ private fun DetectTempo(
     val running = detection is TempoDetection.Running
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            // Stays tappable while locked: songs detected before still fill in, others open the upgrade sheet.
             BoxButton(onClick = onDetect, enabled = canDetect && !running, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Outlined.GraphicEq, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Text(stringResource(R.string.metronome_detect), Modifier.padding(start = 10.dp))
+                if (locked) {
+                    Icon(
+                        Icons.Outlined.Lock,
+                        contentDescription = stringResource(R.string.upgrade_locked_description),
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(16.dp),
+                    )
+                }
             }
             BoxButton(
                 onClick = { onScale(0.5) },

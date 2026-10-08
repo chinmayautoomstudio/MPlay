@@ -23,9 +23,9 @@ class SongTempoAnalyzer(
     private val context: Context,
     private val dao: TempoDao,
     private val stemRepository: StemRepository,
-) {
+) : TempoSource {
     /** The stored result, if the song's file hasn't changed since it was analyzed with meter detection. */
-    suspend fun cached(song: Song): RhythmEstimate? =
+    override suspend fun cached(song: Song): RhythmEstimate? =
         when (val lookup = TempoCache.lookup(dao.tempo(song.id), song.sizeBytes, song.dateModified)) {
             is TempoLookup.Hit -> lookup.rhythm
             TempoLookup.Stale -> {
@@ -36,7 +36,7 @@ class SongTempoAnalyzer(
         }
 
     /** Returns null when the file can't be decoded or has no clear beat. */
-    suspend fun detect(song: Song, onProgress: (Float) -> Unit): RhythmEstimate? {
+    override suspend fun detect(song: Song, onProgress: (Float) -> Unit): RhythmEstimate? {
         cached(song)?.let { return it }
         val rhythm = withContext(Dispatchers.Default) { analyze(song, onProgress) } ?: return null
         dao.upsert(TempoCache.entry(song.id, song.sizeBytes, song.dateModified, rhythm))

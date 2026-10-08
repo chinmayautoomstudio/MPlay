@@ -1,6 +1,7 @@
 package com.autoomstudio.mp3studio.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,9 +12,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -42,14 +45,19 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.SubcomposeAsyncImage
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.account.ProfileRepository
+import com.autoomstudio.mp3studio.ui.plans.PlansViewModel
+import com.autoomstudio.mp3studio.ui.plans.planLabel
 
 /** The signed-in Google account at the top of Settings: photo, name, email, rename and log out (PRD AU5, AU6). */
 @Composable
 fun AccountSection(
     sectionHeader: @Composable (String) -> Unit,
+    onOpenPlans: () -> Unit,
     viewModel: AccountViewModel = viewModel(factory = AccountViewModel.Factory),
+    plansViewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
 ) {
     val account by viewModel.account.collectAsStateWithLifecycle()
+    val plan by plansViewModel.state.collectAsStateWithLifecycle()
     val savingName by viewModel.savingName.collectAsStateWithLifecycle()
     var editingName by rememberSaveable { mutableStateOf(false) }
     var confirmingLogOut by rememberSaveable { mutableStateOf(false) }
@@ -61,6 +69,14 @@ fun AccountSection(
         headlineContent = { Text(current.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(current.email, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+    )
+    ListItem(
+        leadingContent = { Icon(Icons.Outlined.WorkspacePremium, contentDescription = null) },
+        headlineContent = { Text(stringResource(R.string.plan_row_label)) },
+        supportingContent = { Text(planLabel(plan)) },
+        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+        modifier = Modifier.clickable(onClick = onOpenPlans),
     )
     Row(
         modifier = Modifier

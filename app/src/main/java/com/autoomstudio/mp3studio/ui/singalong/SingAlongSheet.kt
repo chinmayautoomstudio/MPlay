@@ -17,6 +17,7 @@ import androidx.compose.material.icons.outlined.BluetoothAudio
 import androidx.compose.material.icons.outlined.Headphones
 import androidx.compose.material.icons.outlined.HeadsetOff
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.SdStorage
 import androidx.compose.material3.AssistChip
@@ -55,12 +56,23 @@ import kotlinx.coroutines.flow.Flow
 
 /** "Sing along" beside the vocal separator control on Now Playing (SA1). */
 @Composable
-fun SingAlongChip(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun SingAlongChip(onClick: () -> Unit, modifier: Modifier = Modifier, locked: Boolean = false) {
     AssistChip(
         onClick = onClick,
         label = { Text(stringResource(R.string.singalong_chip)) },
         leadingIcon = {
             Icon(Icons.Outlined.Mic, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
+        },
+        trailingIcon = if (locked) {
+            {
+                Icon(
+                    Icons.Outlined.Lock,
+                    contentDescription = stringResource(R.string.upgrade_locked_description),
+                    modifier = Modifier.size(AssistChipDefaults.IconSize),
+                )
+            }
+        } else {
+            null
         },
         modifier = modifier,
     )

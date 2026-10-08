@@ -54,7 +54,10 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    /** Run when the app comes to the foreground: drops a disabled or revoked account (AU11), refreshes the profile. */
+    /**
+     * Run when the app comes to the foreground: drops a disabled or revoked account (AU11), refreshes the profile
+     * and the plan (PRD flow 2).
+     */
     fun verifyAccount() {
         viewModelScope.launch {
             val signedIn = container.authRepository.state.value as? AuthState.SignedIn ?: return@launch
@@ -62,6 +65,7 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
                 _errors.send(it)
                 return@launch
             }
+            launch { container.entitlementsRepository.refresh(signedIn.user.id) }
             runCatching { container.profileRepository.refresh(signedIn.user.id) }
         }
     }

@@ -1,8 +1,10 @@
 package com.autoomstudio.mp3studio.di
 
 import android.content.Context
+import android.util.Log
 import com.autoomstudio.mp3studio.BuildConfig
 import com.autoomstudio.mp3studio.data.account.AuthRepository
+import com.autoomstudio.mp3studio.data.account.AuthState
 import com.autoomstudio.mp3studio.data.account.GoogleSignIn
 import com.autoomstudio.mp3studio.data.account.ProfileRepository
 import com.autoomstudio.mp3studio.data.account.SecureSessionStore
@@ -19,6 +21,10 @@ import com.autoomstudio.mp3studio.data.library.LibraryPreferences
 import com.autoomstudio.mp3studio.data.library.MediaStoreSongSource
 import com.autoomstudio.mp3studio.data.library.SongDeleter
 import com.autoomstudio.mp3studio.data.library.SongRepository
+import com.autoomstudio.mp3studio.data.plan.DataStoreEntitlementsCache
+import com.autoomstudio.mp3studio.data.plan.DeviceId
+import com.autoomstudio.mp3studio.data.plan.EntitlementsRepository
+import com.autoomstudio.mp3studio.data.plan.SupabaseEntitlementsBackend
 import com.autoomstudio.mp3studio.data.playlist.MPlayDatabase
 import com.autoomstudio.mp3studio.data.playlist.PlaylistRepository
 import com.autoomstudio.mp3studio.playback.PlaybackController
@@ -39,6 +45,7 @@ import com.autoomstudio.mp3studio.widget.WidgetStateStore
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.createSupabaseClient
+import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.ktor.client.engine.okhttp.OkHttp
 import kotlinx.coroutines.CoroutineScope
@@ -125,7 +132,17 @@ class AppContainer(context: Context) {
                 alwaysAutoRefresh = true
             }
             install(Postgrest)
+            install(Functions)
         }
+    }
+
+    val entitlementsRepository: EntitlementsRepository by lazy {
+        EntitlementsRepository(
+            backend = SupabaseEntitlementsBackend(supabase) { DeviceId.of(appContext) },
+            cache = DataStoreEntitlementsCache(appContext),
+            scope = applicationScope,
+            onRefreshFailed = { Log.w("Entitlements", "Could not refresh entitlements", it) },
+        )
     }
 
     val authRepository: AuthRepository by lazy {
@@ -133,6 +150,8 @@ class AppContainer(context: Context) {
     }
 
     val profileRepository: ProfileRepository by lazy { ProfileRepository(supabase) }
+
+    fun signedInUserId(): String? = (authRepository.state.value as? AuthState.SignedIn)?.user?.id
 
     val googleSignIn: GoogleSignIn by lazy { GoogleSignIn(BuildConfig.GOOGLE_WEB_CLIENT_ID) }
 

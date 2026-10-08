@@ -48,19 +48,19 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `Auth
 ### Staying signed in
 
 - supabase-kt refreshes the token automatically (`alwaysAutoRefresh`). A refresh that fails while offline keeps the user signed in with the stored session's user (`AuthRepository.reduce`), so the app works offline.
-- `MainActivity.onStart` calls `AuthViewModel.verifyAccount()`: it refreshes the session and reads `profiles.disabled`. Codes `user_banned` (disabled) and `session_not_found`, `session_expired`, `refresh_token_not_found`, `refresh_token_already_used`, `user_not_found` (revoked) sign the user out with a message. Network errors are ignored. It then refreshes the profile.
+- `MainActivity.onStart` calls `AuthViewModel.verifyAccount()`: it refreshes the session and reads `profiles.disabled`. Codes `user_banned` (disabled) and `session_not_found`, `session_expired`, `refresh_token_not_found`, `refresh_token_already_used`, `user_not_found` (revoked) sign the user out with a message. Network errors are ignored. It then refreshes the profile and the plan ([plans](plans.md)).
 
 ### Signed out (PRD AU4)
 
 - `PlaybackService` rejects every controller and refuses resumption while signed out, and stops and clears the player on sign-out, keeping the saved queue ([playback](playback.md)).
 - `SignedInMediaButtonReceiver` doesn't start the service for headset or widget play buttons.
 - The widget shows "Sign in to MP3 Studio" without controls ([widget](widget.md)).
-- `AuthEffects`, after a real sign-out (not on a cold start without a session): cancels a sing-along session, stops the metronome, clears the profile and calls `SeparationController.onSignedOut()`, which cancels the WorkManager job so the song returns to the queue ([vocal separation](vocal-separation.md)). On sign-in it calls `onSignedIn()` to resume the queue. It refreshes the widget on both.
+- `AuthEffects`, after a real sign-out (not on a cold start without a session): cancels a sing-along session, stops the metronome, clears the profile and the cached plan (`EntitlementsRepository.clear()`, PRD AU6) and calls `SeparationController.onSignedOut()`, which cancels the WorkManager job so the song returns to the queue ([vocal separation](vocal-separation.md)). On sign-in it refreshes the plan and calls `onSignedIn()` to resume the queue. It refreshes the widget on both.
 - `TrimEditorActivity` finishes itself on sign-out.
 
 ### Account card and log out
 
-`AccountSection` (top of Settings) shows the photo (Coil, with a person icon as placeholder), name and email. The profile row wins; the Google account details cover it until it loads. Edit name updates `profiles.display_name` (max 80 characters, trimmed) and shows an error in the dialog if it fails. Log out asks for confirmation, then runs `AuthRepository.signOut()` on the application scope (local sign-out falls back to clearing the session if the server can't be reached).
+`AccountSection` (top of Settings) shows the photo (Coil, with a person icon as placeholder), name and email, and a Plan row that opens Settings > Plans ([plans](plans.md)). The profile row wins; the Google account details cover it until it loads. Edit name updates `profiles.display_name` (max 80 characters, trimmed) and shows an error in the dialog if it fails. Log out asks for confirmation, then runs `AuthRepository.signOut()` on the application scope (local sign-out falls back to clearing the session if the server can't be reached).
 
 ## Data and persistence
 
@@ -113,3 +113,4 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `Auth
 |---|---|---|
 | 2026-10-07 | - | Mandatory Google sign-in, encrypted session store, signed-out blocking, Account card (M1). |
 | 2026-10-08 | - | Package is now `com.autoomstudio.mp3studio` (Android OAuth clients must use it). `[16] Account reauth failed` shows `AccountUnavailable` instead of failing silently; sign-in failures are logged. |
+| 2026-10-08 | - | M2: sign-in and foreground checks refresh the plan, sign-out clears it, Account card has a Plan row. |
