@@ -59,6 +59,7 @@ All keys in DataStore `app_settings`:
 | `metronome_sound` | String | `Classic` | Metronome |
 | `metronome_volume` | Float | 0.8 (0-1) | Metronome |
 | `singalong_note_seen` | Boolean | `false` | [Sing-along](sing-along.md) |
+| `admin_activity_seen_at` | Long | 0 (epoch ms) | [Admin](admin.md) Activity bell |
 
 Other DataStores: `playback_session`, `library_prefs`, `widget_state`, and `auth_session` (key `session`: the Supabase session, encrypted with Tink, excluded from backup; see [accounts](accounts.md)). The Tink keyset lives in SharedPreferences `auth_keyset_prefs`. DataStore `entitlements` (key `entitlements_json`: the last plan answer from the server, cleared on sign-out; see [plans](plans.md)).
 
@@ -93,3 +94,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-08 | - | `MPlayAppTheme(forceDark)` for the always-dark sign-in screen ([accounts](accounts.md)). |
 | 2026-10-08 | - | Settings tab replaced by the Profile tab (photo as the tab icon), Profile screen with category cards and separate settings pages; `SettingsScreen.kt` removed. |
 | 2026-10-08 | - | Compact Profile layout (one-row header, smaller avatar, cards and text) and a pencil-only Edit button. |
+| 2026-10-08 | - | Key `admin_activity_seen_at` for the Admin Activity bell ([admin](admin.md)). |

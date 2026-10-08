@@ -4,7 +4,7 @@
 
 ## Summary
 
-Admins get an Admin row on the Settings Account card. It opens screens to look up users, see each user's plan, trial, subscriptions, payments and AI Vocal Separator usage, change roles, disable accounts, grant or remove Pro with an end date, add other admins (by email, as an invite if they haven't signed in yet), and read the audit log. Every change is checked and logged on the server; the app only decides whether to offer the screens.
+Admins get an Admin card on the Profile screen, below Subscription. It opens the Admin dashboard, with screens to look up users, see each user's plan, trial, subscriptions, payments and AI Vocal Separator usage, change roles, disable accounts, grant or remove Pro with an end date, add other admins (by email, as an invite if they haven't signed in yet), read the audit log, and follow an Activity feed of new sign-ups, subscriptions and deleted accounts. Every change is checked and logged on the server; the app only decides whether to offer the screens.
 
 ## Key files
 
@@ -15,18 +15,22 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 | `data/admin/AdminModels.kt` | DTOs for every admin response, `UserFilter`, `AddAdminResult`, `AdminError`, `AdminException`. |
 | `data/admin/AdminBackend.kt` | `AdminBackend` interface and `SupabaseAdminBackend`, which calls the `admin` Edge Function with an `action`; `errorOf()` maps HTTP status and refusal codes to `AdminError`. `PAGE_SIZE = 50`. |
 | `data/plan/Entitlements.kt`, `data/plan/EntitlementsBackend.kt` | `Entitlements.isAdmin`, from `role == "admin"` in the `entitlements` response. |
-| `ui/admin/AdminViewModel.kt` | Page back stack (`AdminPage`: Home, User, Admins, Usage, Audit), loading state per page, debounced user search, actions, one-shot `AdminMessage`s, `closed` when access is lost. |
-| `ui/admin/AdminScreen.kt` | Host (back handling, messages) and the home page: overview counts, links, search, filter chips, user list with paging. |
+| `ui/admin/AdminViewModel.kt` | Page back stack (`AdminPage`: Home, User, Admins, Usage, Audit, Activity), loading state per page, debounced user search, actions, one-shot `AdminMessage`s, `closed` when access is lost, `activity` and `unread` for the bell. |
+| `ui/admin/AdminScreen.kt` | Host (back handling, messages) and the dashboard: wordmark header with the Admin chip and bell, stats card, shortcut cards, Users card (pill search, filter chips, `AdminUserRowItem` with the "..." menu and its confirm dialog, paging). |
 | `ui/admin/AdminUserScreen.kt` | User detail and actions, confirm dialogs, `GrantProDialog` (1 month, 3 months, 1 year or a picked date up to 5 years ahead). |
-| `ui/admin/AdminListScreens.kt` | Admins and invites (`AddAdminDialog`), weekly usage with top users, audit log. |
-| `ui/admin/AdminCommon.kt` | Error and message texts, date formatting, shared loading and error blocks. |
-| `ui/settings/AccountSection.kt`, `ui/main/MainScreen.kt` | Admin row (shown when `PlanUiState.isAdmin`) and `SettingsPage.Admin`. |
+| `ui/admin/AdminListScreens.kt` | Admins and invites (`AddAdminDialog`), weekly usage with top users, audit log, `AdminActivityScreen`. |
+| `ui/admin/AdminCommon.kt` | Error and message texts, date formatting, shared loading and error blocks, `AdminCard`, `IconTile`, `AdminColors`. |
+| `ui/settings/ProfileScreen.kt`, `ui/main/MainScreen.kt` | Admin card (shown when `PlanUiState.isAdmin`) and `ProfilePage.Admin`; the app top bar is hidden on the Admin screens. |
+| `data/settings/AppSettings.kt` | `adminActivitySeenAt` (key `admin_activity_seen_at`). |
 | `supabase/migrations/20261010000000_admin.sql` | `admin_invites`, invite handling in `handle_new_user()`, `admin_*` functions. |
+| `supabase/migrations/20261012000000_admin_activity.sql` | `admin_activity()` for the Activity feed. |
 | `supabase/functions/admin/index.ts`, `supabase/functions/_shared/admin.ts` | The `admin` Edge Function and its request parser. |
 
 ## How it works
 
-- **Who sees it.** The Admin row shows when the cached entitlements say `isAdmin`. That flag only hides or shows the screens; every call is checked again on the server.
+- **Dashboard.** The home page draws its own header (MP3 Studio wordmark, Admin chip, bell) instead of the app top bar; system Back leaves it. Below the title are a stats card (Total, Pro, Free trial, Free, Disabled, Admins, and this week's separations, which opens Usage), shortcut cards for Admins, Usage and Audit log, and the Users card. Each user row has an initials avatar with a green (enabled) or grey (disabled) dot, the plan, this week's separations, Admin and Disabled badges, and a "..." menu: View details, Make or Remove admin and Disable (both confirmed) or Enable. Your own row has no Disable.
+- **Activity bell.** The dashboard loads `activity` (the newest 50 events) with the overview. `unread` counts events newer than `admin_activity_seen_at` and shows as a red badge. Opening Activity saves the newest event time as seen. Sign-up and subscription rows open the user; deleted-account rows don't. If the `admin` Edge Function hasn't been redeployed with the `activity` action yet, the call fails quietly and no badge shows.
+- **Who sees it.** The Admin card shows when the cached entitlements say `isAdmin`. That flag only hides or shows the screens; every call is checked again on the server.
 - **Calls.** `SupabaseAdminBackend` sends `POST /functions/v1/admin` with `{"action": ..., ...}`. The function verifies the user token, validates the body (`parseAdminRequest`), and calls the matching `admin_*` Postgres function with `p_actor` set to the caller. Each function starts with `assert_admin(p_actor)`, which refuses non-admins and disabled admins (403 `forbidden`). See [backend.md](../backend.md) for the action list.
 - **Refusals.** Some requests are refused with 409 and a code: `last_admin` (demoting or disabling the last enabled admin), `self` (disabling yourself), `invalid_email`, `invalid_date`. Unknown users are 404. The app shows a snackbar for each (`AdminError`).
 - **Losing access.** If a call returns 403 (you were demoted or disabled elsewhere), `AdminViewModel` shows "Admin access was removed", refreshes your plan and closes the screens.
@@ -38,7 +42,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 
 ## Data and persistence
 
-- Nothing is stored on the phone besides the existing `entitlements` cache ([plans](plans.md)).
+- On the phone: the existing `entitlements` cache ([plans](plans.md)) and the DataStore key `admin_activity_seen_at` (Long, epoch ms of the newest Activity event seen; [settings](settings-and-about.md)).
 - Server: `admin_invites`, `admin_audit_log` (actions `set_role`, `disable`, `enable`, `invite_admin`, `revoke_invite`, `invite_accepted`, `grant_pro`, `revoke_pro`, and `account_deleted` written by `delete_account()` when a user deletes their own account), `subscriptions` rows with provider `admin`. See [backend.md](../backend.md).
 
 ## Manifest, permissions and notifications
@@ -47,17 +51,18 @@ None. Uses the existing network access.
 
 ## Tests
 
-- `app/src/test/.../ui/admin/AdminViewModelTest.kt`: initial load, page back stack, debounced search, refusal message, own role change refreshes the plan, 403 closes the screens.
+- `app/src/test/.../ui/admin/AdminViewModelTest.kt`: initial load, page back stack, debounced search, refusal message, own role change refreshes the plan, 403 closes the screens, Activity unread count cleared by opening the feed.
 - `app/src/test/.../data/plan/EntitlementsResponseTest.kt`: `role` maps to `isAdmin`.
-- `supabase/tests/admin_test.sql` (pgTAP): non-admin and disabled-admin refusals, last admin and self rules, promote and step down, invites and the sign-up trigger, Pro grant and removal, search, audit rows, no access for `authenticated`.
-- `supabase/functions/_shared/admin_test.ts` (Deno): request parsing and validation.
+- `supabase/tests/admin_test.sql` (pgTAP): non-admin and disabled-admin refusals, last admin and self rules, promote and step down, invites and the sign-up trigger, Pro grant and removal, search, audit rows, `admin_activity` (refusal, sign-up, subscription and deleted events, newest first), no access for `authenticated`.
+- `supabase/functions/_shared/admin_test.ts` (Deno): request parsing and validation, including `activity` limits.
 - Gap: no UI (Compose) tests.
 
 ## Known limitations and TODOs
 
 - An invite only matches the exact email (case-insensitive); a different alias of the same Google account isn't matched.
 - Admin Pro grants don't show payment history; payment providers (M4) aren't built yet.
-- The Admin row appears only after entitlements refresh (sign-in or app start), so a newly promoted admin may need to reopen the app.
+- The Activity feed is computed live from `profiles`, `subscriptions` and the audit log: a subscription that later expires drops out of it, and unread is tracked per phone, not per admin.
+- The Admin card appears only after entitlements refresh (sign-in or app start), so a newly promoted admin may need to reopen the app.
 
 ## Change history
 
@@ -65,3 +70,4 @@ None. Uses the existing network access.
 |---|---|---|
 | 2026-10-08 | | Admin screens, invites, Pro grants and audit log (PRD v3.2 M5). |
 | 2026-10-08 | | M6: `account_deleted` audit entries; the store review account gets Pro from the Admin screens ([store review](../store-review.md)). |
+| 2026-10-08 | | Dashboard redesign (wordmark header, stats card, shortcut cards, Users card with "..." menu) and the Activity bell (`admin_activity()`, `activity` action, `admin_activity_seen_at`). |
