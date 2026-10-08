@@ -138,6 +138,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 - `AudioTrack` creation failure is silent.
 - Call detection can take up to 500 ms.
 - `stop()` can block the main thread up to 500 ms per thread join.
+- Swiping the app away from recents stops the metronome (`MetronomeService.onTaskRemoved` and `di/TaskRemoval`, see [architecture](../architecture.md#removal-from-recents)).
 - Signing out stops the metronome (`di/AuthEffects` calls `MetronomeController.stop()`); "Sync with song" is not yet limited to Pro (planned for the plans milestone).
 
 ## Change history
@@ -151,3 +152,4 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | 2026-10-07 | - | The metronome stops on sign-out. See [accounts](accounts.md). |
 | 2026-10-08 | - | New BPM detections need Trial or Pro (`TempoDetectionGate`, `SongTempoAnalyzer` implements `TempoSource`); cached tempos stay usable. See [plans](plans.md). |
 | 2026-10-08 | - | Tap tempo removed (`TapTempo`, `TapTempoTest`); one-tap Detect BPM on the Metronome tab too, through the shared `MetronomeWithDetection`. |
+| 2026-10-08 | - | The metronome stops when the app is swiped away from recents (`MetronomeService.onTaskRemoved`, `TaskRemoval`). |

@@ -6,7 +6,12 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
-Changes after 3.1 that haven't shipped in a version yet. `versionName` is still `3.1`.
+### Changed
+- Swiping MP3 Studio away from recents now ends all background work, not just music: the metronome stops, a sing-along take in progress is discarded, and vocal separation pauses (the song goes back to the queue and the queue resumes the next time the app opens). Pressing Back stops nothing. New `di/TaskRemoval`, called from `onTaskRemoved` of `PlaybackService`, `MetronomeService`, `RecordingService` and the new non-exported `SeparationTaskWatcher` service (started by `SeparationWorker` for the length of a run); `SeparationController.pause()`/`resume()`; unit test `TaskRemovalTest`. ([architecture](architecture.md), [metronome](features/metronome.md), [sing-along](features/sing-along.md), [vocal separation](features/vocal-separation.md), [playback](features/playback.md))
+
+## [3.2] - 2026-10-08
+
+MP3 Studio: the rename from MPlay, mandatory Google sign-in, Free/Trial/Pro plans, the weekly AI Vocal Separator limit, admin screens, account deletion, metronome sync and time signature detection, and playback that stops when the app is swiped away.
 
 ### Added
 - Admin Activity feed: the bell on the Admin dashboard shows a red badge with the number of new events and opens a list of new sign-ups, new subscriptions (with plan and provider) and deleted accounts, newest first; tapping a sign-up or subscription opens that user. Supabase migration `admin_activity` (`admin_activity()`, applied live) and the `activity` action of the `admin` Edge Function; DataStore key `admin_activity_seen_at`; pgTAP, Deno and `AdminViewModelTest` cases. ([admin](features/admin.md), [backend](backend.md))
@@ -42,10 +47,12 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 - `PlaybackController` implements `MusicTimeline` (song ID, playing, seeks, position snapshot with speed) and takes `restoresSession`; `AppContainer` gives the metronome its own instance. ([playback](features/playback.md), [architecture](architecture.md))
 
 ### Changed
+- Swiping MP3 Studio away from recents now stops the music and removes the notification, instead of playing on in the background. The queue and position are saved, so reopening the app or pressing play on the widget resumes it. ([playback](features/playback.md))
 - Detect BPM is now on the Metronome tab as well as the Now Playing sheet: one tap analyses the song that's playing (disabled with "Play a song to detect its BPM" when nothing plays). The low-confidence and failed messages no longer point to Tap tempo. ([metronome](features/metronome.md))
 - The "Profile" label in the bottom navigation bar now lines up with the other tab labels. ([settings](features/settings-and-about.md))
 - Admin dashboard redesign: MP3 Studio wordmark header with an Admin chip and the Activity bell (the app top bar is hidden there), "Admin Dashboard" title, a stats card with six coloured tiles and a weekly usage row, three shortcut cards (Admins, AI Vocal Separator usage, Audit log), and a Users card with a pill search, filled filter chips and rows with initials avatars, a status dot, plan chip, weekly count and a "..." menu (View details, Make/Remove admin, Disable/Enable). ([admin](features/admin.md))
 - Profile screen is more compact so it fits on one phone screen: the back button and title share a row, and the avatar, subscription card, category rows and text are smaller. Edit is now a small pencil icon button. ([settings](features/settings-and-about.md))
+- `versionName` 3.1 to 3.2 and `versionCode` 6 to 7, so Settings > About shows 3.2 and the build installs over 3.1 builds. ([settings](features/settings-and-about.md))
 - `versionCode` 5 to 6 (`versionName` stays 3.1), so sideloaded builds with the Profile tab install as an update and can be told apart from earlier 3.1 builds. ([architecture](architecture.md))
 - The Settings tab is now the Profile tab, and its icon is the account photo. The Profile screen has a back button, the photo with name, email and an Edit button, a subscription card that opens Plans, an Admin card for admins, and cards for Appearance, Library, Vocal Separation, Background Playback and About, each opening its own page. Log out is below About. Delete account and the name field moved into the Edit page. The screen follows the light or dark theme. ([settings](features/settings-and-about.md), [accounts](features/accounts.md), [architecture](architecture.md))
 - Redesigned sign-in screen: always dark, with a glowing floating M logo, "MP3 Studio" with a gradient "Studio", the "Your Music. Your Way." tagline, an animated hero (flowing waves, equalizer bars, floating notes, sparkles), a white glowing "Continue with Google" pill with the Google G and a spinner while signing in, and linked Terms and Privacy text. The entrance is staggered, and every animation is skipped when system animations are off. `MPlayAppTheme` gained `forceDark`. ([accounts](features/accounts.md), [settings](features/settings-and-about.md))

@@ -64,6 +64,11 @@ class RecordingService : Service() {
         return START_NOT_STICKY
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        (application as MPlayApp).container.taskRemoval.onTaskRemoved()
+        stopSelf()
+    }
+
     override fun onDestroy() {
         scope.cancel()
         super.onDestroy()

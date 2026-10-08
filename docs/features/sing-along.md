@@ -125,6 +125,7 @@ The sheet warns when no headphones are connected (music will leak into the mic) 
 - The count-in has no click unless the metronome is already running (SA6).
 - The song must already be the player's current item.
 - The foreground service stops after recording, so review and export run without one.
+- Swiping the app away from recents discards a take that is being prepared, recorded or reviewed (`SingAlongSession.cancel()` from `di/TaskRemoval`, also via `RecordingService.onTaskRemoved`). See [architecture](../architecture.md#removal-from-recents).
 - On Android 8-9, saving needs `WRITE_EXTERNAL_STORAGE`, which this flow doesn't request.
 - Pending-row cleanup only runs on Android 11+.
 
@@ -136,3 +137,4 @@ The sheet warns when no headphones are connected (music will leak into the mic) 
 | 2026-10-06 | - | Recording and saving animations (`SingAlongAnimations.kt`): state transitions, blinking dot, voice rings, scrolling waveform, rolling timer, saving ring, animated saved check; off with system animations. |
 | 2026-10-07 | - | Recordings folder renamed to `Music/MP3 Studio Recordings`; the old `Music/MPlay Recordings/` stays exempt from the 30 s minimum. A running session is cancelled on sign-out (`di/AuthEffects`). |
 | 2026-10-08 | - | Sing Along needs Trial or Pro: the chip opens the upgrade sheet on Free. See [plans](plans.md). |
+| 2026-10-08 | - | A session is discarded when the app is swiped away from recents (`RecordingService.onTaskRemoved`, `TaskRemoval`). |

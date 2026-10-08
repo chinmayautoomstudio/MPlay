@@ -221,6 +221,16 @@ class AppContainer(context: Context) {
         SingAlongSession(appContext, stemRepository, recordingStore, metronomeController, ::createPlaybackController)
     }
 
+    val taskRemoval: TaskRemoval by lazy {
+        TaskRemoval(
+            stopSingAlong = { singAlongSession.cancel() },
+            stopMetronome = { metronomeController.stop() },
+            pauseSeparation = { separationController.pause() },
+            resumeSeparation = { separationController.resume() },
+            scope = applicationScope,
+        )
+    }
+
     fun createWidgetStatePublisher(): WidgetStatePublisher =
         WidgetStatePublisher(appContext, widgetStateStore, applicationScope)
 

@@ -84,6 +84,14 @@ class SeparationController(
     /** Stops separating; the interrupted song goes back to the queue and waits for the next sign-in. */
     suspend fun onSignedOut() = backend.cancel()
 
+    /** Stops separating when the app is removed from recents; the interrupted song goes back to the queue. */
+    suspend fun pause() = backend.cancel()
+
+    /** Picks the queue up again after [pause]. */
+    suspend fun resume() {
+        if (isAvailable && isSignedIn && repository.hasQueued()) backend.schedule()
+    }
+
     suspend fun enqueue(songs: List<Song>): EnqueueResult {
         if (!deviceEligible) return EnqueueResult.Unsupported(deviceReasons)
         if (modelState.value != ModelState.Installed) return EnqueueResult.ModelNotInstalled

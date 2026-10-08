@@ -1,6 +1,6 @@
 # Playback
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-07
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-08
 
 ## Summary
 
@@ -44,7 +44,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
   - `onPlaybackResumption` rebuilds the saved queue for play requests from the widget, headset or system UI. It throws while signed out.
   - `onAddMediaItems` maps items through `resolve()` so the current `StemMode` applies.
 - After a sign-in, a collector on `AuthRepository.state` waits for `SignedOut`, then `stopForSignOut()` saves the queue, cancels the sleep timer, stops and clears the player and calls `stopSelf()`. The saved queue (DataStore `playback_session`) is kept, so the next sign-in can resume it.
-- `onTaskRemoved` saves and stops only if nothing is queued or playback is paused/ended. `onDestroy` clears `musicPlaying`, saves, publishes a paused widget state and releases.
+- `onTaskRemoved` (app swiped away from recents) always saves the queue, cancels the sleep timer, calls `TaskRemoval.onTaskRemoved()` (stops the metronome, sing-along and separation, see [architecture](../architecture.md#removal-from-recents)) and calls Media3's `pauseAllPlayersAndStopSelf()`, which pauses, dismisses the notification and stops the service, so music never keeps playing without the app. A plain `stopSelf()` isn't enough: Media3 re-posts the notification for the loaded queue and restarts the service. The saved queue lets the next launch, the widget or a headset press resume it. `onDestroy` clears `musicPlaying`, saves, publishes a paused widget state and releases.
 
 ### Custom commands and extras
 
@@ -118,3 +118,5 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 | 2026-10-06 | `e13b2f7` | `musicPlaying` flag; `play`/`pause`/`currentPositionMs`/`isSeekable`; chip row became `FlowRow` with metronome and sing-along chips; `MetronomeMiniIndicator` in mini player. |
 | 2026-10-06 | - | `PlaybackController` implements `MusicTimeline` for metronome sync; `restoresSession` parameter. See [metronome](metronome.md). |
 | 2026-10-07 | - | Sign-in required: controllers rejected and resumption refused while signed out, service stops on sign-out, `SignedInMediaButtonReceiver`. See [accounts](accounts.md). |
+| 2026-10-08 | - | Swiping the app away from recents now always stops playback and the service (`onTaskRemoved`). |
+| 2026-10-08 | - | `onTaskRemoved` also reports the removal to `TaskRemoval`, which stops the other background features. |

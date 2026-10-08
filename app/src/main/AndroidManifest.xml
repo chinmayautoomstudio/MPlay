@@ -117,6 +117,11 @@
             android:exported="false"
             android:process=":separator" />
 
+        <!-- Started while separating, only to be told when the app is swiped away from recents. -->
+        <service
+            android:name=".separation.worker.SeparationTaskWatcher"
+            android:exported="false" />
+
         <receiver
             android:name=".separation.worker.CancelSeparationReceiver"
             android:exported="false" />

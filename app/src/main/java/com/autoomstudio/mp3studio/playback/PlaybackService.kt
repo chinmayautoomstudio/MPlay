@@ -236,16 +236,14 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? =
         mediaSession
 
+    /** Swiping MPlay away from recents ends playback; the saved session lets the next launch resume it. */
+    @OptIn(UnstableApi::class)
     override fun onTaskRemoved(rootIntent: Intent?) {
-        val player = mediaSession?.player
-        player?.let(::saveSession)
-        if (player == null ||
-            !player.playWhenReady ||
-            player.mediaItemCount == 0 ||
-            player.playbackState == Player.STATE_ENDED
-        ) {
-            stopSelf()
-        }
+        mediaSession?.player?.let(::saveSession)
+        sleepTimer.cancel()
+        (application as MPlayApp).container.taskRemoval.onTaskRemoved()
+        // A plain stopSelf() is undone by Media3 re-posting the notification for the still-loaded queue.
+        pauseAllPlayersAndStopSelf()
     }
 
     override fun onDestroy() {

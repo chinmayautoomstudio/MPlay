@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
             settingsViewModel.theme.value == null || authViewModel.state.value is AuthState.Loading
         }
         if (savedInstanceState == null) handleIntent(intent)
+        (application as MPlayApp).container.taskRemoval.onAppOpened()
         setContent {
             val theme = settingsViewModel.theme.collectAsStateWithLifecycle().value ?: return@setContent
             val auth by authViewModel.state.collectAsStateWithLifecycle()

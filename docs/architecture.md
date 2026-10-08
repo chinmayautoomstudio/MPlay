@@ -118,10 +118,22 @@ flowchart LR
 | `SeparationWorker` (via WorkManager `SystemForegroundService`) | `CoroutineWorker` | `mediaProcessing` (35+) / `dataSync` (29-34) | Notification IDs 4101/4102. |
 | `data.usage.UsageSyncWorker` | `CoroutineWorker`, unique `"usage-sync"`, needs a network | none | Sends separation outcomes to `finish-separation`; scheduled after each job ends and on sign-in. |
 | `separation.worker.SeparatorService` | Bound service, `:separator` process | none | Runs the model so a native crash or OOM never kills playback. |
+| `separation.worker.SeparationTaskWatcher` | Started service, not exported | none | Runs while `SeparationWorker` does; its `onTaskRemoved` pauses separation when the app is swiped away. |
 | `playback.SignedInMediaButtonReceiver` | Receiver, exported | | Headset/widget play-pause; extends Media3's `MediaButtonReceiver` and doesn't start the service while signed out. |
 | `widget.MPlayWidgetReceiver` | Glance receiver, exported | | Home/lock screen widget. |
 | `separation.worker.CancelSeparationReceiver` | Receiver | | Cancel action on the separation notification. |
 | `ui.trim.TrimEditorActivity` | Activity | | Clip / ringtone editor. Finishes on sign-out. |
+
+### Removal from recents
+
+Swiping the app away ends all background work. `di/TaskRemoval` (`AppContainer.taskRemoval`) cancels a sing-along session, stops the metronome and calls `SeparationController.pause()` (the running song goes back to the queue). `PlaybackService` stops music itself with `pauseAllPlayersAndStopSelf()`. The removal is reported by:
+
+- `onTaskRemoved` of `PlaybackService`, `MetronomeService` and `RecordingService` (Android only calls it on started services);
+- `onTaskRemoved` of `separation.worker.SeparationTaskWatcher`, a plain started service that `SeparationWorker` runs for the length of a run, because WorkManager's `SystemForegroundService` and the bound `SeparatorService` aren't ours to hook.
+
+`MainActivity.onDestroy` is deliberately not used: on current Android (checked on API 37) Back also finishes the root activity, so `isFinishing` can't tell Back from a swipe. Back stops nothing.
+
+`onTaskRemoved()` acts once per removal. `MainActivity.onCreate` calls `onAppOpened()`, which resumes the separation queue (`SeparationController.resume()`) if the process outlived a removal; after a cold start `AuthEffects` resumes it as usual.
 
 ### How the UI talks to playback
 
@@ -164,3 +176,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-08 | - | Admin (M5): `adminBackend`, `AdminViewModel`, `SettingsPage.Admin`, `admin` Edge Function. |
 | 2026-10-08 | - | Hardening (M6): `AuthRepository` takes an `AccountDeletionBackend`; `delete-account` Edge Function; recorded that old MPlay installs are not migrated. |
 | 2026-10-08 | - | `Destination.Settings` became `Destination.Profile` and `SettingsPage` became `ProfilePage` (new Profile screen and settings sub-pages). |
+| 2026-10-08 | - | `TaskRemoval` in `AppContainer`: removal from recents stops music, metronome, sing-along and separation; hooks in `onTaskRemoved` of `PlaybackService`, `MetronomeService`, `RecordingService` and the new `SeparationTaskWatcher` service; `MainActivity.onCreate` resumes separation. |

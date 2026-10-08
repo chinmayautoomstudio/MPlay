@@ -64,6 +64,7 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
             notifications.showNeedsApp()
             return Result.success()
         }
+        SeparationTaskWatcher.start(applicationContext)
 
         val client = SeparatorClient(applicationContext)
         return try {
@@ -76,6 +77,7 @@ class SeparationWorker(context: Context, params: WorkerParameters) : CoroutineWo
             throw e
         } finally {
             client.close()
+            SeparationTaskWatcher.stop(applicationContext)
             if (!isStopped) notifications.showFinished(done, failed)
         }
     }

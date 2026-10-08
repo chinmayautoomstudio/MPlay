@@ -97,6 +97,7 @@ Playing existing stems never calls the server (US4). Usage ("7/10 songs used thi
 - Constraints from settings: requires charging, battery not low. Linear backoff 5 minutes. Policy `APPEND_OR_REPLACE` while running.
 - Starts with `recoverInterrupted()` (requeue `Running` jobs, delete leftovers). Then, if `AuthRepository.awaitReady()` isn't `SignedIn`, it returns without touching the queue; it also re-checks `isSignedIn` before each song.
 - Separation needs a signed-in user (PRD AU1). Queued work resumes from `di/AuthEffects` via `SeparationController.onSignedIn()` once the saved session is read, not from `start()`. On sign-out `onSignedOut()` cancels the unique work, so the running song goes back to `Queued` and waits for the next sign-in.
+- Swiping the app away from recents calls `SeparationController.pause()` (same cancel, song back to `Queued`) through `di/TaskRemoval`, reported by `SeparationTaskWatcher.onTaskRemoved` (a started service the worker runs between `setForeground` and the end of `doWork`) or another started service's. Back doesn't pause it. The next `MainActivity.onCreate` calls `resume()`; after a cold start `AuthEffects` resumes it. See [architecture](../architecture.md#removal-from-recents).
 - Foreground type `MEDIA_PROCESSING` (API 35+) or `DATA_SYNC` (29-34). If Android 12+ refuses a background foreground start, jobs get `NeedsApp`.
 - Output goes to `filesDir/stems/.work/<jobId>/`, then `commit()` atomically renames to `stems/<songId>/` and writes `stem_sets` + marks `Done` in one transaction. The measured speed is recorded for estimates.
 - System stop reasons map to `TimeLimit`, `Charging`, `Battery` or `Interrupted` and requeue the job.
@@ -136,7 +137,7 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 
 - `FOREGROUND_SERVICE_DATA_SYNC`, `FOREGROUND_SERVICE_MEDIA_PROCESSING`, `POST_NOTIFICATIONS`, `WAKE_LOCK`, `WRITE_EXTERNAL_STORAGE` (max 29).
 - `SystemForegroundService` merged with `dataSync|mediaProcessing`.
-- `SeparatorService` (`:separator`, not exported), `CancelSeparationReceiver` (not exported).
+- `SeparatorService` (`:separator`, not exported), `SeparationTaskWatcher` (main process, not exported), `CancelSeparationReceiver` (not exported).
 
 ## Tests
 
@@ -147,8 +148,7 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 
 ## Known limitations and TODOs
 
-- Interrupted jobs restart from the beginning (no per-segment resume).
-- Cancel can lag by one segment because an ONNX call can't be interrupted.
+- Interrupted jobs restart from the beginning (no per-segment resume); this includes jobs paused by swiping the app away.- Cancel can lag by one segment because an ONNX call can't be interrupted.
 - Any `:separator` death is reported as out of memory.
 - Eligibility (including free storage) is computed once per app start.
 - `NeedsApp` doesn't reschedule until the app opens again.
@@ -174,3 +174,4 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 | 2026-10-06 | - | `MediaPcmSource(exactStart = true)` drops decoded audio before `startUs` (by buffer presentation time), for the metronome's beat grid. Separation doesn't use it. |
 | 2026-10-07 | - | Export folder renamed to `Music/MP3 Studio Stems`. The queue runs only while signed in (`onSignedIn`/`onSignedOut`, `SeparationBackend.cancel()`, worker auth check). See [accounts](accounts.md). |
 | 2026-10-08 | - | M3 weekly usage limit: reserve before queueing, `completed`/`released` reports via `usage_reports` and `UsageSyncWorker`, new `EnqueueResult` values, usage display, limit sheet (Room schema v7). Time notice warns when a selection is bigger than the uses left; checked end to end against the deployed functions. |
+| 2026-10-08 | - | Separation pauses when the app is swiped away from recents and resumes when it is opened again (`SeparationController.pause()`/`resume()`, `TaskRemoval`, `SeparationTaskWatcher`). |
