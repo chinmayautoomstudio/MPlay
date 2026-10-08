@@ -39,6 +39,7 @@ There is no DI framework. [`di/AppContainer.kt`](../app/src/main/java/com/autoom
 - Accounts: `supabase` (`SupabaseClient` with Auth using the private `SecureSessionStore`, Postgrest and Functions), `authRepository`, `profileRepository`, `googleSignIn`, and `signedInUserId()`. `separationController` gets `isSignedIn = { authRepository.isSignedIn }`. See [accounts](features/accounts.md).
 - Plans: `entitlementsRepository` (`SupabaseEntitlementsBackend` with `DeviceId`, `DataStoreEntitlementsCache`). `MetronomeViewModel` gets a `TempoDetectionGate` over `tempoAnalyzer`. See [plans](features/plans.md).
 - Usage limit: a private `usageBackend` (`SupabaseUsageBackend`), `usageGate` (`SeparationUsageGate`, passed to `separationController` with `signedInUserId`) and `usageReporter` (`UsageReporter` over `stemRepository`'s `usage_reports`). `stemRepository` gets `onUsageReported = { UsageSyncWorker.schedule(...) }`. See [vocal separation](features/vocal-separation.md#weekly-usage-limit-prd-us1-us9-pl5).
+- Admin: `adminBackend` (`SupabaseAdminBackend` over the `admin` Edge Function). `AdminViewModel` also gets `signedInUserId` and `entitlementsRepository.refresh`. See [admin](features/admin.md).
 - `musicPlaying: MutableStateFlow<Boolean>` is shared state: `PlaybackService` writes it, `MetronomeController` reads it.
 - A private `mainScope` (`Dispatchers.Main.immediate`) backs a private app-scoped `PlaybackController` (`restoresSession = false`) passed to `MetronomeController` as its `MusicTimeline`, for syncing with the song. It binds to `PlaybackService` only while sync is on.
 - Factories: `createWidgetStatePublisher()` and `createPlaybackController(scope)` return new instances per call.
@@ -53,7 +54,7 @@ companion object {
 }
 ```
 
-ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `SeparationViewModel`, `SettingsViewModel`, `MetronomeViewModel`, `SingAlongViewModel`, `TrimEditorViewModel`, `AuthViewModel`, `AccountViewModel`, `PlansViewModel` (shared by the main screen, Now Playing, the metronome sheet, the Account card and the Plans screen). State is exposed as `StateFlow` and collected with `collectAsStateWithLifecycle`; one-off events (snackbar messages) are `Flow`s.
+ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `SeparationViewModel`, `SettingsViewModel`, `MetronomeViewModel`, `SingAlongViewModel`, `TrimEditorViewModel`, `AuthViewModel`, `AccountViewModel`, `AdminViewModel`, `PlansViewModel` (shared by the main screen, Now Playing, the metronome sheet, the Account card and the Plans screen). State is exposed as `StateFlow` and collected with `collectAsStateWithLifecycle`; one-off events (snackbar messages) are `Flow`s.
 
 `SettingsViewModel` and `AuthViewModel` belong to `MainActivity`. Everything under `MPlayRoot` gets its ViewModels from `SignedInViewModelScope` (an activity ViewModel holding a separate `ViewModelStore` per user), provided as `LocalViewModelStoreOwner`. The store is cleared on sign-out, which releases the playback `MediaController` and all per-user state, and survives rotation.
 
@@ -72,7 +73,7 @@ ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `Sepa
 No Navigation-Compose. [`ui/main/MainScreen.kt`](../app/src/main/java/com/autoomstudio/mp3studio/ui/main/MainScreen.kt) holds state in `rememberSaveable` and swaps screens with `AnimatedContent` + `fadeThrough()`.
 
 - Bottom bar (`Destination`): `Library`, `Playlists`, `Metronome`, `Settings`.
-- Settings sub-pages (`SettingsPage`): `Main`, `Duplicates`, `Separation` (queue), `About`, `Licenses`, `Plans`. `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`.
+- Settings sub-pages (`SettingsPage`): `Main`, `Duplicates`, `Separation` (queue), `About`, `Licenses`, `Plans`, `Admin` (shown to admins; it keeps its own page stack in `AdminViewModel`). `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`.
 - The trial banner (last 3 days of the trial) sits above the screen content inside the scaffold.
 - Library back stack: route strings `album:<id>` / `artist:<name>`.
 - `ExpandablePlayer` is a draggable sheet from the mini player to Now Playing.
@@ -157,3 +158,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-08 | - | Removed the `:spike` feasibility app module (not shipped, no dependents). |
 | 2026-10-08 | - | Plans (M2): supabase-kt Functions, `entitlementsRepository` and `signedInUserId()` in `AppContainer`, `PlansViewModel`, `SettingsPage.Plans`, trial banner, `supabase/functions/`. |
 | 2026-10-08 | - | Usage limit (M3): `usageGate`, `usageReporter` and `UsageSyncWorker`; `SeparationController` takes `usageGate` and `signedInUserId` instead of `isSignedIn`. |
+| 2026-10-08 | - | Admin (M5): `adminBackend`, `AdminViewModel`, `SettingsPage.Admin`, `admin` Edge Function. |

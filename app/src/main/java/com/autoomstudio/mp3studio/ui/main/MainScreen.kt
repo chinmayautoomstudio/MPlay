@@ -77,6 +77,7 @@ import com.autoomstudio.mp3studio.data.stems.StemMode
 import com.autoomstudio.mp3studio.data.settings.ThemeSettings
 import com.autoomstudio.mp3studio.playback.NowPlayingState
 import com.autoomstudio.mp3studio.data.library.SongDeleter
+import com.autoomstudio.mp3studio.ui.admin.AdminScreen
 import com.autoomstudio.mp3studio.ui.common.rememberWithLegacyStorage
 import com.autoomstudio.mp3studio.ui.components.MPlayTopBar
 import com.autoomstudio.mp3studio.ui.components.MetronomeIcons
@@ -559,6 +560,12 @@ fun MainScreen(
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
                                     )
+                                    SettingsPage.Admin -> AdminScreen(
+                                        onBack = { settingsPage = SettingsPage.Main },
+                                        onMessage = showMessage,
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                    )
                                     SettingsPage.Main -> SettingsScreen(
                                         theme = themeSettings,
                                         onThemeModeChange = onThemeModeChange,
@@ -570,7 +577,11 @@ fun MainScreen(
                                         onOpenAbout = { settingsPage = SettingsPage.About },
                                         modifier = contentModifier,
                                         accountSection = { header ->
-                                            AccountSection(sectionHeader = header, onOpenPlans = openPlans)
+                                            AccountSection(
+                                                sectionHeader = header,
+                                                onOpenPlans = openPlans,
+                                                onOpenAdmin = { settingsPage = SettingsPage.Admin },
+                                            )
                                         },
                                         separationSection = { header ->
                                             SeparationSettingsSection(
@@ -718,7 +729,7 @@ fun MainScreen(
     SingAlongOverlay()
 }
 
-private enum class SettingsPage { Main, Duplicates, Separation, About, Licenses, Plans }
+private enum class SettingsPage { Main, Duplicates, Separation, About, Licenses, Plans, Admin }
 
 /** Last days of the free trial (PRD TR6); tapping it opens Plans. */
 @Composable

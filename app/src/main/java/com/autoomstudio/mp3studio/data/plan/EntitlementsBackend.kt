@@ -34,6 +34,7 @@ class SupabaseEntitlementsBackend(
 @Serializable
 data class EntitlementsResponse(
     val plan: String,
+    val role: String? = null,
     val trial: TrialDto? = null,
     val subscription: SubscriptionDto? = null,
     val trialClaim: ClaimDto? = null,
@@ -75,6 +76,7 @@ data class EntitlementsResponse(
             else -> null
         },
         usage = usage?.toUsage(),
+        isAdmin = role == "admin",
         serverTime = epochMillis(serverTime),
         checkedAt = checkedAt,
     )

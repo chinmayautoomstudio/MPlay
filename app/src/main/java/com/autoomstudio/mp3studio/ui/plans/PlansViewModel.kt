@@ -41,6 +41,8 @@ data class PlanUiState(
     val checkedAt: Long?,
     /** Free users' AI Vocal Separator uses this week; null on Trial and Pro. */
     val usage: SeparatorUsage? = null,
+    /** Shows the Admin entry in Settings; the server checks every admin call. */
+    val isAdmin: Boolean = false,
 ) {
     fun unlocks(feature: Feature): Boolean = when (feature) {
         Feature.BpmDetector, Feature.SingAlong, Feature.UnlimitedSeparator -> plan != Plan.Free
@@ -62,6 +64,7 @@ data class PlanUiState(
             cancelAtPeriodEnd = entitlements?.cancelAtPeriodEnd ?: false,
             checkedAt = entitlements?.checkedAt,
             usage = EntitlementPolicy.separatorUsage(entitlements, now),
+            isAdmin = entitlements?.isAdmin == true,
         )
     }
 }

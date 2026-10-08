@@ -45,7 +45,8 @@ sequenceDiagram
 
 ### Server
 
-- `compute_entitlements`: Pro when a `pro` subscription is `active`, or `cancelled` with `expires_at` in the future (and any `expires_at` not passed); else Trial while `trials.ends_at` is in the future; else Free.
+- `compute_entitlements`: Pro when a `pro` subscription is `active`, or `cancelled` with `expires_at` in the future (and any `expires_at` not passed); else Trial while `trials.ends_at` is in the future; else Free. It also returns the profile `role`, which the app maps to `Entitlements.isAdmin` to offer the [Admin](admin.md) screens.
+- Admin Pro grants (M5): an Admin can grant Pro until a date (at most 5 years ahead) or remove it. That is a `subscriptions` row with `provider = 'admin'`, `payment_status = 'granted'` and `expires_at` as the end, so the rule above needs no special case; removing it marks the row `expired`. See [admin](admin.md).
 - `claim_trial`: serialised per user with an advisory lock. Returns `existing` if the user has a trial row, `denied` (`account`) for a disabled profile, `denied` (`email` or `device`) when `trial_claims` already holds that hash, otherwise inserts the claim and a 30-day `trials` row and returns `granted`.
 - The Edge Function takes the email from the verified token, normalizes it (lowercase, no `+alias`, Gmail dots removed, `googlemail.com` as `gmail.com`) and HMAC-SHA256s it and the device ID with `TRIAL_HASH_PEPPER`. Only hashes are stored.
 
@@ -77,6 +78,7 @@ None. Uses the existing `INTERNET` permission.
 
 - `data/plan/EntitlementPolicyTest.kt`: access table for Free, Trial and Pro, no cache, ended trial, expired subscription with and without a trial, 7-day grace boundary, clock turned back, server time deciding end dates, days-left rounding, usage shown only on Free and rolled over after the reset.
 - `data/plan/EntitlementsRepositoryTest.kt`: refresh stores and maps the server answer, offline refresh keeps the cache, another account's cache unlocks nothing, clear, unknown plan values.
+- `data/plan/EntitlementsResponseTest.kt`: `role` maps to `isAdmin`.
 - `data/tempo/TempoDetectionGateTest.kt`: cached tempo on Free, locked new detection, detection with BPM Detector.
 - `supabase/tests/plans_test.sql` (pgTAP, 16 checks): plan computation, claim idempotence, email and device reuse denied, disabled account, both functions not executable by `authenticated`.
 - `supabase/functions/_shared/trial_test.ts` (Deno, 5 tests): email normalization, device ID validation, peppered hashing.
@@ -88,7 +90,8 @@ None. Uses the existing `INTERNET` permission.
 - The device check trusts the `ANDROID_ID` hash the app sends; it changes after a factory reset and differs per Android user.
 - Accounts created before M2 get their trial at their first refresh after the functions are deployed.
 - The plan shown on screens is recomputed when the cache changes, not as time passes; the next foreground refresh catches up.
-- Payments (M4) and admin plan changes (M5) are not built yet.
+- Payments (M4) are not built yet. Admin Pro grants (M5) are.
+- A user granted Pro by an Admin sees it after their next refresh (app start, foreground or the Plans screen).
 
 ## Change history
 
@@ -96,3 +99,4 @@ None. Uses the existing `INTERNET` permission.
 |---|---|---|
 | 2026-10-08 | - | Plans and gating (M2): entitlements functions, trial with abuse checks, cache with 7-day grace, BPM and Sing Along gates, upgrade sheet, Plans screen, Account plan row, trial banner. |
 | 2026-10-08 | - | Usage limit (M3): `SeparatorUsage` in the cache, `separatorUsage()`, usage on the Plans card, limit-reached upgrade sheet. |
+| 2026-10-08 | - | Admin (M5): `Entitlements.isAdmin` from `role`, `PlanUiState.isAdmin`, admin Pro grants as `provider = 'admin'` subscriptions. |

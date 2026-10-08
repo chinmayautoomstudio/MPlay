@@ -14,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.WorkspacePremium
@@ -53,6 +54,7 @@ import com.autoomstudio.mp3studio.ui.plans.planLabel
 fun AccountSection(
     sectionHeader: @Composable (String) -> Unit,
     onOpenPlans: () -> Unit,
+    onOpenAdmin: () -> Unit,
     viewModel: AccountViewModel = viewModel(factory = AccountViewModel.Factory),
     plansViewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
 ) {
@@ -78,6 +80,16 @@ fun AccountSection(
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
         modifier = Modifier.clickable(onClick = onOpenPlans),
     )
+    if (plan.isAdmin) {
+        ListItem(
+            leadingContent = { Icon(Icons.Outlined.AdminPanelSettings, contentDescription = null) },
+            headlineContent = { Text(stringResource(R.string.admin_title)) },
+            supportingContent = { Text(stringResource(R.string.admin_row_summary)) },
+            trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+            modifier = Modifier.clickable(onClick = onOpenAdmin),
+        )
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()

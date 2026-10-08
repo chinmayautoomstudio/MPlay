@@ -40,7 +40,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 1. `Nonce.generate()`; Google gets `Nonce.sha256Hex(raw)`, Supabase gets the raw value.
 2. `GoogleSignIn.requestIdToken()` shows the Google account sheet (`GetSignInWithGoogleOption` with `GOOGLE_WEB_CLIENT_ID`).
-3. `auth.signInWith(IDToken) { provider = Google; nonce = raw }`. On the server, the `handle_new_user` trigger creates the profile on first sign-in (see [backend](../backend.md)).
+3. `auth.signInWith(IDToken) { provider = Google; nonce = raw }`. On the server, the `handle_new_user` trigger creates the profile on first sign-in (see [backend](../backend.md)). If an Admin invited that email (`admin_invites`), the new account starts as Admin and the invite is used up ([admin](admin.md)).
 4. `verifyAccount()` signs out again if the profile is disabled.
 
 Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `AuthViewModel` also logs the exception (`Log.w`, tag `AuthViewModel`). A cancelled sheet shows nothing. Play services reports a failed account check as a cancellation with the message `[16] Account reauth failed.`; `AuthErrors.classify` turns that into `AuthError.AccountUnavailable` ("Google couldn't confirm this account on this phone...") so it isn't silent. Typical causes: no Android OAuth client for this package and signing key, the account isn't a test user while the consent screen is in Testing, or a work account that still needs setup on the device.
@@ -60,7 +60,7 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `Auth
 
 ### Account card and log out
 
-`AccountSection` (top of Settings) shows the photo (Coil, with a person icon as placeholder), name and email, and a Plan row that opens Settings > Plans ([plans](plans.md)). The profile row wins; the Google account details cover it until it loads. Edit name updates `profiles.display_name` (max 80 characters, trimmed) and shows an error in the dialog if it fails. Log out asks for confirmation, then runs `AuthRepository.signOut()` on the application scope (local sign-out falls back to clearing the session if the server can't be reached).
+`AccountSection` (top of Settings) shows the photo (Coil, with a person icon as placeholder), name and email, and a Plan row that opens Settings > Plans ([plans](plans.md)). Admins also get an Admin row that opens the [Admin](admin.md) screens. The profile row wins; the Google account details cover it until it loads. Edit name updates `profiles.display_name` (max 80 characters, trimmed) and shows an error in the dialog if it fails. Log out asks for confirmation, then runs `AuthRepository.signOut()` on the application scope (local sign-out falls back to clearing the session if the server can't be reached).
 
 ## Data and persistence
 
@@ -105,7 +105,7 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `Auth
 - The terms URL (`about_terms_url`, `https://autoomstudio.com/terms`) is a placeholder until the page exists.
 - The launcher icon is still the MPlay icon.
 - If GoTrue still allows email or phone sign-up, someone could create an account through the API; disable them on the server ([backend](../backend.md#auth-settings)).
-- An account disabled by an Admin is noticed on the next foreground check, not instantly.
+- An account disabled by an Admin (Disable account on the Admin user page) is noticed on the next foreground check, not instantly.
 
 ## Change history
 
@@ -114,3 +114,4 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `Auth
 | 2026-10-07 | - | Mandatory Google sign-in, encrypted session store, signed-out blocking, Account card (M1). |
 | 2026-10-08 | - | Package is now `com.autoomstudio.mp3studio` (Android OAuth clients must use it). `[16] Account reauth failed` shows `AccountUnavailable` instead of failing silently; sign-in failures are logged. |
 | 2026-10-08 | - | M2: sign-in and foreground checks refresh the plan, sign-out clears it, Account card has a Plan row. |
+| 2026-10-08 | - | M5: invited emails become Admin on first sign-in; Admin row on the Account card for admins. |
