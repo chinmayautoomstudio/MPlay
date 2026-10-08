@@ -4,13 +4,13 @@ plugins {
 }
 
 android {
-    namespace = "com.autoomstudio.mplay.spike"
+    namespace = "com.autoomstudio.mp3studio.spike"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.autoomstudio.mplay.ai.spike"
+        applicationId = "com.autoomstudio.mp3studio.ai.spike"
         minSdk = 26
         targetSdk = 37
         versionCode = 1

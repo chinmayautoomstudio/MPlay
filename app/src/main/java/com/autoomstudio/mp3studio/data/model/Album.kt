@@ -1,0 +1,12 @@
+package com.autoomstudio.mp3studio.data.model
+
+import android.net.Uri
+
+data class Album(
+    val id: Long,
+    val title: String,
+    val artist: String,
+    val artUri: Uri,
+    /** In track order. */
+    val songs: List<Song>,
+)

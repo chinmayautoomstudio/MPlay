@@ -8,7 +8,7 @@ A resizable Glance widget for the home and lock screen showing the current song 
 
 ## Key files
 
-Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
+Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 | File | Role |
 |---|---|

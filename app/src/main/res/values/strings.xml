@@ -9,6 +9,7 @@
     <string name="signin_terms">Terms of Service</string>
     <string name="signin_privacy">Privacy Policy</string>
     <string name="auth_error_no_account">No Google account on this phone. Add one in Settings, then try again.</string>
+    <string name="auth_error_account_unavailable">Google couldn\'t confirm this account on this phone. Try again, or use another Google account.</string>
     <string name="auth_error_play_services">Google sign-in needs Google Play services, which is missing or out of date on this phone.</string>
     <string name="auth_error_network">No internet connection. Connect and try again.</string>
     <string name="auth_error_disabled">This account has been disabled. Contact connect@autoomstudio.com if you think this is a mistake.</string>

@@ -8,7 +8,7 @@ The library reads every music file from Android's MediaStore and shows it in Son
 
 ## Key files
 
-Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
+Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 | File | Role |
 |---|---|

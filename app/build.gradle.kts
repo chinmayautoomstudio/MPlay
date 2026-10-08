@@ -29,13 +29,13 @@ val backendConfig = mapOf(
 )
 
 android {
-    namespace = "com.autoomstudio.mplay"
+    namespace = "com.autoomstudio.mp3studio"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.autoomstudio.mplay"
+        applicationId = "com.autoomstudio.mp3studio"
         minSdk = 26
         targetSdk = 37
         versionCode = 5

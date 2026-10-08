@@ -8,7 +8,7 @@ Two or three sentences on what the feature does for the user.
 
 ## Key files
 
-Paths are relative to `app/src/main/java/com/autoomstudio/mplay/` unless they start with `app/` or another module.
+Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless they start with `app/` or another module.
 
 | File | Role |
 |---|---|

@@ -8,7 +8,7 @@ A toggle on Now Playing that makes music sound like an old record: playback at a
 
 ## Key files
 
-Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
+Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 | File | Role |
 |---|---|

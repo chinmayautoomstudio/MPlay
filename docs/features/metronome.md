@@ -8,7 +8,7 @@ A metronome available as its own tab and as a sheet on Now Playing: 20 to 300 BP
 
 ## Key files
 
-Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
+Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 | File | Role |
 |---|---|
@@ -98,7 +98,7 @@ Resets after 2 s without a tap, keeps the last 8 taps, needs at least 4. BPM = 6
 
 ### Service and notification
 
-`MetronomeController.start()` starts `MetronomeService` (`mediaPlayback` on API 29+). Channel `metronome`, ID 4201, text like "120 BPM · 4/4". Tap opens the Metronome tab (`EXTRA_OPEN_METRONOME`); Stop sends `com.autoomstudio.mplay.metronome.STOP`. The service stops itself when the metronome stops.
+`MetronomeController.start()` starts `MetronomeService` (`mediaPlayback` on API 29+). Channel `metronome`, ID 4201, text like "120 BPM · 4/4". Tap opens the Metronome tab (`EXTRA_OPEN_METRONOME`); Stop sends `com.autoomstudio.mp3studio.metronome.STOP`. The service stops itself when the metronome stops.
 
 ### Integration
 

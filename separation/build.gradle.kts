@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.autoomstudio.mplay.separation"
+    namespace = "com.autoomstudio.mp3studio.separation"
     compileSdk {
         version = release(37)
     }

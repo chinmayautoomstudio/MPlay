@@ -8,7 +8,7 @@ MPlay finds copies of the same song and, with "Hide duplicates" on (the default)
 
 ## Key files
 
-Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
+Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 | File | Role |
 |---|---|

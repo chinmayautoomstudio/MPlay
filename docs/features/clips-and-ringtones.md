@@ -8,7 +8,7 @@ From the song menu, **Cut and save** or **Set as ringtone** opens a full-screen 
 
 ## Key files
 
-Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
+Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 | File | Role |
 |---|---|
@@ -20,7 +20,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
 | `data/clip/SoundType.kt` | `Ringtone` / `Notification` / `Alarm` mapping. |
 | `data/clip/TrimRange.kt` | Immutable range: clamping, minimum length, nudges, ringtone default. |
 | `data/clip/WaveformExtractor.kt` | Decodes the file with `MediaExtractor` + `MediaCodec` into peaks, emitting partial results. |
-| `ui/trim/TrimEditorActivity.kt` | Hosts the editor; intent extras `com.autoomstudio.mplay.extra.TRIM_*`. |
+| `ui/trim/TrimEditorActivity.kt` | Hosts the editor; intent extras `com.autoomstudio.mp3studio.extra.TRIM_*`. |
 | `ui/trim/TrimEditorScreen.kt` | Editor UI, sound type sheet, WRITE_SETTINGS dialog, snackbars. |
 | `ui/trim/TrimEditorViewModel.kt` | State, preview player, export, ringtone setting, undo, error mapping. |
 | `ui/trim/WaveformView.kt` | Canvas waveform with handles, playhead and accessibility actions. |

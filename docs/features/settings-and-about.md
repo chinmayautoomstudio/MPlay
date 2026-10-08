@@ -8,7 +8,7 @@ The Settings tab starts with the Account card (Google photo, name, email, Edit n
 
 ## Key files
 
-Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
+Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 | File | Role |
 |---|---|

@@ -8,7 +8,7 @@ Local songs play from a background Media3 session service, with the system media
 
 ## Key files
 
-Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
+Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 | File | Role |
 |---|---|
@@ -48,7 +48,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
 
 ### Custom commands and extras
 
-| Command (`com.autoomstudio.mplay.command.*`) | Args |
+| Command (`com.autoomstudio.mp3studio.command.*`) | Args |
 |---|---|
 | `SET_SLEEP_TIMER` | `minutes` |
 | `SET_SLEEP_TIMER_END_OF_SONG` | |

@@ -8,7 +8,7 @@ Sing-along records the user singing over a song's instrumental stem (the song mu
 
 ## Key files
 
-Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
+Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 | File | Role |
 |---|---|
@@ -108,7 +108,7 @@ The sheet warns when no headphones are connected (music will leak into the mic) 
 
 - `RECORD_AUDIO` (runtime), `FOREGROUND_SERVICE_MICROPHONE`, `<uses-feature android.hardware.microphone required="false">`.
 - `singalong.RecordingService` (not exported, `foregroundServiceType="microphone"`; type 0 below Android 11).
-- Channel `singalong`, ID 4301, Stop action `com.autoomstudio.mplay.singalong.STOP`, chronometer while recording.
+- Channel `singalong`, ID 4301, Stop action `com.autoomstudio.mp3studio.singalong.STOP`, chronometer while recording.
 
 ## Tests
 

@@ -1,6 +1,6 @@
 # Accounts and Google sign-in
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-07
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-08
 
 ## Summary
 
@@ -8,7 +8,7 @@ MP3 Studio requires a Google account (PRD v3.2, AU1-AU11). On first launch, and 
 
 ## Key files
 
-Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
+Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 | File | Role |
 |---|---|
@@ -43,7 +43,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mplay/`.
 3. `auth.signInWith(IDToken) { provider = Google; nonce = raw }`. On the server, the `handle_new_user` trigger creates the profile on first sign-in (see [backend](../backend.md)).
 4. `verifyAccount()` signs out again if the profile is disabled.
 
-Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings). A cancelled sheet shows nothing.
+Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `AuthViewModel` also logs the exception (`Log.w`, tag `AuthViewModel`). A cancelled sheet shows nothing. Play services reports a failed account check as a cancellation with the message `[16] Account reauth failed.`; `AuthErrors.classify` turns that into `AuthError.AccountUnavailable` ("Google couldn't confirm this account on this phone...") so it isn't silent. Typical causes: no Android OAuth client for this package and signing key, the account isn't a test user while the consent screen is in Testing, or a work account that still needs setup on the device.
 
 ### Staying signed in
 
@@ -79,7 +79,10 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings). A can
 | `supabase.key` | `SUPABASE_KEY` (anon key) |
 | `google.webClientId` | `GOOGLE_WEB_CLIENT_ID` (OAuth Web client ID, also configured in GoTrue) |
 
-`check<Variant>BackendConfig` fails release builds when any is blank and warns in debug. Without them the sign-in button shows "Sign-in isn't set up in this build of MP3 Studio." Google sign-in also needs Android OAuth clients registered for the package with the debug and release SHA-1 fingerprints.
+`check<Variant>BackendConfig` fails release builds when any is blank and warns in debug. Without them the sign-in button shows "Sign-in isn't set up in this build of MP3 Studio." Google Cloud setup, in the same project as the Web client:
+
+- An **Android** OAuth client per signing key, all with package `com.autoomstudio.mp3studio`: the debug keystore, the release keystore, and the Play App Signing key once the app is on Play. The app never uses these IDs; they authorise the package and key to get tokens for the Web client.
+- While the consent screen (Audience) is External and in Testing, every account that signs in must be listed under Test users. Publish to Production before release.
 
 ## Manifest, permissions and notifications
 
@@ -90,7 +93,7 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings). A can
 
 ## Tests
 
-- `data/account/AuthErrorsTest.kt`: GoTrue code mapping, exception classification (including wrapped causes), which errors end the session.
+- `data/account/AuthErrorsTest.kt`: GoTrue code mapping, exception classification (including wrapped causes and `[16]` reauth failures versus real cancels), which errors end the session.
 - `data/account/NonceTest.kt`: SHA-256 hex, nonce length and alphabet.
 - `data/account/AuthRepositoryTest.kt`: `reduce()` (offline refresh keeps the user), `verifyAccount()` with a fake backend (disabled, revoked, offline, active).
 - `supabase/tests/rls_test.sql`: server-side access rules ([backend](../backend.md#testing-rls)).
@@ -109,3 +112,4 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings). A can
 | Date | Commit | Change |
 |---|---|---|
 | 2026-10-07 | - | Mandatory Google sign-in, encrypted session store, signed-out blocking, Account card (M1). |
+| 2026-10-08 | - | Package is now `com.autoomstudio.mp3studio` (Android OAuth clients must use it). `[16] Account reauth failed` shows `AccountUnavailable` instead of failing silently; sign-in failures are logged. |

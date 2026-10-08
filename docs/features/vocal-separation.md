@@ -8,7 +8,7 @@ MPlay splits any local song into vocals and an instrumental entirely on the phon
 
 ## Key files
 
-Paths are relative to `app/src/main/java/com/autoomstudio/mplay/` unless they start with `separation/` (the Gradle module).
+Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless they start with `separation/` (the Gradle module).
 
 | File | Role |
 |---|---|

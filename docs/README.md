@@ -1,6 +1,6 @@
 # MP3 Studio Developer Documentation
 
-MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.autoomstudio.mplay`) built with Jetpack Compose and Media3. On top of normal playback it adds playlists, duplicate detection, clip cutting and ringtones, a lofi effect, on-device AI vocal separation (HT-Demucs on ONNX Runtime), a metronome with BPM detection, and sing-along recording. Since PRD v3.2 the app requires a Google sign-in, backed by a self-hosted Supabase project; music and recordings still never leave the phone.
+MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.autoomstudio.mp3studio`) built with Jetpack Compose and Media3. On top of normal playback it adds playlists, duplicate detection, clip cutting and ringtones, a lofi effect, on-device AI vocal separation (HT-Demucs on ONNX Runtime), a metronome with BPM detection, and sing-along recording. Since PRD v3.2 the app requires a Google sign-in, backed by a self-hosted Supabase project; music and recordings still never leave the phone.
 
 | Item | Value |
 |---|---|

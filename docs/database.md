@@ -4,9 +4,9 @@
 
 ## Overview
 
-- Class: [`data/playlist/MPlayDatabase.kt`](../app/src/main/java/com/autoomstudio/mplay/data/playlist/MPlayDatabase.kt)
+- Class: [`data/playlist/MPlayDatabase.kt`](../app/src/main/java/com/autoomstudio/mp3studio/data/playlist/MPlayDatabase.kt)
 - File: `mplay.db`, built with `Room.databaseBuilder(...)`. No destructive fallback and no manual migrations.
-- `exportSchema = true`. Schemas: [`app/schemas/com.autoomstudio.mplay.data.playlist.MPlayDatabase/`](../app/schemas/com.autoomstudio.mplay.data.playlist.MPlayDatabase/) `1.json` to `6.json`.
+- `exportSchema = true`. Schemas: [`app/schemas/com.autoomstudio.mp3studio.data.playlist.MPlayDatabase/`](../app/schemas/com.autoomstudio.mp3studio.data.playlist.MPlayDatabase/) `1.json` to `6.json`.
 - DAOs: `playlistDao()`, `duplicateDao()`, `stemDao()`, `tempoDao()`.
 
 Library songs are not stored here. They are read live from MediaStore, and every table refers to songs by MediaStore `_ID` without a foreign key.
@@ -94,7 +94,7 @@ Indexes on `songId` and `state`.
 
 ### `song_tempos` (v4, meter columns v5, grid columns v6), `SongTempoEntity`
 
-Declared in [`data/tempo/TempoEntities.kt`](../app/src/main/java/com/autoomstudio/mplay/data/tempo/TempoEntities.kt).
+Declared in [`data/tempo/TempoEntities.kt`](../app/src/main/java/com/autoomstudio/mp3studio/data/tempo/TempoEntities.kt).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -109,7 +109,7 @@ Declared in [`data/tempo/TempoEntities.kt`](../app/src/main/java/com/autoomstudi
 | `downbeatMs` | REAL, nullable (v6) | Song time of a downbeat, for sync |
 | `beatPeriodMs` | REAL, nullable (v6) | Time between clicks (matches `meterBpm`); `0.0` = analyzed, no grid; NULL = row from before v6, re-analyzed on next Detect |
 
-Read and written through `TempoCache` ([`data/tempo/TempoCache.kt`](../app/src/main/java/com/autoomstudio/mplay/data/tempo/TempoCache.kt)).
+Read and written through `TempoCache` ([`data/tempo/TempoCache.kt`](../app/src/main/java/com/autoomstudio/mp3studio/data/tempo/TempoCache.kt)).
 
 ## DAOs
 
