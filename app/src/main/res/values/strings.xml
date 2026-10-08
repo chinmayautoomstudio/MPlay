@@ -78,6 +78,10 @@
         <item quantity="one">Uses %1$d of your %2$d remaining song this week.</item>
         <item quantity="other">Uses %1$d of your %2$d remaining songs this week.</item>
     </plurals>
+    <plurals name="separation_notice_usage_partial">
+        <item quantity="one">You have %1$d song left this week. Only the first is separated; %2$d will be skipped.</item>
+        <item quantity="other">You have %1$d songs left this week. Only the first %1$d are separated; %2$d will be skipped.</item>
+    </plurals>
     <string name="upgrade_locked_description">Pro feature</string>
     <plurals name="trial_banner">
         <item quantity="one">Your free trial ends within a day.</item>

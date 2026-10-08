@@ -90,7 +90,14 @@ fun SeparationNoticeDialog(
                 Text(stringResource(R.string.separation_notice_message))
                 if (usage != null) {
                     Text(
-                        text = if (usage.remaining > 0) {
+                        text = if (usage.remaining in 1 until request.songs.size) {
+                            pluralStringResource(
+                                R.plurals.separation_notice_usage_partial,
+                                usage.remaining,
+                                usage.remaining,
+                                request.songs.size - usage.remaining,
+                            )
+                        } else if (usage.remaining > 0) {
                             pluralStringResource(
                                 R.plurals.separation_notice_usage,
                                 usage.remaining,

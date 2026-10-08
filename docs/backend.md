@@ -72,7 +72,11 @@ Deploying on the self-hosted server:
 1. Copy `supabase/functions/_shared`, `entitlements`, `claim-trial`, `reserve-separation` and `finish-separation` into the stack's `volumes/functions/` (next to `main` and `hello`). Copy `_shared` again whenever it changes.
 2. Add `TRIAL_HASH_PEPPER` (a long random secret, for example `openssl rand -hex 32`) to the `functions` service environment in `docker-compose.yml` / `.env`. Never change it afterwards: existing claims would stop matching.
 3. `docker compose up -d --force-recreate functions`.
-4. Check: `POST /functions/v1/entitlements` without a token returns `401 {"error":"unauthorized"}`.
+4. Check: `POST /functions/v1/entitlements` with the anon `apikey` header but no user token returns `401 {"error":"unauthorized"}`.
+
+The live stack is the Coolify service `faifqncpzdrvhsf6zbvzwhvb` on `54.163.241.161` (SSH as `root`), so the paths are `/data/coolify/services/faifqncpzdrvhsf6zbvzwhvb/volumes/functions/` and that folder's `docker-compose.yml` and `.env`. The service is `supabase-edge-functions`. Restart only that container: `docker compose --project-name faifqncpzdrvhsf6zbvzwhvb -f docker-compose.yml --env-file .env up -d --no-deps --force-recreate supabase-edge-functions`. The pepper is in `.env` and passed through `TRIAL_HASH_PEPPER: '${TRIAL_HASH_PEPPER}'` in the compose file. Coolify rewrites both files when the service is saved or redeployed from its UI, so add the same variable there (same value, copied from `.env`) before doing that.
+
+Deployed on 2026-10-08: all four functions, with a checked trial claim, reserve, complete, partial grant, release and limit from the app.
 
 Tests: `deno test supabase/functions/_shared/` (`trial_test.ts`: normalization, device ID validation, hashing; `usage_test.ts`: reserve and finish body validation).
 
@@ -119,3 +123,4 @@ Sign in once with the Google account, then run `supabase/seed/first_admin.sql` (
 | 2026-10-07 | - | Project folder, foundation migration, RLS tests, first-Admin snippet; live database migrated. |
 | 2026-10-08 | - | M2: `plans` migration (applied live, checks run in a rolled-back block), `entitlements` and `claim-trial` Edge Functions, `plans_test.sql`. |
 | 2026-10-08 | - | M3: `usage` migration (applied live, checks run in a rolled-back block), `reserve-separation` and `finish-separation`, `usage` in the `entitlements` answer, `usage_test.sql`, admin usage SQL. |
+| 2026-10-08 | - | Edge Functions deployed over SSH to the Coolify stack, `TRIAL_HASH_PEPPER` set; Coolify deploy notes. |

@@ -73,7 +73,7 @@ Free users get 10 songs per week, reset Monday 00:00 India Standard Time; Trial 
 3. **Send.** `StemRepository` then calls `onUsageReported`, which schedules `UsageSyncWorker`. It needs a network, retries with exponential backoff and also runs after every sign-in. `UsageReporter` calls `finish-separation` per report and deletes it once sent; reports for another account are dropped.
 4. `retry(jobId)` reserves a new `jobRef` first, because failing or cancelling gave the old one back.
 
-Playing existing stems never calls the server (US4). Usage ("7/10 songs used this week. 3 remaining. Resets Mon, 12 Oct.") shows for Free users in the Settings section, the queue screen header, the time notice ("Uses 1 of your 3 remaining songs this week.") and Settings > Plans. It comes from the `entitlements` cache and the reserve and finish answers ([plans](plans.md)).
+Playing existing stems never calls the server (US4). Usage ("7/10 songs used this week. 3 remaining. Resets Mon, 12 Oct.") shows for Free users in the Settings section, the queue screen header, the time notice ("Uses 1 of your 3 remaining songs this week.", or "You have 1 song left this week. Only the first is separated; 2 will be skipped." when the selection is bigger) and Settings > Plans. It comes from the `entitlements` cache and the reserve and finish answers ([plans](plans.md)).
 
 ### Model
 
@@ -173,4 +173,4 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 | 2026-10-06 | - | Simpler `separation_notice_message`: patience, processor and resources; dropped heat, quality and personal-use wording. |
 | 2026-10-06 | - | `MediaPcmSource(exactStart = true)` drops decoded audio before `startUs` (by buffer presentation time), for the metronome's beat grid. Separation doesn't use it. |
 | 2026-10-07 | - | Export folder renamed to `Music/MP3 Studio Stems`. The queue runs only while signed in (`onSignedIn`/`onSignedOut`, `SeparationBackend.cancel()`, worker auth check). See [accounts](accounts.md). |
-| 2026-10-08 | - | M3 weekly usage limit: reserve before queueing, `completed`/`released` reports via `usage_reports` and `UsageSyncWorker`, new `EnqueueResult` values, usage display, limit sheet (Room schema v7). |
+| 2026-10-08 | - | M3 weekly usage limit: reserve before queueing, `completed`/`released` reports via `usage_reports` and `UsageSyncWorker`, new `EnqueueResult` values, usage display, limit sheet (Room schema v7). Time notice warns when a selection is bigger than the uses left; checked end to end against the deployed functions. |
