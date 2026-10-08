@@ -426,7 +426,10 @@ fun MainScreen(
                             }
                         },
                     )
-                } else if (destination != Destination.Profile || profilePage != ProfilePage.Main) {
+                } else if (
+                    destination != Destination.Profile ||
+                    (profilePage != ProfilePage.Main && profilePage != ProfilePage.Admin)
+                ) {
                     MPlayTopBar(
                         showActions = destination == Destination.Library,
                         searchActive = searchActive && destination == Destination.Library,

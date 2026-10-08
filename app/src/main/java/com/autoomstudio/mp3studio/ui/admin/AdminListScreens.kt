@@ -1,6 +1,7 @@
 package com.autoomstudio.mp3studio.ui.admin
 
 import android.content.Context
+import android.text.format.DateUtils
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.PersonAdd
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -28,16 +30,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.autoomstudio.mp3studio.R
+import com.autoomstudio.mp3studio.data.admin.AdminActivity
 import com.autoomstudio.mp3studio.data.admin.AuditEntry
+import com.autoomstudio.mp3studio.data.plan.epochMillis
 import com.autoomstudio.mp3studio.ui.library.DetailBackButton
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -261,6 +269,81 @@ internal fun AdminAuditScreen(viewModel: AdminViewModel, onBack: () -> Unit, mod
                     modifier = Modifier.padding(16.dp),
                 ) { Text(stringResource(R.string.admin_load_more)) }
             }
+        }
+    }
+}
+
+/** New sign-ups, new subscriptions and deleted accounts, newest first; opened from the bell on the dashboard. */
+@Composable
+internal fun AdminActivityScreen(viewModel: AdminViewModel, onBack: () -> Unit, modifier: Modifier) {
+    val activity by viewModel.activity.collectAsStateWithLifecycle()
+
+    LazyColumn(modifier) {
+        item { DetailBackButton(onBack = onBack) }
+        item { PageTitle(stringResource(R.string.admin_activity_title)) }
+        item {
+            LoadableContent(activity, onRetry = viewModel::reload) { events ->
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    if (events.isEmpty()) {
+                        Text(stringResource(R.string.admin_activity_empty), modifier = Modifier.padding(vertical = 8.dp))
+                    }
+                    events.forEach { event ->
+                        ActivityRow(event, onOpenUser = { id -> viewModel.open(AdminPage.User(id)) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActivityRow(event: AdminActivity, onOpenUser: (String) -> Unit) {
+    val (icon, tint) = when (event.type) {
+        "subscribed" -> painterResource(R.drawable.ic_crown) to AdminColors.Amber
+        "deleted" -> rememberVectorPainter(Icons.Outlined.DeleteOutline) to AdminColors.Red
+        else -> rememberVectorPainter(Icons.Outlined.PersonAdd) to AdminColors.Teal
+    }
+    val title = when (event.type) {
+        "subscribed" -> stringResource(
+            R.string.admin_activity_subscribed,
+            planName(event.plan ?: "pro"),
+            providerName(event.provider.orEmpty()),
+        )
+        "deleted" -> stringResource(R.string.admin_activity_deleted, planName(event.plan ?: "free"))
+        else -> stringResource(R.string.admin_activity_signup)
+    }
+    val who = if (event.type == "deleted") {
+        stringResource(R.string.admin_activity_deleted_detail)
+    } else {
+        event.email ?: event.name.orEmpty()
+    }
+    val when_ = DateUtils.getRelativeTimeSpanString(
+        runCatching { epochMillis(event.at) }.getOrDefault(0L),
+        System.currentTimeMillis(),
+        DateUtils.MINUTE_IN_MILLIS,
+    ).toString()
+    val userId = event.userId?.takeUnless { event.type == "deleted" }
+    AdminCard(onClick = userId?.let { { onOpenUser(it) } }) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(12.dp)) {
+            IconTile(icon, tint, size = 40.dp)
+            Column(
+                Modifier
+                    .weight(1f)
+                    .padding(horizontal = 12.dp),
+            ) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    who,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Text(when_, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

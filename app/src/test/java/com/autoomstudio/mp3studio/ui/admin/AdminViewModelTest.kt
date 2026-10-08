@@ -1,6 +1,7 @@
 package com.autoomstudio.mp3studio.ui.admin
 
 import com.autoomstudio.mp3studio.data.admin.AddAdminResult
+import com.autoomstudio.mp3studio.data.admin.AdminActivity
 import com.autoomstudio.mp3studio.data.admin.AdminBackend
 import com.autoomstudio.mp3studio.data.admin.AdminError
 import com.autoomstudio.mp3studio.data.admin.AdminException
@@ -16,6 +17,7 @@ import com.autoomstudio.mp3studio.data.admin.UserFilter
 import com.autoomstudio.mp3studio.data.plan.UsageDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
@@ -28,6 +30,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Instant
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AdminViewModelTest {
@@ -80,17 +83,36 @@ class AdminViewModelTest {
         override suspend fun grantPro(userId: String, until: Long) = check()
         override suspend fun revokePro(userId: String) = check()
         override suspend fun audit(before: Long?): List<AuditEntry> = emptyList<AuditEntry>().also { check() }
+        override suspend fun activity(): List<AdminActivity> = listOf(
+            AdminActivity("signup", "2026-10-08T10:00:00+00:00", userId = "u1", email = "a@b.c"),
+            AdminActivity("subscribed", "2026-10-08T09:00:00+00:00", userId = "u1", provider = "admin", plan = "pro"),
+            AdminActivity("deleted", "2026-10-07T09:00:00+00:00", plan = "free"),
+        ).also { check() }
     }
 
     private val backend = FakeBackend()
     private val refreshed = mutableListOf<String>()
+    private val seenAt = MutableStateFlow(0L)
 
     private fun viewModel() = AdminViewModel(
         backend = backend,
         currentUserId = { "me" },
         refreshOwnPlan = { refreshed += it },
+        activitySeenAt = seenAt,
+        markActivitySeen = { seenAt.value = it },
         searchDelayMillis = 300,
     ).also { it.enter() }
+
+    @Test
+    fun newActivityIsUnreadUntilTheFeedIsOpened() = runTest(dispatcher) {
+        seenAt.value = Instant.parse("2026-10-08T08:00:00Z").toEpochMilli()
+        val vm = viewModel()
+        assertEquals(2, vm.unread.value)
+        vm.open(AdminPage.Activity)
+        assertEquals(3, vm.activity.value.data?.size)
+        assertEquals(Instant.parse("2026-10-08T10:00:00Z").toEpochMilli(), seenAt.value)
+        assertEquals(0, vm.unread.value)
+    }
 
     @Test
     fun enteringLoadsTheOverviewAndTheFirstUsers() = runTest(dispatcher) {

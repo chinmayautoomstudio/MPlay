@@ -243,7 +243,7 @@ private fun JobRow(job: AdminJob) {
 }
 
 @Composable
-private fun providerName(provider: String): String = when (provider) {
+internal fun providerName(provider: String): String = when (provider) {
     "admin" -> stringResource(R.string.admin_provider_admin)
     "razorpay" -> stringResource(R.string.admin_provider_razorpay)
     "play" -> stringResource(R.string.admin_provider_play)

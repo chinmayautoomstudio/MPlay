@@ -3,12 +3,19 @@ package com.autoomstudio.mp3studio.ui.admin
 import android.content.Context
 import android.content.res.Resources
 import android.text.format.DateUtils
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -16,8 +23,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.admin.AddAdminResult
@@ -118,6 +130,49 @@ internal fun ErrorBlock(error: AdminError, onRetry: () -> Unit) {
     ) {
         Text(error.text(resources), color = MaterialTheme.colorScheme.error)
         OutlinedButton(onClick = onRetry) { Text(stringResource(R.string.admin_retry)) }
+    }
+}
+
+/** Fixed accent hues for the dashboard icons; they read on both the light and the dark theme. */
+internal object AdminColors {
+    val Blue = Color(0xFF3B82F6)
+    val Amber = Color(0xFFF59E0B)
+    val Teal = Color(0xFF14B8A6)
+    val Red = Color(0xFFEF4444)
+    val Violet = Color(0xFF8B5CF6)
+    val Green = Color(0xFF22C55E)
+}
+
+/** Rounded card with a faint primary outline, used across the dashboard and the Activity feed. */
+@Composable
+internal fun AdminCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    brush: Brush? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val shape = RoundedCornerShape(20.dp)
+    Column(
+        modifier
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .then(if (brush != null) Modifier.background(brush) else Modifier)
+            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), shape)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
+        content = content,
+    )
+}
+
+@Composable
+internal fun IconTile(icon: Painter, tint: Color, size: Dp = 40.dp) {
+    Box(
+        Modifier
+            .size(size)
+            .clip(RoundedCornerShape(size * 0.3f))
+            .background(tint.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.55f))
     }
 }
 

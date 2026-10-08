@@ -78,6 +78,11 @@ export function parseAdminRequest(body: unknown): AdminCall | null {
       const id = userId(b.userId);
       return id ? { fn: "admin_revoke_pro", args: { p_user: id } } : null;
     }
+    case "activity": {
+      const limit = count(b.limit, 50, PAGE_MAX);
+      if (limit === null || limit === 0) return null;
+      return { fn: "admin_activity", args: { p_limit: limit } };
+    }
     case "audit": {
       const limit = count(b.limit, 50, PAGE_MAX);
       const before = count(b.before, 0, Number.MAX_SAFE_INTEGER);

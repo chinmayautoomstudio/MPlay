@@ -21,6 +21,8 @@ Deno.test("Read actions map to their SQL functions with defaults", () => {
   });
   assertEquals(parseAdminRequest({ action: "audit" })!.args, { p_limit: 50, p_before: null });
   assertEquals(parseAdminRequest({ action: "audit", before: 42 })!.args, { p_limit: 50, p_before: 42 });
+  assertEquals(parseAdminRequest({ action: "activity" }), { fn: "admin_activity", args: { p_limit: 50 } });
+  assertEquals(parseAdminRequest({ action: "activity", limit: 10 })!.args, { p_limit: 10 });
 });
 
 Deno.test("Write actions validate their fields", () => {
@@ -47,4 +49,6 @@ Deno.test("Malformed requests are rejected", () => {
   assertEquals(parseAdminRequest({ action: "users", limit: PAGE_MAX + 1 }), null);
   assertEquals(parseAdminRequest({ action: "users", offset: -1 }), null);
   assertEquals(parseAdminRequest({ action: "users", query: "x".repeat(101) }), null);
+  assertEquals(parseAdminRequest({ action: "activity", limit: 0 }), null);
+  assertEquals(parseAdminRequest({ action: "activity", limit: PAGE_MAX + 1 }), null);
 });

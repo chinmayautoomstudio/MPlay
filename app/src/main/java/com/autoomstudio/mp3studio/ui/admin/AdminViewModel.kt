@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.autoomstudio.mp3studio.MPlayApp
 import com.autoomstudio.mp3studio.data.admin.AddAdminResult
+import com.autoomstudio.mp3studio.data.admin.AdminActivity
 import com.autoomstudio.mp3studio.data.admin.AdminBackend
 import com.autoomstudio.mp3studio.data.admin.AdminError
 import com.autoomstudio.mp3studio.data.admin.AdminException
@@ -17,14 +18,18 @@ import com.autoomstudio.mp3studio.data.admin.AdminUserDetail
 import com.autoomstudio.mp3studio.data.admin.AdminUserRow
 import com.autoomstudio.mp3studio.data.admin.AuditEntry
 import com.autoomstudio.mp3studio.data.admin.UserFilter
+import com.autoomstudio.mp3studio.data.plan.epochMillis
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -35,6 +40,7 @@ sealed interface AdminPage {
     data object Admins : AdminPage
     data object Usage : AdminPage
     data object Audit : AdminPage
+    data object Activity : AdminPage
 }
 
 /** One page's data as fetched from the server. */
@@ -77,6 +83,8 @@ class AdminViewModel(
     private val backend: AdminBackend,
     private val currentUserId: () -> String?,
     private val refreshOwnPlan: suspend (userId: String) -> Unit,
+    activitySeenAt: Flow<Long>,
+    private val markActivitySeen: suspend (epochMillis: Long) -> Unit,
     private val searchDelayMillis: Long = 300,
 ) : ViewModel() {
 
@@ -101,6 +109,14 @@ class AdminViewModel(
 
     private val _audit = MutableStateFlow(AuditState())
     val audit: StateFlow<AuditState> = _audit.asStateFlow()
+
+    private val _activity = MutableStateFlow(Loadable<List<AdminActivity>>())
+    val activity: StateFlow<Loadable<List<AdminActivity>>> = _activity.asStateFlow()
+
+    /** Activity events newer than the last one the admin saw; shown as the bell's badge. */
+    val unread: StateFlow<Int> = combine(_activity, activitySeenAt) { activity, seenAt ->
+        activity.data.orEmpty().count { eventMillis(it) > seenAt }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
     private val _busy = MutableStateFlow(false)
 
@@ -147,12 +163,28 @@ class AdminViewModel(
             AdminPage.Admins -> load(_admins) { backend.admins() }
             AdminPage.Usage -> load(_usage) { backend.usage() }
             AdminPage.Audit -> loadAudit(more = false)
+            AdminPage.Activity -> loadActivity(markSeen = true)
         }
     }
 
     private fun loadHome() {
         load(_overview) { backend.overview() }
+        loadActivity(markSeen = false)
         searchUsers(immediately = true)
+    }
+
+    private fun loadActivity(markSeen: Boolean) {
+        viewModelScope.launch {
+            _activity.update { it.copy(loading = true, error = null) }
+            try {
+                val events = backend.activity()
+                _activity.value = Loadable(data = events)
+                if (markSeen) events.maxOfOrNull(::eventMillis)?.let { markActivitySeen(it) }
+            } catch (e: AdminException) {
+                _activity.update { it.copy(loading = false, error = e.error) }
+                onForbidden(e.error)
+            }
+        }
     }
 
     fun setQuery(query: String) {
@@ -309,8 +341,12 @@ class AdminViewModel(
                     backend = container.adminBackend,
                     currentUserId = container::signedInUserId,
                     refreshOwnPlan = { container.entitlementsRepository.refresh(it) },
+                    activitySeenAt = container.appSettings.adminActivitySeenAt,
+                    markActivitySeen = container.appSettings::setAdminActivitySeenAt,
                 )
             }
         }
     }
 }
+
+private fun eventMillis(event: AdminActivity): Long = runCatching { epochMillis(event.at) }.getOrDefault(0L)

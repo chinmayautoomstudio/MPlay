@@ -132,6 +132,18 @@ data class AdminInvite(val email: String, val invitedBy: String? = null, val cre
 @Serializable
 data class AdminList(val admins: List<AdminMember>, val invites: List<AdminInvite>)
 
+/** One event in the Admin activity feed. [type] is `signup`, `subscribed` or `deleted`; deleted accounts have no user. */
+@Serializable
+data class AdminActivity(
+    val type: String,
+    val at: String,
+    val userId: String? = null,
+    val email: String? = null,
+    val name: String? = null,
+    val provider: String? = null,
+    val plan: String? = null,
+)
+
 @Serializable
 data class AuditEntry(
     val id: Long,

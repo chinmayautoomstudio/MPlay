@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.autoomstudio.mp3studio.data.stems.StemMode
@@ -160,7 +161,17 @@ class AppSettings(context: Context) {
         dataStore.edit { it[KEY_SINGALONG_NOTE_SEEN] = true }
     }
 
+    /** Time of the newest Admin activity event the admin has seen; the bell counts newer events as unread. */
+    val adminActivitySeenAt: Flow<Long> = dataStore.data
+        .map { it[KEY_ADMIN_ACTIVITY_SEEN_AT] ?: 0L }
+        .distinctUntilChanged()
+
+    suspend fun setAdminActivitySeenAt(epochMillis: Long) {
+        dataStore.edit { it[KEY_ADMIN_ACTIVITY_SEEN_AT] = epochMillis }
+    }
+
     private companion object {
+        val KEY_ADMIN_ACTIVITY_SEEN_AT = longPreferencesKey("admin_activity_seen_at")
         val KEY_SINGALONG_NOTE_SEEN = booleanPreferencesKey("singalong_note_seen")
         val KEY_METRONOME_BPM = intPreferencesKey("metronome_bpm")
         val KEY_METRONOME_BEATS = intPreferencesKey("metronome_beats")

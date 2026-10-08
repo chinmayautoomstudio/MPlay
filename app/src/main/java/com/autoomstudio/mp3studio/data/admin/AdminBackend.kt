@@ -29,6 +29,7 @@ interface AdminBackend {
     suspend fun grantPro(userId: String, until: Long)
     suspend fun revokePro(userId: String)
     suspend fun audit(before: Long?): List<AuditEntry>
+    suspend fun activity(): List<AdminActivity>
 
     companion object {
         const val PAGE_SIZE = 50
@@ -94,6 +95,9 @@ class SupabaseAdminBackend(private val client: SupabaseClient) : AdminBackend {
         if (before != null) put("before", before)
     }.entries
 
+    override suspend fun activity(): List<AdminActivity> =
+        call<ActivityDto>("activity") { put("limit", AdminBackend.PAGE_SIZE) }.events
+
     private suspend inline fun <reified T> call(action: String, fields: JsonObjectBuilder.() -> Unit = {}): T {
         val body = buildJsonObject {
             put("action", action)
@@ -118,6 +122,9 @@ class SupabaseAdminBackend(private val client: SupabaseClient) : AdminBackend {
 
     @Serializable
     private data class AuditDto(val entries: List<AuditEntry>)
+
+    @Serializable
+    private data class ActivityDto(val events: List<AdminActivity>)
 
     private companion object {
         val json = Json { ignoreUnknownKeys = true }

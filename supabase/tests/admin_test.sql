@@ -3,7 +3,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(25);
+select plan(31);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -85,6 +85,34 @@ select ok(exists (
 ), 'Search finds a user by name');
 select is((select count(*)::int from public.admin_audit_log where created_at = now()), 9,
     'Each change wrote one audit row');
+
+-- Activity feed --------------------------------------------------------------------------------------------
+
+select throws_ok($$ select public.admin_activity('aaaaaaaa-0000-0000-0000-000000000002', 50) $$, '42501', null,
+    'A normal user cannot read the activity feed');
+select is(public.admin_grant_pro('aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000002',
+    now() + interval '1 month') ->> 'result', 'ok', 'Pro can be granted again');
+insert into public.admin_audit_log (actor_id, action, target_user_id, details)
+values (null, 'account_deleted', null, '{"role": "user", "plan": "free"}');
+select ok(exists (
+    select 1 from jsonb_array_elements(public.admin_activity('aaaaaaaa-0000-0000-0000-000000000001', 100) -> 'events') e
+    where e ->> 'type' = 'signup' and e ->> 'email' = 'user@example.com'
+), 'Sign-ups are in the feed');
+select ok(exists (
+    select 1 from jsonb_array_elements(public.admin_activity('aaaaaaaa-0000-0000-0000-000000000001', 100) -> 'events') e
+    where e ->> 'type' = 'subscribed' and e ->> 'provider' = 'admin' and e ->> 'email' = 'user@example.com'
+), 'Active subscriptions are in the feed');
+select ok(exists (
+    select 1 from jsonb_array_elements(public.admin_activity('aaaaaaaa-0000-0000-0000-000000000001', 100) -> 'events') e
+    where e ->> 'type' = 'deleted' and e ->> 'plan' = 'free' and e ->> 'email' is null
+), 'Deleted accounts are in the feed, without an email');
+select is(
+    (select count(*)::int from (
+        select (e ->> 'at')::timestamptz as at, lag((e ->> 'at')::timestamptz) over (order by n) as prev
+        from jsonb_array_elements(public.admin_activity('aaaaaaaa-0000-0000-0000-000000000001', 100) -> 'events')
+            with ordinality as t(e, n)
+    ) x where prev < at),
+    0, 'The feed is newest first');
 
 -- Access ---------------------------------------------------------------------------------------------------
 
