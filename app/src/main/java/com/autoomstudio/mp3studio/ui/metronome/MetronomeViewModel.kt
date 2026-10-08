@@ -1,6 +1,5 @@
 package com.autoomstudio.mp3studio.ui.metronome
 
-import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
 import androidx.lifecycle.viewModelScope
@@ -18,12 +17,10 @@ import com.autoomstudio.mp3studio.metronome.MetronomeController
 import com.autoomstudio.mp3studio.metronome.MetronomeSettings
 import com.autoomstudio.mp3studio.metronome.MetronomeState
 import com.autoomstudio.mp3studio.metronome.SyncState
-import com.autoomstudio.mp3studio.metronome.TapTempo
 import com.autoomstudio.mp3studio.metronome.TempoConfidence
 import com.autoomstudio.mp3studio.metronome.TempoEstimate
 import com.autoomstudio.mp3studio.metronome.TimeSignature
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -75,12 +72,6 @@ class MetronomeViewModel(
     val beat: StateFlow<BeatTick?> = controller.beat
     val sync: StateFlow<SyncState> = controller.sync
 
-    private val tapTempo = TapTempo()
-    private val _tapCount = MutableStateFlow(0)
-
-    /** Taps in the current tap-tempo run; 0 when idle. */
-    val tapCount: StateFlow<Int> = _tapCount.asStateFlow()
-
     private val _detection = MutableStateFlow<TempoDetection>(TempoDetection.Idle)
     val detection: StateFlow<TempoDetection> = _detection.asStateFlow()
 
@@ -94,7 +85,6 @@ class MetronomeViewModel(
     /** Detect BPM was tapped for a song never analyzed while BPM Detector isn't in the plan (PRD flow 6). */
     val upgradeRequests: SharedFlow<Feature> = _upgradeRequests.asSharedFlow()
 
-    private var tapReset: Job? = null
     private var detectJob: Job? = null
 
     fun update(transform: (MetronomeSettings) -> MetronomeSettings) = controller.update(transform = transform)
@@ -102,18 +92,6 @@ class MetronomeViewModel(
     fun toggle() = controller.toggle()
 
     fun toggleMute() = controller.setUserMuted(!controller.state.value.muted)
-
-    fun tap() {
-        val bpm = tapTempo.tap(SystemClock.elapsedRealtime())
-        _tapCount.value = tapTempo.count
-        if (bpm != null) controller.update { it.copy(bpm = bpm) }
-        tapReset?.cancel()
-        tapReset = viewModelScope.launch {
-            delay(TAP_RESET_MS)
-            tapTempo.reset()
-            _tapCount.value = 0
-        }
-    }
 
     /**
      * Fills in the BPM from [song], instantly when it was detected before, and the time signature when it is at
@@ -218,8 +196,6 @@ class MetronomeViewModel(
     fun scaleBpm(factor: Double) = controller.scaleTempo(factor)
 
     companion object {
-        private const val TAP_RESET_MS = 2_000L
-
         val Factory = viewModelFactory {
             initializer {
                 val container = (this[APPLICATION_KEY] as MPlayApp).container

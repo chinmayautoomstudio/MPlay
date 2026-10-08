@@ -547,11 +547,6 @@
     <string name="metronome_enter_bpm_hint">20 to 300 BPM</string>
     <string name="metronome_set">Set</string>
     <string name="metronome_cancel">Cancel</string>
-    <string name="metronome_tap">Tap tempo</string>
-    <plurals name="metronome_tap_more">
-        <item quantity="one">Tap %d more time</item>
-        <item quantity="other">Tap %d more times</item>
-    </plurals>
     <string name="metronome_time_signature">Time signature</string>
     <string name="metronome_beats_per_bar">Beats per bar</string>
     <string name="metronome_fewer_beats">Fewer beats</string>
@@ -565,7 +560,6 @@
     <string name="metronome_beat_description">Beat %1$d of %2$d</string>
     <string name="metronome_subtitle">Keep your perfect rhythm</string>
     <string name="metronome_back">Close metronome</string>
-    <string name="metronome_tap_hint">Tap to set BPM</string>
     <string name="metronome_sound_toggle">Sound</string>
     <string name="metronome_mute">Mute clicks</string>
     <string name="metronome_unmute">Unmute clicks</string>
@@ -636,12 +630,13 @@
     <string name="metronome_chip_bpm">%d BPM</string>
     <string name="metronome_mini_indicator">Metronome on, %d BPM</string>
     <string name="metronome_detect">Detect BPM</string>
+    <string name="metronome_detect_hint">Play a song to detect its BPM</string>
     <string name="metronome_detecting">Listening for the beat…</string>
     <string name="metronome_detected">Detected %d BPM</string>
     <string name="metronome_confidence_high">Clear, steady beat.</string>
     <string name="metronome_confidence_medium">Fairly sure. If it feels half or double speed, use ÷2 or ×2.</string>
-    <string name="metronome_confidence_low">Not sure about this one. Check it by ear, or use Tap tempo.</string>
-    <string name="metronome_detect_failed">Couldn\'t find a clear beat. Try Tap tempo.</string>
+    <string name="metronome_confidence_low">Not sure about this one. Check it by ear and use ÷2 or ×2 if needed.</string>
+    <string name="metronome_detect_failed">Couldn\'t find a clear beat. Set the BPM with the dial or slider.</string>
     <string name="metronome_detected_with_meter">%1$d BPM, %2$s</string>
     <string name="metronome_detected_with_meter_felt">%1$d BPM, %2$s (felt as %3$d)</string>
     <string name="metronome_meter_confidence_high">Time signature: clear accent pattern.</string>

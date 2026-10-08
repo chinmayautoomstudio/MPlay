@@ -4,7 +4,7 @@
 
 ## Summary
 
-A metronome available as its own tab and as a sheet on Now Playing: 20 to 300 BPM, time-signature presets, accented first beat, three generated click sounds, volume and tap tempo. It plays alongside music without pausing or ducking it, and keeps running with the screen off from a notification with a Stop button. On Now Playing it can detect the current song's BPM (with half/double fixes) and time signature (2/4, 3/4, 4/4, 6/8), cached per song, and then click in sync with the song: on its beats, silent while it is paused, re-aligned after seeks.
+A metronome available as its own tab and as a sheet on Now Playing: 20 to 300 BPM, time-signature presets, accented first beat, three generated click sounds and volume. It plays alongside music without pausing or ducking it, and keeps running with the screen off from a notification with a Stop button. On both the tab and Now Playing, one tap on Detect BPM can detect the current song's BPM (with half/double fixes) and time signature (2/4, 3/4, 4/4, 6/8), cached per song, and then click in sync with the song: on its beats, silent while it is paused, re-aligned after seeks.
 
 ## Key files
 
@@ -20,17 +20,16 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `metronome/SongSync.kt` | Pure math from a `BeatGrid` and the two "heard at" timestamps to an engine `Alignment`, and the drift in ms. |
 | `metronome/MetronomeService.kt` | Foreground service, ongoing notification with Stop. |
 | `metronome/MetronomeSettings.kt` | `MetronomeSettings`, `ClickSound`, `TimeSignature`, limits. |
-| `metronome/TapTempo.kt` | Tap tempo. |
 | `metronome/TempoDetector.kt` | Spectral flux + autocorrelation BPM estimator; `detect()` gives `TempoEstimate`, `detectRhythm()` gives `RhythmEstimate` (tempo + meter); `TempoConfidence`. |
 | `metronome/MeterDetector.kt` | Time signature estimator on the detector's envelopes and beat period; `MeterEstimate`, `BeatGrid`. |
 | `data/tempo/SongTempoAnalyzer.kt` | Decodes 45 s of a song from an exact start, runs the detector, moves the grid to song time, caches in Room. |
 | `data/tempo/TempoEntities.kt` | `SongTempoEntity` (`song_tempos`), `TempoDao`. |
 | `data/tempo/TempoCache.kt` | Row to `RhythmEstimate` conversion and the cache decision (`TempoLookup`). |
 | `ui/metronome/MetronomeDial.kt` | `BpmDial`: glowing BPM ring (pulses on each beat), beat dots, -/+ circles, decorative waveform bars. |
-| `ui/metronome/MetronomeControls.kt` | Shared layout: header, dial, tempo slider, Tap tempo tile (`ActionTile`), Sound / Start-Stop / Settings row, sound settings sheet, Time signature card (presets, Custom dialog, beats-per-bar stepper), Accent card; `MetronomeCard`. |
-| `ui/metronome/MetronomeScreen.kt` | Metronome tab. |
-| `ui/metronome/MetronomePlayerUi.kt` | `MetronomeChip`, `MetronomeSheet` (Detect BPM / ÷2 / ×2 row, result card with "Looks like 3/4. Use it?" pill, Undo snackbar, "Sync with song" tile), `MetronomeMiniIndicator`. |
-| `ui/metronome/MetronomeViewModel.kt` | Controller wrapper, tap tempo, detection states (through `TempoDetectionGate`), `upgradeRequests`, applying/undoing the detected meter (`MeterApplied`), starting sync and `toggleSync()`. |
+| `ui/metronome/MetronomeControls.kt` | Shared layout: header, dial, tempo slider, `syncTile` slot, Sound / Start-Stop / Settings row, sound settings sheet, Time signature card (presets, Custom dialog, beats-per-bar stepper), Accent card; `MetronomeCard`. |
+| `ui/metronome/MetronomeScreen.kt` | Metronome tab: `MetronomeWithDetection` for the song that's playing (passed from `MainScreen`). |
+| `ui/metronome/MetronomePlayerUi.kt` | `MetronomeChip`, `MetronomeWithDetection` (shared by the tab and the sheet: Detect BPM / ÷2 / ×2 row, "Play a song to detect its BPM" hint, result card with "Looks like 3/4. Use it?" pill, Undo snackbar, "Sync with song" tile), `MetronomeSheet` (the bottom sheet around it), `MetronomeMiniIndicator`. |
+| `ui/metronome/MetronomeViewModel.kt` | Controller wrapper, detection states (through `TempoDetectionGate`), `upgradeRequests`, applying/undoing the detected meter (`MeterApplied`), starting sync and `toggleSync()`. |
 | `data/tempo/TempoDetectionGate.kt` | `TempoSource` and the plan gate for new detections; see [plans](plans.md). |
 | `ui/components/MetronomeIcons.kt` | Metronome vector icon. |
 | `app/src/main/res/drawable/ic_notification_metronome.xml` | Notification icon. |
@@ -53,15 +52,11 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 ### Screen layout
 
-- Both the tab and the Now Playing sheet use `MetronomeControls`: header ("Keep your perfect rhythm"; the sheet adds a back button that closes it), `BpmDial` (tap the number to type a BPM), slider with 20/300 labels, Tap tempo tile, then Sound / big Start-Stop / Settings, the Time signature card and the Accent card.
-- The sheet adds, via `tempoExtras` and `syncTile`, the Detect BPM / ÷2 / ×2 row, the result card, and a "Sync with song" tile next to Tap tempo once a detection is done.
+- Both the tab and the Now Playing sheet use `MetronomeControls`: header ("Keep your perfect rhythm"; the sheet adds a back button that closes it), `BpmDial` (tap the number to type a BPM), slider with 20/300 labels, then Sound / big Start-Stop / Settings, the Time signature card and the Accent card.
+- Both wrap it in `MetronomeWithDetection`, which adds, via `tempoExtras` and `syncTile`, the Detect BPM / ÷2 / ×2 row, the result card, and a "Sync with song" tile once a detection is done. Detect BPM works on the song that's playing; with nothing playing it is disabled and shows "Play a song to detect its BPM". There is no manual tap tempo.
 - **Sound** is a quick mute: `MetronomeController.setUserMuted()` sets `MetronomeState.muted`; the beat keeps running and the dial keeps pulsing. Not saved, but kept across stop and start.
 - **Settings** opens a bottom sheet with the click sound and volume.
 - **Custom** in the Time signature card opens a dialog for beats per bar (1-12) and beat unit (1/4 or 1/8 note); it shows the current signature when it isn't a preset.
-
-### Tap tempo
-
-Resets after 2 s without a tap, keeps the last 8 taps, needs at least 4. BPM = 60000 / average interval, rounded and clamped.
 
 ### Tempo detection
 
@@ -86,7 +81,7 @@ Resets after 2 s without a tap, keeps the last 8 taps, needs at least 4. BPM = 6
 
 1. **Beat grid.** `MeterDetector` also returns where the beats are: the comb phase is refined between envelope frames (linear interpolation plus a parabola through the best offset), and the downbeat is the accented bar position. `TempoDetector.detectRhythm()` turns it into `BeatGrid(downbeatMs, periodMs)`, subtracting the onset envelope's delay (`ONSET_DELAY_SAMPLES` = 676, calibrated on synthetic loops to within about 2 ms). The period is the click period: the eighth note for 6/8, so it matches `clickBpm`. With no meter the grid uses the tempo's beat.
 2. **Song time.** `SongTempoAnalyzer` decodes with `MediaPcmSource(exactStart = true)`, so the window starts exactly at `startMs`, and shifts the grid by `startMs`.
-3. **Start.** After Detect, `MetronomeViewModel` calls `MetronomeController.syncTo(songId, grid)` (starting the metronome if needed). When the meter wasn't applied (Low confidence), the grid period is multiplied up to the detected tempo's beat. Applying the meter, Undo and ÷2/×2 (`scaleTempo()`, which scales the grid exactly) keep sync on; any other BPM change (slider, +/-, tap tempo) ends it. The "Sync with song" tile turns it on and off.
+3. **Start.** After Detect, `MetronomeViewModel` calls `MetronomeController.syncTo(songId, grid)` (starting the metronome if needed). When the meter wasn't applied (Low confidence), the grid period is multiplied up to the detected tempo's beat. Applying the meter, Undo and ÷2/×2 (`scaleTempo()`, which scales the grid exactly) keep sync on; any other BPM change (slider, +/-, typed BPM) ends it. The "Sync with song" tile turns it on and off.
 4. **Mapping.** `SongSync.align()` combines `MusicTimeline.snapshot()` (song position, `System.nanoTime()`, playback speed) with `MetronomeEngine.heardFrame()` (from `AudioTrack.getTimestamp`, falling back to the head position before audio flows) to find the output frame of song beat 0 and the frames per beat at the current speed.
 5. **Engine.** `MetronomeEngine.align()` hands the `Alignment` to the writer thread, which calls `BeatClock.align()`. Beat indices become song beat numbers (negative before the downbeat), the bar position is `floorMod(beat, beatsPerBar)`, and the set BPM is ignored until `unalign()`. A grid beat less than 40% of a beat after the last click is skipped, so re-aligning never double-clicks.
 6. **Following.** While synced, `MetronomeController` mutes the clicks while the music is paused (with calls and transient focus loss) and re-aligns when it resumes, after every seek or speed change (`seeks`), 500 ms after starting, and every 2 s if the drift is over 20 ms. When the song changes, sync ends; if sync started the metronome it stops too.
@@ -124,7 +119,6 @@ Resets after 2 s without a tap, keeps the last 8 taps, needs at least 4. BPM = 6
 
 - `metronome/BeatClockTest.kt`: exact spacing, under 1 frame error over 10 minutes, tempo change on next beat; aligned beats and song numbering (including negative), skipping a beat too close to the last click, unalign carrying on at the tempo.
 - `metronome/SongSyncTest.kt`: anchor and period from the two timestamps, playback speed, signed drift, changed period.
-- `metronome/TapTempoTest.kt`: minimum taps, averaging, 8-tap window, reset, clamping.
 - `metronome/TempoDetectorTest.kt`: synthetic click tracks at many tempos, octave folding, accents, noise, confidence, silence.
 - `metronome/MeterDetectorTest.kt`: synthetic drum loops (4/4 at 90/120/140, 3/4 at 90/120, 2/4 at 100, 6/8 with accents on pulses 1 and 4), each clean and with noise (28 runs, at least 90% required); unaccented clicks give 4/4 Low; noise null or Low; silence and short clips null; 6/8 clicks the eighths; the grid's downbeat within 6 ms (measured about 2 ms) and period within 0.1%, also with the window starting mid-bar.
 - `metronome/SyntheticAudio.kt`: shared test audio (`clicks`, `pattern`).
@@ -139,6 +133,7 @@ Resets after 2 s without a tap, keeps the last 8 taps, needs at least 4. BPM = 6
 - 6/8 plays as six even beats; no subdivisions or per-beat accents.
 - Detection folds to 60-200 BPM and uses one 45 s window; cached results have no score.
 - Time signature: a 4/4 bar whose beats 1 and 3 sound alike is the same pattern as 2/4, so it is reported as 2/4 Low (chip only). When the tempo lands on half time the meter is judged on that grid (for example 4/4 at 140 read at 70 BPM falls back to 4/4 Low). Only 2/4, 3/4, 4/4 and 6/8 are considered. Tuned on synthetic audio only.
+- Without a playing song (or for Free users on songs never analysed) there is no automatic way to set the BPM; use the dial, slider or typed BPM.
 - Settings load asynchronously, so an early `update()` can be overwritten.
 - `AudioTrack` creation failure is silent.
 - Call detection can take up to 500 ms.
@@ -155,3 +150,4 @@ Resets after 2 s without a tap, keeps the last 8 taps, needs at least 4. BPM = 6
 | 2026-10-06 | - | UI redesign: `BpmDial` ring, slider, action tiles, Sound mute toggle (`setUserMuted`), sound settings sheet, Time signature and Accent cards, Custom time signature dialog; same layout in the tab and the Now Playing sheet. |
 | 2026-10-07 | - | The metronome stops on sign-out. See [accounts](accounts.md). |
 | 2026-10-08 | - | New BPM detections need Trial or Pro (`TempoDetectionGate`, `SongTempoAnalyzer` implements `TempoSource`); cached tempos stay usable. See [plans](plans.md). |
+| 2026-10-08 | - | Tap tempo removed (`TapTempo`, `TapTempoTest`); one-tap Detect BPM on the Metronome tab too, through the shared `MetronomeWithDetection`. |

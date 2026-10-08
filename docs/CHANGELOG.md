@@ -42,6 +42,7 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 - `PlaybackController` implements `MusicTimeline` (song ID, playing, seeks, position snapshot with speed) and takes `restoresSession`; `AppContainer` gives the metronome its own instance. ([playback](features/playback.md), [architecture](architecture.md))
 
 ### Changed
+- Detect BPM is now on the Metronome tab as well as the Now Playing sheet: one tap analyses the song that's playing (disabled with "Play a song to detect its BPM" when nothing plays). The low-confidence and failed messages no longer point to Tap tempo. ([metronome](features/metronome.md))
 - The "Profile" label in the bottom navigation bar now lines up with the other tab labels. ([settings](features/settings-and-about.md))
 - Admin dashboard redesign: MP3 Studio wordmark header with an Admin chip and the Activity bell (the app top bar is hidden there), "Admin Dashboard" title, a stats card with six coloured tiles and a weekly usage row, three shortcut cards (Admins, AI Vocal Separator usage, Audit log), and a Users card with a pill search, filled filter chips and rows with initials avatars, a status dot, plan chip, weekly count and a "..." menu (View details, Make/Remove admin, Disable/Enable). ([admin](features/admin.md))
 - Profile screen is more compact so it fits on one phone screen: the back button and title share a row, and the avatar, subscription card, category rows and text are smaller. Edit is now a small pencil icon button. ([settings](features/settings-and-about.md))
@@ -69,6 +70,7 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 - Google sign-in no longer fails silently when Google rejects the chosen account (`[16] Account reauth failed`, reported as a cancellation): it shows "Google couldn't confirm this account on this phone" (`AuthError.AccountUnavailable`) and logs the exception. ([accounts](features/accounts.md))
 
 ### Removed
+- Metronome Tap tempo (manual tapping to set the BPM), with `TapTempo` and `TapTempoTest`; Detect BPM replaces it. ([metronome](features/metronome.md))
 - `:spike` module (the separation feasibility/benchmark app; never shipped, nothing depended on it) and the `song` mode of `tools/make_reference.py` that only fed it. ([architecture](architecture.md))
 
 ### Database

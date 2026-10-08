@@ -536,7 +536,10 @@ fun MainScreen(
                                 backEnabled = screenBackEnabled,
                             )
 
-                            Destination.Metronome -> MetronomeScreen(modifier = contentModifier)
+                            Destination.Metronome -> MetronomeScreen(
+                                song = allSongs.firstOrNull { it.id == nowPlaying?.songId },
+                                modifier = contentModifier,
+                            )
 
                             Destination.Profile -> AnimatedContent(
                                 targetState = profilePage,

@@ -1,35 +1,18 @@
 package com.autoomstudio.mp3studio.ui.metronome
 
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
+import com.autoomstudio.mp3studio.data.model.Song
 
-/** The Metronome tab (MT1). */
+/** The Metronome tab (MT1), with Detect BPM for [song], the song that's playing. */
 @Composable
-fun MetronomeScreen(
-    modifier: Modifier = Modifier,
-    viewModel: MetronomeViewModel = viewModel(factory = MetronomeViewModel.Factory),
-) {
-    val state by viewModel.state.collectAsStateWithLifecycle()
-    val tapCount by viewModel.tapCount.collectAsStateWithLifecycle()
-    MetronomeControls(
-        state = state,
-        beat = viewModel.beat,
-        tapCount = tapCount,
-        onUpdate = viewModel::update,
-        onToggle = viewModel::toggle,
-        onTap = viewModel::tap,
-        onToggleMute = viewModel::toggleMute,
-        modifier = modifier
-            .verticalScroll(rememberScrollState())
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+fun MetronomeScreen(song: Song?, modifier: Modifier = Modifier) {
+    MetronomeWithDetection(
+        song = song,
+        onBack = null,
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+        modifier = modifier,
     )
 }

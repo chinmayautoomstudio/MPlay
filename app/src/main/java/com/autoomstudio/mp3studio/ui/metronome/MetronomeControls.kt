@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -65,7 +64,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -89,18 +87,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.roundToInt
 
 /**
- * The full set of metronome controls, shared by the Metronome tab and the Now Playing sheet (MT2 to MT8).
- * [onBack] adds a close button to the header (the sheet). [tempoExtras] sits under the tempo slider, for Detect BPM
- * in the sheet, and [syncTile] goes beside the Tap tempo tile.
+ * The full set of metronome controls, shared by the Metronome tab and the Now Playing sheet (MT2 to MT7).
+ * [onBack] adds a close button to the header (the sheet). [tempoExtras] sits under the tempo slider, for Detect BPM,
+ * and [syncTile] below it once a song's beats are known.
  */
 @Composable
 fun MetronomeControls(
     state: MetronomeState,
     beat: StateFlow<BeatTick?>,
-    tapCount: Int,
     onUpdate: ((MetronomeSettings) -> MetronomeSettings) -> Unit,
     onToggle: () -> Unit,
-    onTap: () -> Unit,
     onToggleMute: () -> Unit,
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
@@ -128,20 +124,10 @@ fun MetronomeControls(
         )
         TempoSlider(bpm = settings.bpm, onChange = { bpm -> onUpdate { it.copy(bpm = bpm) } })
         tempoExtras()
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-            syncTile?.invoke(this)
-            val tapsLeft = TAPS_NEEDED - tapCount
-            ActionTile(
-                icon = Icons.Outlined.TouchApp,
-                title = stringResource(R.string.metronome_tap),
-                subtitle = if (tapCount in 1 until TAPS_NEEDED) {
-                    LocalResources.current.getQuantityString(R.plurals.metronome_tap_more, tapsLeft, tapsLeft)
-                } else {
-                    stringResource(R.string.metronome_tap_hint)
-                },
-                onClick = onTap,
-                modifier = Modifier.weight(1f),
-            )
+        if (syncTile != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                syncTile()
+            }
         }
         TransportRow(
             running = state.running,
@@ -168,8 +154,6 @@ fun MetronomeControls(
         SoundSettingsSheet(settings = settings, onUpdate = onUpdate, onDismiss = { showSoundSettings = false })
     }
 }
-
-private const val TAPS_NEEDED = 4
 
 private val ClickSound.label: Int
     get() = when (this) {

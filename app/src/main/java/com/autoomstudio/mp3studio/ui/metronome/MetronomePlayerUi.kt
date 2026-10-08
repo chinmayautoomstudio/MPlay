@@ -6,6 +6,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -93,17 +94,37 @@ fun MetronomeChip(
     )
 }
 
-/** Same controls as the Metronome tab, plus Detect BPM for [song] (MT9, MT12). */
+/** The metronome controls in the Now Playing sheet (MT12), with Detect BPM for [song]. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MetronomeSheet(
+fun MetronomeSheet(song: Song?, onDismiss: () -> Unit) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        MetronomeWithDetection(
+            song = song,
+            onBack = onDismiss,
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 32.dp),
+        )
+    }
+}
+
+/**
+ * The metronome controls plus one-tap Detect BPM for [song], the song that's playing (MT9). Shared by the
+ * Metronome tab and the Now Playing sheet; shows its own snackbar because the sheet covers the main one (MT19).
+ */
+@Composable
+fun MetronomeWithDetection(
     song: Song?,
-    onDismiss: () -> Unit,
+    onBack: (() -> Unit)?,
+    contentPadding: PaddingValues,
+    modifier: Modifier = Modifier,
     viewModel: MetronomeViewModel = viewModel(factory = MetronomeViewModel.Factory),
     plansViewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val tapCount by viewModel.tapCount.collectAsStateWithLifecycle()
     val detection by viewModel.detection.collectAsStateWithLifecycle()
     val sync by viewModel.sync.collectAsStateWithLifecycle()
     val plan by plansViewModel.state.collectAsStateWithLifecycle()
@@ -112,7 +133,6 @@ fun MetronomeSheet(
         viewModel.upgradeRequests.collect { upgradeFeature = it }
     }
     upgradeFeature?.let { feature -> UpgradeSheet(feature = feature, onDismiss = { upgradeFeature = null }) }
-    // The sheet covers the main screen's snackbar, so it shows its own (MT19).
     val snackbarHostState = remember { SnackbarHostState() }
     val resources = LocalContext.current.resources
     LaunchedEffect(viewModel) {
@@ -126,73 +146,65 @@ fun MetronomeSheet(
             if (result == SnackbarResult.ActionPerformed) viewModel.undoMeter(event)
         }
     }
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
-            ) {
-                val songDetection = detection.takeIf { song != null && it.songId == song.id } ?: TempoDetection.Idle
-                val songSync = (sync as? SyncState.On)?.takeIf { song != null && it.songId == song.id }
-                MetronomeControls(
-                    state = state,
-                    beat = viewModel.beat,
-                    tapCount = tapCount,
-                    onUpdate = viewModel::update,
-                    onToggle = viewModel::toggle,
-                    onTap = viewModel::tap,
-                    onToggleMute = viewModel::toggleMute,
-                    onBack = onDismiss,
-                    tempoExtras = {
-                        DetectTempo(
-                            detection = songDetection,
-                            bpm = state.settings.bpm,
-                            canDetect = song != null,
-                            locked = !plan.unlocks(Feature.BpmDetector),
-                            onDetect = { song?.let(viewModel::detect) },
-                            onScale = viewModel::scaleBpm,
-                            onApplyMeter = viewModel::applyMeter,
+    Box(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(contentPadding),
+        ) {
+            val songDetection = detection.takeIf { song != null && it.songId == song.id } ?: TempoDetection.Idle
+            val songSync = (sync as? SyncState.On)?.takeIf { song != null && it.songId == song.id }
+            MetronomeControls(
+                state = state,
+                beat = viewModel.beat,
+                onUpdate = viewModel::update,
+                onToggle = viewModel::toggle,
+                onToggleMute = viewModel::toggleMute,
+                onBack = onBack,
+                tempoExtras = {
+                    DetectTempo(
+                        detection = songDetection,
+                        bpm = state.settings.bpm,
+                        canDetect = song != null,
+                        locked = !plan.unlocks(Feature.BpmDetector),
+                        onDetect = { song?.let(viewModel::detect) },
+                        onScale = viewModel::scaleBpm,
+                        onApplyMeter = viewModel::applyMeter,
+                    )
+                },
+                syncTile = (songDetection as? TempoDetection.Done)?.let { done ->
+                    {
+                        SyncTile(
+                            sync = songSync,
+                            available = done.grid != null,
+                            onToggle = viewModel::toggleSync,
+                            modifier = Modifier.weight(1f),
                         )
-                    },
-                    syncTile = (songDetection as? TempoDetection.Done)?.let { done ->
-                        {
-                            SyncTile(
-                                sync = songSync,
-                                available = done.grid != null,
-                                onToggle = viewModel::toggleSync,
-                                modifier = Modifier.weight(1f),
-                            )
+                    }
+                },
+            )
+        }
+        val undoDescription = stringResource(R.string.metronome_meter_undo_description)
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp),
+        ) { data ->
+            Snackbar(
+                action = data.visuals.actionLabel?.let { label ->
+                    {
+                        TextButton(
+                            onClick = { data.performAction() },
+                            modifier = Modifier.semantics { contentDescription = undoDescription },
+                        ) {
+                            Text(label)
                         }
-                    },
-                )
-            }
-            val undoDescription = stringResource(R.string.metronome_meter_undo_description)
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp),
-            ) { data ->
-                Snackbar(
-                    action = data.visuals.actionLabel?.let { label ->
-                        {
-                            TextButton(
-                                onClick = { data.performAction() },
-                                modifier = Modifier.semantics { contentDescription = undoDescription },
-                            ) {
-                                Text(label)
-                            }
-                        }
-                    },
-                ) {
-                    Text(data.visuals.message)
-                }
+                    }
+                },
+            ) {
+                Text(data.visuals.message)
             }
         }
     }
@@ -241,6 +253,13 @@ private fun DetectTempo(
             ) {
                 Text(stringResource(R.string.metronome_double))
             }
+        }
+        if (!canDetect) {
+            Text(
+                stringResource(R.string.metronome_detect_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         when (detection) {
             TempoDetection.Idle -> Unit
