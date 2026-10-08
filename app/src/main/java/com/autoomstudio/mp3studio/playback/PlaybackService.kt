@@ -430,7 +430,7 @@ class PlaybackService : MediaSessionService() {
         const val PERIODIC_SAVE_MS = 10_000L
         const val SWITCH_TAG = "StemSwitch"
 
-        /** About 90% speed with the pitch lowered to match, like a slowed-down record. */
-        val LOFI_PLAYBACK = PlaybackParameters(0.9f, 0.9f)
+        /** Slightly slowed, with the pitch kept close to the original so voices don't turn deep. */
+        val LOFI_PLAYBACK = PlaybackParameters(0.92f, 0.98f)
     }
 }

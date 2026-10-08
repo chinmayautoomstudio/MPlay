@@ -7,6 +7,7 @@ import org.junit.Test
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 class LofiEffectTest {
 
@@ -73,6 +74,38 @@ class LofiEffectTest {
         val tail = samples.copyOfRange(samples.size / 2, samples.size)
         val peak = tail.maxOf { abs(it) }
         assertTrue("peak was $peak", peak < 0.25f)
+    }
+
+    @Test
+    fun silenceHasOnlySoftHissAndNoCrackle() {
+        val effect = LofiEffect(sampleRate, channels, startEnabled = true)
+        val frames = sampleRate * 3
+        val samples = FloatArray(frames * channels)
+        effect.process(samples, frames)
+        val peak = samples.maxOf { abs(it) }
+        assertTrue("peak was $peak", peak <= 0.011f)
+    }
+
+    @Test
+    fun vocalBandIsQuieterThanBass() {
+        val vocal = settledRms(sine(sampleRate / 2, 2_500.0, amplitude = 0.3f))
+        val bass = settledRms(sine(sampleRate / 2, 150.0, amplitude = 0.3f))
+        assertTrue("vocal $vocal, bass $bass", vocal < bass * 0.7f)
+    }
+
+    @Test
+    fun stereoSidesAreLiftedOverTheCentre() {
+        val centre = sine(sampleRate / 2, 300.0, amplitude = 0.3f)
+        val sides = centre.copyOf().also { for (i in 1 until it.size step channels) it[i] = -it[i] }
+        val centreRms = settledRms(centre)
+        val sidesRms = settledRms(sides)
+        assertTrue("centre $centreRms, sides $sidesRms", sidesRms > centreRms * 1.15f)
+    }
+
+    private fun settledRms(samples: FloatArray): Float {
+        LofiEffect(sampleRate, channels, startEnabled = true).process(samples, samples.size / channels)
+        val tail = samples.copyOfRange(samples.size / 2, samples.size)
+        return sqrt(tail.sumOf { (it * it).toDouble() } / tail.size).toFloat()
     }
 
     @Test

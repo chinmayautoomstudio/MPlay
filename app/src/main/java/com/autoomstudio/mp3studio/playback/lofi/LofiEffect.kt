@@ -5,15 +5,18 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sign
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.math.tanh
 
 /**
- * The lofi sound: low-pass, light bit-crush, a small reverb and a quiet vinyl layer, on interleaved
- * float samples in [-1, 1]. [enabled] may change from any thread; the wet amount follows it with a
- * short crossfade so toggling never clicks.
+ * The lofi sound on interleaved float samples in [-1, 1]: a vocal-presence dip on the centre (mid)
+ * channel with the stereo sides lifted, so instruments sit level with the voice, then a warm low
+ * shelf, low-pass, light bit-crush, a small reverb and a soft hiss. [enabled] may change from any
+ * thread; the wet amount follows it with a short crossfade so toggling never clicks.
  */
 class LofiEffect(
     sampleRate: Int,
@@ -30,11 +33,16 @@ class LofiEffect(
         private set
 
     private val mixStep = 1f / (sampleRate * CROSSFADE_SECONDS)
+    private val isStereo = channelCount == 2
+    // Stereo applies the dip to the shared mid signal only; other layouts filter each channel.
+    private val presence = Array(if (isStereo) 1 else channelCount) {
+        Biquad.peaking(sampleRate, PRESENCE_HZ, PRESENCE_Q, PRESENCE_DB)
+    }
+    private val lowShelf = Array(channelCount) { Biquad.lowShelf(sampleRate, SHELF_HZ, SHELF_DB) }
     private val lowPass = Array(channelCount) { Biquad.lowPass(sampleRate, CUTOFF_HZ, Q) }
     private val reverb = Array(channelCount) { SchroederReverb(sampleRate, stereoOffsetMs = it * 0.37f) }
-    private val crackleChance = CRACKLES_PER_SECOND / sampleRate
+    private val balanced = FloatArray(channelCount)
     private var rng = if (seed == 0L) 1L else seed
-    private var crackle = 0f
     private var hiss = 0f
 
     /** True when [process] would leave samples untouched, so callers can skip conversion work. */
@@ -47,9 +55,10 @@ class LofiEffect(
             mix = if (mix < target) min(target, mix + mixStep) else max(target, mix - mixStep)
             val noise = vinylNoise()
             val base = frame * channelCount
+            balanceVocals(samples, base)
             for (channel in 0 until channelCount) {
                 val dry = samples[base + channel]
-                var wet = crush(lowPass[channel].process(dry))
+                var wet = crush(lowPass[channel].process(lowShelf[channel].process(balanced[channel])))
                 wet += reverb[channel].process(wet) * REVERB_MIX
                 wet = wet * WET_GAIN + noise
                 samples[base + channel] = softClip(dry + mix * (wet - dry))
@@ -60,20 +69,32 @@ class LofiEffect(
     }
 
     fun reset() {
+        presence.forEach(Biquad::reset)
+        lowShelf.forEach(Biquad::reset)
         lowPass.forEach(Biquad::reset)
         reverb.forEach(SchroederReverb::reset)
-        crackle = 0f
         hiss = 0f
+    }
+
+    /** Fills [balanced] with the frame at [base], vocal presence dipped and (for stereo) sides lifted. */
+    private fun balanceVocals(samples: FloatArray, base: Int) {
+        if (isStereo) {
+            val left = samples[base]
+            val right = samples[base + 1]
+            val mid = presence[0].process((left + right) * 0.5f)
+            val side = (left - right) * 0.5f * SIDE_GAIN
+            balanced[0] = mid + side
+            balanced[1] = mid - side
+        } else {
+            for (channel in 0 until channelCount) {
+                balanced[channel] = presence[channel].process(samples[base + channel])
+            }
+        }
     }
 
     private fun vinylNoise(): Float {
         hiss += (nextNoise() * HISS_LEVEL - hiss) * HISS_SMOOTHING
-        if (nextUnit() < crackleChance) {
-            crackle = (CRACKLE_MIN + nextUnit() * (CRACKLE_MAX - CRACKLE_MIN)) * nextNoise().sign
-        } else {
-            crackle *= CRACKLE_DECAY
-        }
-        return hiss + crackle
+        return hiss
     }
 
     /** Xorshift, so output is repeatable in tests and allocation-free on the audio thread. */
@@ -92,17 +113,19 @@ class LofiEffect(
 
     private companion object {
         const val CROSSFADE_SECONDS = 0.15f
-        const val CUTOFF_HZ = 4_500.0
+        const val CUTOFF_HZ = 5_500.0
         const val Q = 0.707
+        const val PRESENCE_HZ = 2_500.0
+        const val PRESENCE_Q = 1.0
+        const val PRESENCE_DB = -4.0
+        const val SIDE_GAIN = 1.3f
+        const val SHELF_HZ = 180.0
+        const val SHELF_DB = 3.0
         const val CRUSH_LEVELS = 512f
-        const val REVERB_MIX = 0.22f
-        const val WET_GAIN = 0.9f
+        const val REVERB_MIX = 0.15f
+        const val WET_GAIN = 0.85f
         const val HISS_LEVEL = 0.01f
         const val HISS_SMOOTHING = 0.3f
-        const val CRACKLES_PER_SECOND = 7f
-        const val CRACKLE_MIN = 0.015f
-        const val CRACKLE_MAX = 0.06f
-        const val CRACKLE_DECAY = 0.82f
 
         fun crush(x: Float): Float = (x * CRUSH_LEVELS).roundToInt() / CRUSH_LEVELS
 
@@ -140,18 +163,60 @@ internal class Biquad private constructor(
 
     companion object {
         fun lowPass(sampleRate: Int, cutoffHz: Double, q: Double): Biquad {
-            val w0 = 2 * PI * min(cutoffHz, sampleRate * 0.45) / sampleRate
+            val w0 = omega(sampleRate, cutoffHz)
             val alpha = sin(w0) / (2 * q)
             val cosW0 = cos(w0)
-            val a0 = 1 + alpha
-            return Biquad(
-                b0 = ((1 - cosW0) / 2 / a0).toFloat(),
-                b1 = ((1 - cosW0) / a0).toFloat(),
-                b2 = ((1 - cosW0) / 2 / a0).toFloat(),
-                a1 = (-2 * cosW0 / a0).toFloat(),
-                a2 = ((1 - alpha) / a0).toFloat(),
+            return normalized(
+                b0 = (1 - cosW0) / 2,
+                b1 = 1 - cosW0,
+                b2 = (1 - cosW0) / 2,
+                a0 = 1 + alpha,
+                a1 = -2 * cosW0,
+                a2 = 1 - alpha,
             )
         }
+
+        fun peaking(sampleRate: Int, centerHz: Double, q: Double, gainDb: Double): Biquad {
+            val w0 = omega(sampleRate, centerHz)
+            val alpha = sin(w0) / (2 * q)
+            val cosW0 = cos(w0)
+            val a = 10.0.pow(gainDb / 40)
+            return normalized(
+                b0 = 1 + alpha * a,
+                b1 = -2 * cosW0,
+                b2 = 1 - alpha * a,
+                a0 = 1 + alpha / a,
+                a1 = -2 * cosW0,
+                a2 = 1 - alpha / a,
+            )
+        }
+
+        /** Shelf slope 1. */
+        fun lowShelf(sampleRate: Int, cornerHz: Double, gainDb: Double): Biquad {
+            val w0 = omega(sampleRate, cornerHz)
+            val cosW0 = cos(w0)
+            val a = 10.0.pow(gainDb / 40)
+            val alpha = sin(w0) / 2 * sqrt(2.0)
+            val twoSqrtAAlpha = 2 * sqrt(a) * alpha
+            return normalized(
+                b0 = a * ((a + 1) - (a - 1) * cosW0 + twoSqrtAAlpha),
+                b1 = 2 * a * ((a - 1) - (a + 1) * cosW0),
+                b2 = a * ((a + 1) - (a - 1) * cosW0 - twoSqrtAAlpha),
+                a0 = (a + 1) + (a - 1) * cosW0 + twoSqrtAAlpha,
+                a1 = -2 * ((a - 1) + (a + 1) * cosW0),
+                a2 = (a + 1) + (a - 1) * cosW0 - twoSqrtAAlpha,
+            )
+        }
+
+        private fun omega(sampleRate: Int, hz: Double): Double = 2 * PI * min(hz, sampleRate * 0.45) / sampleRate
+
+        private fun normalized(b0: Double, b1: Double, b2: Double, a0: Double, a1: Double, a2: Double) = Biquad(
+            b0 = (b0 / a0).toFloat(),
+            b1 = (b1 / a0).toFloat(),
+            b2 = (b2 / a0).toFloat(),
+            a1 = (a1 / a0).toFloat(),
+            a2 = (a2 / a0).toFloat(),
+        )
     }
 }
 
