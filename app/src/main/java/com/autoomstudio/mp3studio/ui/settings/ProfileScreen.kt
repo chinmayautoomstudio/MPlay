@@ -32,7 +32,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -91,26 +90,32 @@ fun ProfileScreen(
     Column(
         modifier = modifier
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Spacer(Modifier.height(4.dp))
-        IconButton(
-            onClick = onBack,
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-            modifier = Modifier.size(44.dp),
-        ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(
+                onClick = onBack,
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                modifier = Modifier.size(36.dp),
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = stringResource(R.string.action_back),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = stringResource(R.string.profile_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
-        Text(
-            text = stringResource(R.string.profile_title),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
 
         account?.let { current ->
             IdentityRow(
@@ -175,7 +180,7 @@ fun ProfileScreen(
             accent = MaterialTheme.colorScheme.error,
             showChevron = false,
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(8.dp))
     }
 
     if (confirmingLogOut) {
@@ -209,26 +214,26 @@ private fun IdentityRow(name: String, email: String, avatarUrl: String?, onEdit:
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 2.dp),
     ) {
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(96.dp)
-                .border(BorderStroke(3.dp, NeonBrush), CircleShape)
-                .padding(5.dp),
+                .size(64.dp)
+                .border(BorderStroke(2.dp, NeonBrush), CircleShape)
+                .padding(4.dp),
         ) {
-            Avatar(avatarUrl, size = 86.dp)
+            Avatar(avatarUrl, size = 56.dp)
         }
         Column(
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
             modifier = Modifier
                 .weight(1f)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 12.dp),
         ) {
             Text(
                 name,
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
@@ -236,27 +241,24 @@ private fun IdentityRow(name: String, email: String, avatarUrl: String?, onEdit:
             )
             Text(
                 email,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        OutlinedButton(
+        IconButton(
             onClick = onEdit,
-            shape = RoundedCornerShape(50),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            colors = IconButtonDefaults.iconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                contentColor = MaterialTheme.colorScheme.primary,
+            ),
+            modifier = Modifier.size(32.dp),
         ) {
             Icon(
                 Icons.Outlined.Edit,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(18.dp),
-            )
-            Text(
-                stringResource(R.string.profile_edit),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 8.dp),
+                contentDescription = stringResource(R.string.profile_edit),
+                modifier = Modifier.size(16.dp),
             )
         }
     }
@@ -266,7 +268,7 @@ private fun IdentityRow(name: String, email: String, avatarUrl: String?, onEdit:
 private fun SubscriptionCard(plan: PlanUiState, onClick: () -> Unit) {
     val primary = MaterialTheme.colorScheme.primary
     val tertiary = MaterialTheme.colorScheme.tertiary
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(16.dp)
     Surface(
         onClick = onClick,
         shape = shape,
@@ -298,27 +300,27 @@ private fun SubscriptionCard(plan: PlanUiState, onClick: () -> Unit) {
                     }
                     drawPath(front, Brush.horizontalGradient(listOf(Color.Transparent, primary.copy(alpha = 0.45f))))
                 }
-                .padding(horizontal = 20.dp, vertical = 22.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(68.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(NeonBrush),
             ) {
                 Icon(
                     painter = painterResource(R.drawable.ic_crown),
                     contentDescription = null,
                     tint = Color.White,
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(22.dp),
                 )
             }
-            Spacer(Modifier.width(18.dp))
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
                     stringResource(R.string.profile_subscription_label),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 val appName = stringResource(R.string.profile_subscription_app)
@@ -329,13 +331,13 @@ private fun SubscriptionCard(plan: PlanUiState, onClick: () -> Unit) {
                         append(' ')
                         withStyle(SpanStyle(color = primary)) { append(planName) }
                     },
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     subscriptionDetail(plan),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
             }
@@ -383,41 +385,41 @@ private fun CategoryRow(
 ) {
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
         ) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(52.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(accent.copy(alpha = 0.12f))
-                    .border(1.dp, accent.copy(alpha = 0.25f), RoundedCornerShape(14.dp)),
+                    .border(1.dp, accent.copy(alpha = 0.25f), RoundedCornerShape(10.dp)),
             ) {
-                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(28.dp))
+                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
             }
             Column(
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp),
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 24.dp),
+                    .padding(horizontal = 12.dp),
             ) {
                 Text(
                     title,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = if (showChevron) MaterialTheme.colorScheme.onSurface else accent,
                 )
                 if (subtitle != null) {
                     Text(
                         subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -429,6 +431,7 @@ private fun CategoryRow(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
                 )
             }
         }

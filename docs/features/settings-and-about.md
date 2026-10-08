@@ -25,7 +25,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 ## How it works
 
 - `MainScreen` keeps `ProfilePage` (`Main`, `EditProfile`, `Appearance`, `Library`, `Duplicates`, `Separation`, `SeparationQueue`, `Playback`, `About`, `Licenses`, `Plans`, `Admin`). Sub-pages go back to `Main`, except Duplicates (back to Library), the separation queue (back to Separation) and Licenses (back to About). `MPlayTopBar` is hidden on `Main`, because the Profile screen draws its own back button and "Profile" title. That back button returns to the tab that was open before Profile.
-- The subscription card shows "MP3 Studio" plus the plan name (Free, Trial or Pro). Below that it shows the days left in the trial, or the days until the Pro subscription expires or renews; Free users see an upgrade hint. Tapping it opens Plans. The Profile cards use theme colours, so they follow light and dark mode.
+- The subscription card shows "MP3 Studio" plus the plan name (Free, Trial or Pro). Below that it shows the days left in the trial, or the days until the Pro subscription expires or renews; Free users see an upgrade hint. Tapping it opens Plans. The Profile cards use theme colours, so they follow light and dark mode. The layout is compact so the whole screen fits above the mini player and bottom bar on a typical phone: the back button and title share one row, the avatar is 56dp, category rows are about 60dp tall, and Edit is a small pencil-only icon button (content description "Edit").
 - `MPlayAppTheme` decides dark/light from the setting (or system), or dark when `forceDark` is set (`MainActivity` sets it while signed out, so the sign-in screen is always dark), runs edge-to-edge with matching bar icons, and uses dynamic colour on API 31+ when enabled, otherwise `NeonDarkColors` / `NeonLightColors`.
 - `MainActivity` keeps the splash screen until the theme has loaded.
 - The battery item re-checks `isIgnoringBatteryOptimizations` on resume and opens system settings.
@@ -92,3 +92,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-08 | - | Plan row on the Account card, Settings > Plans page, DataStore `entitlements` ([plans](plans.md)). |
 | 2026-10-08 | - | `MPlayAppTheme(forceDark)` for the always-dark sign-in screen ([accounts](accounts.md)). |
 | 2026-10-08 | - | Settings tab replaced by the Profile tab (photo as the tab icon), Profile screen with category cards and separate settings pages; `SettingsScreen.kt` removed. |
+| 2026-10-08 | - | Compact Profile layout (one-row header, smaller avatar, cards and text) and a pencil-only Edit button. |
