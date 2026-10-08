@@ -41,6 +41,7 @@ Changes after 3.1 that haven't shipped in a version yet. `versionName` is still 
 - `PlaybackController` implements `MusicTimeline` (song ID, playing, seeks, position snapshot with speed) and takes `restoresSession`; `AppContainer` gives the metronome its own instance. ([playback](features/playback.md), [architecture](architecture.md))
 
 ### Changed
+- Redesigned sign-in screen: always dark, with a glowing floating M logo, "MP3 Studio" with a gradient "Studio", the "Your Music. Your Way." tagline, an animated hero (flowing waves, equalizer bars, floating notes, sparkles), a white glowing "Continue with Google" pill with the Google G and a spinner while signing in, and linked Terms and Privacy text. The entrance is staggered, and every animation is skipped when system animations are off. `MPlayAppTheme` gained `forceDark`. ([accounts](features/accounts.md), [settings](features/settings-and-about.md))
 - Decided in M6 that old MPlay (`com.autoomstudio.mplay`) installs are not migrated: MP3 Studio installs as a separate app. The PRD's App ID decision has a dated note. ([architecture](architecture.md))
 - `usage_test.sql` counts denied rows for its own test user, so it passes against a database with real usage. ([backend](backend.md))
 - Offline grace checked end to end on the emulator: offline Trial works, 8 days without a check or a clock turned back locks Pro features with the "offline for more than 7 days" message, and the next foreground refresh restores the plan. ([plans](features/plans.md))

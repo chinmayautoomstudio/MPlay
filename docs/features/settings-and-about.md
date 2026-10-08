@@ -23,7 +23,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 ## How it works
 
-- `MPlayAppTheme` decides dark/light from the setting (or system), runs edge-to-edge with matching bar icons, and uses dynamic colour on API 31+ when enabled, otherwise `NeonDarkColors` / `NeonLightColors`.
+- `MPlayAppTheme` decides dark/light from the setting (or system), or dark when `forceDark` is set (`MainActivity` sets it while signed out, so the sign-in screen is always dark), runs edge-to-edge with matching bar icons, and uses dynamic colour on API 31+ when enabled, otherwise `NeonDarkColors` / `NeonLightColors`.
 - `MainActivity` keeps the splash screen until the theme has loaded.
 - The battery item re-checks `isIgnoringBatteryOptimizations` on resume and opens system settings.
 - About picks logos by background luminance (the in-app theme doesn't change resource night mode). Links: `https://autoomstudio.com/`, `connect@autoomstudio.com`, `https://autoomstudio.com/privacy-policy`, `https://autoomstudio.com/terms` (`about_terms_url`). Long press copies a link. The privacy note (`about_privacy_note`) says there are no ads, music and recordings stay on the phone, and the Google account details, plan and usage are stored on the backend.
@@ -87,3 +87,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-06 | `e13b2f7` | Keys `separation_notice_hidden`, `separation_speed_factor`, `metronome_*`, `singalong_note_seen`; `MetronomeIcons`. |
 | 2026-10-07 | - | Renamed to MP3 Studio (strings, wordmark). Account card at the top of Settings, Terms link and new privacy text in About, DataStore `auth_session`. |
 | 2026-10-08 | - | Plan row on the Account card, Settings > Plans page, DataStore `entitlements` ([plans](plans.md)). |
+| 2026-10-08 | - | `MPlayAppTheme(forceDark)` for the always-dark sign-in screen ([accounts](accounts.md)). |

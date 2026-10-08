@@ -21,7 +21,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `data/account/Nonce.kt` | Raw nonce (32 random bytes, URL-safe Base64) and its SHA-256 hex. |
 | `data/account/AuthErrors.kt` | `AuthError` and the mapping from exceptions and GoTrue codes. |
 | `data/account/Profile.kt`, `ProfileRepository.kt` | The user's `profiles` row; `refresh()`, `updateDisplayName()`, `clear()`. |
-| `ui/auth/SignInScreen.kt`, `AuthViewModel.kt` | Sign-in screen, error snackbar, foreground account check. |
+| `ui/auth/SignInScreen.kt`, `AuthViewModel.kt` | Sign-in screen (logo, title, Google button, legal links), error snackbar, foreground account check. |
+| `ui/auth/SignInBackdrop.kt` | Sign-in background (`SignInBackdrop`), animated hero (`SignInHero`) and the screen's palette (`SignInColors`). |
 | `ui/auth/SignedInViewModelScope.kt` | `ViewModelStore` for signed-in screens, cleared on sign-out. |
 | `ui/settings/AccountSection.kt`, `AccountViewModel.kt` | Account card in Settings, edit-name, log-out and delete-account dialogs. |
 | `di/AuthEffects.kt` | App-wide reactions to sign-in and sign-out (separation, metronome, sing-along, profile, widget). |
@@ -34,6 +35,18 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 1. `MPlayApp.onCreate` (main process) calls `authRepository.start()`, which collects the supabase-kt session status. The state is `Loading` until the saved session has been read.
 2. `MainActivity` keeps the splash screen until the theme is loaded and the state isn't `Loading`.
 3. `SignedOut` shows `SignInScreen`. `SignedIn` provides a `ViewModelStoreOwner` from `SignedInViewModelScope.storeFor(userId)` as `LocalViewModelStoreOwner` around `MPlayRoot`, so the playback, library and other screen ViewModels belong to that user. Signing out (or another user signing in) clears the store; rotation keeps it.
+
+### Sign-in screen
+
+`SignInScreen` is always dark: `MainActivity` passes `forceDark` to `MPlayAppTheme` while signed out, which also gives light status bar icons. From top to bottom:
+- the M mark (`ic_mp3studio_mark`) with a pulsing glow;
+- "MP3 Studio" with a gradient "Studio";
+- the tagline `signin_tagline`;
+- the hero;
+- the white "Continue with Google" pill (`ic_google_g`), which shows a spinner and "Signing in…" while `signingIn`;
+- the legal text, where Terms of Service and Privacy Policy are `LinkAnnotation.Clickable` links that open `about_terms_url` and `about_privacy_url`.
+
+`SignInHero` draws equalizer bars, four wave layers, sparkles and floating notes on one canvas. All of them run off a single 12-second looping time value that is read only in the draw phase, so the hero redraws each frame without recomposing. Elements fade and slide in one after another on first show (`entrance`), the logo floats and the button glow breathes. When system animations are off (`rememberAnimationsEnabled()`), the screen appears at once with a still frame.
 
 ### Signing in
 
@@ -117,6 +130,7 @@ Delete account (under Log out, in the error color) opens a dialog that says what
 - Requires Google Play services; phones without them can't sign in.
 - The terms URL (`about_terms_url`, `https://autoomstudio.com/terms`) is a placeholder until the page exists.
 - The launcher icon is still the MPlay icon.
+- `ic_mp3studio_mark.webp` is a stand-in cut out of `ic_mplay_logo_dark`; replace it with the final transparent M mark (same file name).
 - If GoTrue still allows email or phone sign-up, someone could create an account through the API; disable them on the server ([backend](../backend.md#auth-settings)).
 - An account disabled by an Admin (Disable account on the Admin user page) is noticed on the next foreground check, not instantly.
 - Deleting doesn't revoke the Google grant; signing in again with the same Google account creates a new, empty account (without a trial).
@@ -132,3 +146,4 @@ Delete account (under Log out, in the error color) opens a dialog that says what
 | 2026-10-08 | - | M2: sign-in and foreground checks refresh the plan, sign-out clears it, Account card has a Plan row. |
 | 2026-10-08 | - | M5: invited emails become Admin on first sign-in; Admin row on the Account card for admins. |
 | 2026-10-08 | - | M6: Delete account (dialog, `delete-account` function, local sign-out), deletion tests; old MPlay installs are not migrated. |
+| 2026-10-08 | - | Redesigned, always-dark sign-in screen with animated hero, glowing logo and Google pill button (`SignInBackdrop.kt`). |

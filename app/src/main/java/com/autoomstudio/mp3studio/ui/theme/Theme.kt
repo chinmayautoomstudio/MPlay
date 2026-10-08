@@ -71,15 +71,17 @@ internal val NeonLightColors = lightColorScheme(
 
 /**
  * Applies the user's theme settings and matches the edge-to-edge system bar icons to them, so a
- * forced light or dark theme doesn't leave unreadable status bar icons.
+ * forced light or dark theme doesn't leave unreadable status bar icons. [forceDark] overrides the
+ * settings for screens that are always dark, such as sign-in.
  */
 @Composable
 fun MPlayAppTheme(
     activity: ComponentActivity,
     settings: ThemeSettings,
+    forceDark: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val darkTheme = when (settings.mode) {
+    val darkTheme = forceDark || when (settings.mode) {
         ThemeMode.System -> isSystemInDarkTheme()
         ThemeMode.Light -> false
         ThemeMode.Dark -> true

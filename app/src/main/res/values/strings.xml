@@ -1,11 +1,11 @@
 <resources>
     <string name="app_name">MP3 Studio</string>
 
-    <string name="signin_title">Welcome to MP3 Studio</string>
-    <string name="signin_message">Sign in with your Google account to play your music and use the studio tools. Your account keeps your plan and free trial with you. Your music and recordings never leave your phone.</string>
+    <string name="signin_tagline">Your Music. Your Way.</string>
     <string name="signin_google">Continue with Google</string>
     <string name="signin_in_progress">Signing in…</string>
-    <string name="signin_legal">By continuing you agree to the Terms of Service and Privacy Policy.</string>
+    <string name="signin_legal_prefix">By continuing, you agree to our</string>
+    <string name="signin_legal_links">%1$s and %2$s.</string>
     <string name="signin_terms">Terms of Service</string>
     <string name="signin_privacy">Privacy Policy</string>
     <string name="auth_error_no_account">No Google account on this phone. Add one in Settings, then try again.</string>

@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val theme = settingsViewModel.theme.collectAsStateWithLifecycle().value ?: return@setContent
             val auth by authViewModel.state.collectAsStateWithLifecycle()
-            MPlayAppTheme(activity = this, settings = theme) {
+            MPlayAppTheme(activity = this, settings = theme, forceDark = auth is AuthState.SignedOut) {
                 // Sign-in is mandatory: nothing below the sign-in screen exists until someone is signed in.
                 // Notification requests stay pending meanwhile and are handled once MPlayRoot appears.
                 when (val state = auth) {
