@@ -29,8 +29,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import com.autoomstudio.mp3studio.R
 import kotlin.math.PI
@@ -194,8 +195,10 @@ private val Sparkles = Random(5).let { random ->
 @Composable
 internal fun SignInHero(animated: Boolean, modifier: Modifier = Modifier) {
     val time = rememberLoopTime(animated)
-    val single = rememberVectorPainter(Icons.Filled.MusicNote)
-    val beamed = painterResource(R.drawable.ic_music_note_beamed)
+    val single = Icons.Filled.MusicNote
+    val beamed = ImageVector.vectorResource(R.drawable.ic_music_note_beamed)
+    // A VectorPainter caches one rendering; sharing it between notes of different sizes in a frame clips them.
+    val notePainters = Notes.map { rememberVectorPainter(if (it.beamed) beamed else single) }
     Spacer(
         modifier.drawWithCache {
             val fill = Path()
@@ -218,7 +221,7 @@ internal fun SignInHero(animated: Boolean, modifier: Modifier = Modifier) {
                 drawEqualizer(t)
                 Waves.forEachIndexed { i, layer -> drawWave(t, layer, fillBrushes[i], shade, fill, crest) }
                 drawSparkles(t)
-                Notes.forEach { drawNote(t, it, if (it.beamed) beamed else single) }
+                Notes.forEachIndexed { i, note -> drawNote(t, note, notePainters[i]) }
                 drawRect(fade, topLeft = Offset(0f, size.height * 0.82f))
             }
         },

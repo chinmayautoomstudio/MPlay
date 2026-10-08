@@ -9,6 +9,9 @@ Each entry should say what changed and link to the feature doc. Use these groups
 ### Changed
 - Swiping MP3 Studio away from recents now ends all background work, not just music: the metronome stops, a sing-along take in progress is discarded, and vocal separation pauses (the song goes back to the queue and the queue resumes the next time the app opens). Pressing Back stops nothing. New `di/TaskRemoval`, called from `onTaskRemoved` of `PlaybackService`, `MetronomeService`, `RecordingService` and the new non-exported `SeparationTaskWatcher` service (started by `SeparationWorker` for the length of a run); `SeparationController.pause()`/`resume()`; unit test `TaskRemovalTest`. ([architecture](architecture.md), [metronome](features/metronome.md), [sing-along](features/sing-along.md), [vocal separation](features/vocal-separation.md), [playback](features/playback.md))
 
+### Fixed
+- The two floating music notes on the left of the sign-in screen no longer look clipped. Notes sharing one `VectorPainter` were drawn from a bitmap cached at another note's size; each note now has its own painter (`SignInBackdrop.kt`). ([accounts](features/accounts.md))
+
 ## [3.2] - 2026-10-08
 
 MP3 Studio: the rename from MPlay, mandatory Google sign-in, Free/Trial/Pro plans, the weekly AI Vocal Separator limit, admin screens, account deletion, metronome sync and time signature detection, and playback that stops when the app is swiped away.

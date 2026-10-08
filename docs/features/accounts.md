@@ -149,3 +149,4 @@ Delete account (at the bottom of the Edit page, in the error color) opens a dial
 | 2026-10-08 | - | M6: Delete account (dialog, `delete-account` function, local sign-out), deletion tests; old MPlay installs are not migrated. |
 | 2026-10-08 | - | Redesigned, always-dark sign-in screen with animated hero, glowing logo and Google pill button (`SignInBackdrop.kt`). |
 | 2026-10-08 | - | Account card replaced by the Profile tab (photo as tab icon) and an Edit page; Delete account moved into Edit, Log out below About. |
+| 2026-10-08 | - | Fixed the two left floating notes on the sign-in screen being drawn clipped: each note now has its own `VectorPainter` (a shared one caches a single rendering). |
