@@ -6,9 +6,14 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-10-09
+
+Patch release: lofi tuning, swipe-away stopping all background work, and a sign-in screen fix. From now on each small release bumps the patch number (3.2.1, 3.2.2, ...).
+
 ### Changed
+- `versionName` 3.2 to 3.2.1 and `versionCode` 7 to 8. Settings > About now shows only "Version 3.2.1"; the build number is no longer displayed (`about_version` string). ([settings](features/settings-and-about.md))
 - Swiping MP3 Studio away from recents now ends all background work, not just music: the metronome stops, a sing-along take in progress is discarded, and vocal separation pauses (the song goes back to the queue and the queue resumes the next time the app opens). Pressing Back stops nothing. New `di/TaskRemoval`, called from `onTaskRemoved` of `PlaybackService`, `MetronomeService`, `RecordingService` and the new non-exported `SeparationTaskWatcher` service (started by `SeparationWorker` for the length of a run); `SeparationController.pause()`/`resume()`; unit test `TaskRemovalTest`. ([architecture](architecture.md), [metronome](features/metronome.md), [sing-along](features/sing-along.md), [vocal separation](features/vocal-separation.md), [playback](features/playback.md))
-- Lofi mode sounds more natural: voices no longer turn deep (`LOFI_PLAYBACK` is now 0.92x speed with pitch 0.98x instead of 0.9x/0.9x), and instruments sit level with the vocals thanks to a -4 dB 2.5 kHz presence dip on the centre channel, stereo sides lifted 1.3x and a +3 dB low shelf at 180 Hz. The low-pass opens to 5.5 kHz and the reverb is lighter. The vinyl crackle pops are gone; the soft hiss and bit-crush stay. New `Biquad.peaking`/`Biquad.lowShelf`; new `LofiEffectTest` cases. ([lofi mode](features/lofi-mode.md))
+- Lofi mode sounds more natural: voices no longer turn deep (`LOFI_PLAYBACK` keeps 0.9x speed but pitch is now 0.98x instead of 0.9x), and instruments sit level with the vocals thanks to a -4 dB 2.5 kHz presence dip on the centre channel and stereo sides lifted 1.2x. The low-pass opens to 5 kHz and the reverb mix drops to 0.2. The vinyl crackle pops are gone; the soft hiss and bit-crush stay. New `Biquad.peaking`; new `LofiEffectTest` cases. ([lofi mode](features/lofi-mode.md))
 
 ### Fixed
 - The two floating music notes on the left of the sign-in screen no longer look clipped. Notes sharing one `VectorPainter` were drawn from a bitmap cached at another note's size; each note now has its own painter (`SignInBackdrop.kt`). ([accounts](features/accounts.md))

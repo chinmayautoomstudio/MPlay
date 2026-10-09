@@ -13,7 +13,7 @@ The developer docs live in `docs/` (index: `docs/README.md`). Whenever you chang
 4. **Room schema change** (`MPlayDatabase` version, entities, migrations): update `docs/database.md` (version table and table section) and add a `### Database` entry to the changelog.
 5. **Architecture change** (new service, receiver, activity, process, permission, module, or `AppContainer` dependency): update `docs/architecture.md`.
 6. **DataStore key added/renamed/removed**: update the key table in `docs/features/settings-and-about.md` and the feature doc that owns it.
-7. **Version bump** (`versionName` in `app/build.gradle.kts`): rename `## [Unreleased]` to `## [x.y] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` above it, and update the version in `docs/README.md`.
+7. **Version bump** (`versionName` in `app/build.gradle.kts`): minor changes bump the patch number (3.2.1, 3.2.2, ...) and `versionCode` by 1. Then rename `## [Unreleased]` to `## [x.y] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` above it, and update the version in `docs/README.md`.
 
 Feature area to doc mapping:
 

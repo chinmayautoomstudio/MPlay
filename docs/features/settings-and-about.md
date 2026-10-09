@@ -1,6 +1,6 @@
 # Settings, About, theme and shared components
 
-> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-08
+> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-09
 
 ## Summary
 
@@ -17,7 +17,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `ui/settings/ProfileScreen.kt` | Profile tab: header, identity row, subscription card, category cards, Log out; `ProfileTabIcon` for the bottom bar. |
 | `ui/settings/SettingsPages.kt` | Sub-pages `AppearanceSettingsScreen`, `LibrarySettingsScreen`, `SeparationSettingsScreen`, `PlaybackSettingsScreen`, and the shared `SubPageHeader`. |
 | `ui/settings/EditProfileScreen.kt`, `AccountViewModel.kt` | Edit page (photo, name, Delete account), shared `Avatar` and `LogOutDialog`; documented in [accounts](accounts.md). |
-| `ui/settings/AboutScreen.kt` | Logos, version/build, website, email, privacy note, privacy policy, terms, licenses. |
+| `ui/settings/AboutScreen.kt` | Logos, version (no build number), website, email, privacy note, privacy policy, terms, licenses. |
 | `ui/settings/LicensesScreen.kt` | Hand-maintained license list and detail view. |
 | `ui/theme/Color.kt`, `Theme.kt`, `Type.kt`, `Motion.kt` | Palette, `MPlayAppTheme`, typography, motion durations and transitions. |
 | `ui/components/*` | Shared components: `ArtworkImage`, `ComingSoon`, `Interactions` (`pressBounce`, `popOnChange`), `LoadingIndicator`, `MPlayTopBar`, `MPlayWordmark`, `NowPlayingBars`, `SelectionTopBar`, `ThemedLottie`, `LofiWaveIcon`, `MetronomeIcons`. |
@@ -96,3 +96,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-08 | - | Compact Profile layout (one-row header, smaller avatar, cards and text) and a pencil-only Edit button. |
 | 2026-10-08 | - | Key `admin_activity_seen_at` for the Admin Activity bell ([admin](admin.md)). |
 | 2026-10-08 | - | `ProfileTabIcon` uses the same 24dp slot as other tab icons (ring drawn outside), so the "Profile" label lines up. |
+| 2026-10-09 | - | About shows only "Version x.y.z"; the build number is hidden (3.2.1). |

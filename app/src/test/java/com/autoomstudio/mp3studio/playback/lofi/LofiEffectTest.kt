@@ -99,7 +99,7 @@ class LofiEffectTest {
         val sides = centre.copyOf().also { for (i in 1 until it.size step channels) it[i] = -it[i] }
         val centreRms = settledRms(centre)
         val sidesRms = settledRms(sides)
-        assertTrue("centre $centreRms, sides $sidesRms", sidesRms > centreRms * 1.15f)
+        assertTrue("centre $centreRms, sides $sidesRms", sidesRms > centreRms * 1.1f)
     }
 
     private fun settledRms(samples: FloatArray): Float {
