@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="splash_background">#FFF7F5FC</color>
-    <!-- Matches the launcher foreground's backdrop where the splash circle mask cuts it. -->
-    <color name="splash_screen_background">#FF09072F</color>
+    <!-- splash_logo fades into this colour (BACKDROP in tools/generate_logo_assets.py). -->
+    <color name="splash_screen_background">#FF030013</color>
 
     <color name="widget_surface">#FFFFFFFF</color>
     <color name="widget_artwork">#FFE9E5F4</color>

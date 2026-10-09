@@ -241,7 +241,7 @@ private fun GlowingLogo(animated: Boolean, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Image(
-            painter = painterResource(R.drawable.ic_mp3studio_mark),
+            painter = painterResource(R.drawable.ic_mp3studio_logo),
             contentDescription = null,
             modifier = Modifier.size(140.dp),
         )

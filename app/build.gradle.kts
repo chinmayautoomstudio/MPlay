@@ -38,8 +38,8 @@ android {
         applicationId = "com.autoomstudio.mp3studio"
         minSdk = 26
         targetSdk = 37
-        versionCode = 9
-        versionName = "3.2.2"
+        versionCode = 10
+        versionName = "3.2.3"
         // An imported model file must match the same export the build bundles.
         val modelHash = rootProject.file("models/htdemucs.onnx.sha256").readText().trim().substringBefore(' ').lowercase()
         buildConfigField("String", "MODEL_SHA256", "\"$modelHash\"")

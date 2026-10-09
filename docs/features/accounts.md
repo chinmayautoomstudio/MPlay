@@ -40,7 +40,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 ### Sign-in screen
 
 `SignInScreen` is always dark: `MainActivity` passes `forceDark` to `MPlayAppTheme` while signed out, which also gives light status bar icons. From top to bottom:
-- the M mark (`ic_mp3studio_mark`) with a pulsing glow;
+- the MP3 Studio logo (`ic_mp3studio_logo`, built by `tools/generate_logo_assets.py`) with a pulsing glow;
 - "MP3 Studio" with a gradient "Studio";
 - the tagline `signin_tagline`;
 - the hero;
@@ -130,8 +130,6 @@ Delete account (at the bottom of the Edit page, in the error color) opens a dial
 
 - Requires Google Play services; phones without them can't sign in.
 - The terms URL (`about_terms_url`, `https://autoomstudio.com/terms`) is a placeholder until the page exists.
-- The launcher icon is still the MPlay icon.
-- `ic_mp3studio_mark.webp` is a stand-in cut out of `ic_mplay_logo_dark`; replace it with the final transparent M mark (same file name).
 - If GoTrue still allows email or phone sign-up, someone could create an account through the API; disable them on the server ([backend](../backend.md#auth-settings)).
 - An account disabled by an Admin (Disable account on the Admin user page) is noticed on the next foreground check, not instantly.
 - Deleting doesn't revoke the Google grant; signing in again with the same Google account creates a new, empty account (without a trial).
@@ -150,3 +148,4 @@ Delete account (at the bottom of the Edit page, in the error color) opens a dial
 | 2026-10-08 | - | Redesigned, always-dark sign-in screen with animated hero, glowing logo and Google pill button (`SignInBackdrop.kt`). |
 | 2026-10-08 | - | Account card replaced by the Profile tab (photo as tab icon) and an Edit page; Delete account moved into Edit, Log out below About. |
 | 2026-10-08 | - | Fixed the two left floating notes on the sign-in screen being drawn clipped: each note now has its own `VectorPainter` (a shared one caches a single rendering). |
+| 2026-10-09 | - | 3.2.3: sign-in logo is the new MP3 Studio logo (`ic_mp3studio_logo`); the stand-in `ic_mp3studio_mark` was removed. |

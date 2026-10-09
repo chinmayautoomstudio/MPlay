@@ -17,7 +17,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `ui/settings/ProfileScreen.kt` | Profile tab: header, identity row, subscription card, category cards, Log out; `ProfileTabIcon` for the bottom bar. |
 | `ui/settings/SettingsPages.kt` | Sub-pages `AppearanceSettingsScreen`, `LibrarySettingsScreen`, `SeparationSettingsScreen`, `PlaybackSettingsScreen`, and the shared `SubPageHeader`. |
 | `ui/settings/EditProfileScreen.kt`, `AccountViewModel.kt` | Edit page (photo, name, Delete account), shared `Avatar` and `LogOutDialog`; documented in [accounts](accounts.md). |
-| `ui/settings/AboutScreen.kt` | Logos, version (no build number), website, email, privacy note, privacy policy, terms, licenses. |
+| `ui/settings/AboutScreen.kt` | Logos (`ic_mp3studio_logo`, Autoom Studio), version (no build number), website, email, privacy note, privacy policy, terms, licenses. |
 | `ui/settings/LicensesScreen.kt` | Hand-maintained license list and detail view. |
 | `ui/theme/Color.kt`, `Theme.kt`, `Type.kt`, `Motion.kt` | Palette, `MPlayAppTheme`, typography, motion durations and transitions. |
 | `ui/components/*` | Shared components: `ArtworkImage`, `ComingSoon`, `Interactions` (`pressBounce`, `popOnChange`), `LoadingIndicator`, `MPlayTopBar`, `MPlayWordmark`, `NowPlayingBars`, `SelectionTopBar`, `ThemedLottie`, `LofiWaveIcon`, `MetronomeIcons`. |
@@ -97,3 +97,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-08 | - | Key `admin_activity_seen_at` for the Admin Activity bell ([admin](admin.md)). |
 | 2026-10-08 | - | `ProfileTabIcon` uses the same 24dp slot as other tab icons (ring drawn outside), so the "Profile" label lines up. |
 | 2026-10-09 | - | About shows only "Version x.y.z"; the build number is hidden (3.2.1). |
+| 2026-10-09 | - | About shows the new MP3 Studio logo (`ic_mp3studio_logo`) in both themes; `ic_mplay_logo`/`ic_mplay_logo_dark` removed (3.2.3). |

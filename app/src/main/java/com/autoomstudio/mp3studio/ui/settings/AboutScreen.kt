@@ -77,7 +77,7 @@ fun AboutScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             Image(
-                painter = painterResource(if (darkTheme) R.drawable.ic_mplay_logo_dark else R.drawable.ic_mplay_logo),
+                painter = painterResource(R.drawable.ic_mp3studio_logo),
                 contentDescription = stringResource(R.string.app_name),
                 modifier = Modifier.size(96.dp),
             )

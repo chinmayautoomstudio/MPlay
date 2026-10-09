@@ -6,6 +6,16 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+## [3.2.3] - 2026-10-09
+
+### Changed
+- New MP3 Studio logo everywhere, from `logos/mp3-studio-logo-v1.png`: launcher and Play Store icons (Android Studio Image Asset, `ece37fb`), the splash (new `splash_logo`, whose glow fades into `splash_screen_background` `#030013`, so no ring edge shows), the sign-in screen and About (new transparent `ic_mp3studio_logo`). New `tools/generate_logo_assets.py` rebuilds the splash and in-app logo. ([accounts](features/accounts.md), [settings](features/settings-and-about.md), [architecture](architecture.md))
+- Adaptive icon background is a solid `#030013` instead of the default green grid; the `<monochrome>` layer was removed, so themed-icon mode shows the coloured icon instead of a solid blob.
+- `versionName` 3.2.2 to 3.2.3 and `versionCode` 9 to 10.
+
+### Removed
+- Old logo assets `ic_mplay_logo`, `ic_mplay_logo_dark` and `ic_mp3studio_mark`.
+
 ## [3.2.2] - 2026-10-09
 
 ### Changed
