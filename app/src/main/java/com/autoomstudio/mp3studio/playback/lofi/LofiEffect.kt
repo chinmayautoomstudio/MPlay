@@ -118,7 +118,7 @@ class LofiEffect(
         const val SIDE_GAIN = 1.2f
         const val CRUSH_LEVELS = 512f
         const val REVERB_MIX = 0.5f
-        const val WET_GAIN = 0.85f
+        const val WET_GAIN = 0.88f
         const val HISS_LEVEL = 0.01f
         const val HISS_SMOOTHING = 0.3f
 
