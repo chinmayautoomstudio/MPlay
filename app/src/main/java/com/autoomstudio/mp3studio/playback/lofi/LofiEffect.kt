@@ -117,7 +117,7 @@ class LofiEffect(
         const val PRESENCE_DB = -4.0
         const val SIDE_GAIN = 1.2f
         const val CRUSH_LEVELS = 512f
-        const val REVERB_MIX = 0.2f
+        const val REVERB_MIX = 0.5f
         const val WET_GAIN = 0.85f
         const val HISS_LEVEL = 0.01f
         const val HISS_SMOOTHING = 0.3f
@@ -198,7 +198,7 @@ internal class Biquad private constructor(
     }
 }
 
-/** Four damped combs into two allpasses: a small, soft room. */
+/** Four damped combs into two allpasses: a soft room with a tail of about 1.2 s. */
 internal class SchroederReverb(sampleRate: Int, stereoOffsetMs: Float) {
     private val combs = COMB_MS.map { DelayLine(samplesFor(sampleRate, it + stereoOffsetMs)) }
     private val combFilterState = FloatArray(COMB_MS.size)
@@ -246,7 +246,7 @@ internal class SchroederReverb(sampleRate: Int, stereoOffsetMs: Float) {
     private companion object {
         val COMB_MS = floatArrayOf(29.7f, 37.1f, 41.1f, 43.7f)
         val ALLPASS_MS = floatArrayOf(5.0f, 1.7f)
-        const val FEEDBACK = 0.72f
+        const val FEEDBACK = 0.80f
         const val DAMPING = 0.4f
         const val ALLPASS_GAIN = 0.7f
 

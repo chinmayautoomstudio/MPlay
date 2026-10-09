@@ -431,6 +431,6 @@ class PlaybackService : MediaSessionService() {
         const val SWITCH_TAG = "StemSwitch"
 
         /** Slightly slowed, with the pitch kept close to the original so voices don't turn deep. */
-        val LOFI_PLAYBACK = PlaybackParameters(0.9f, 0.98f)
+        val LOFI_PLAYBACK = PlaybackParameters(0.85f, 0.98f)
     }
 }

@@ -6,6 +6,12 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+## [3.2.2] - 2026-10-09
+
+### Changed
+- Lofi mode is slower and roomier: `LOFI_PLAYBACK` speed 0.9x to 0.85x (pitch stays 0.98x), reverb mix 0.2 to 0.3 and `SchroederReverb` feedback 0.72 to 0.80, so the tail lasts about 1.2 s instead of 0.8 s. ([lofi mode](features/lofi-mode.md))
+- `versionName` 3.2.1 to 3.2.2 and `versionCode` 8 to 9. ([settings](features/settings-and-about.md))
+
 ## [3.2.1] - 2026-10-09
 
 Patch release: lofi tuning, swipe-away stopping all background work, and a sign-in screen fix. From now on each small release bumps the patch number (3.2.1, 3.2.2, ...).
