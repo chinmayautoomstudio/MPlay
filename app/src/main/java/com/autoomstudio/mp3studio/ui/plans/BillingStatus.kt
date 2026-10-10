@@ -1,6 +1,7 @@
 package com.autoomstudio.mp3studio.ui.plans
 
 import com.autoomstudio.mp3studio.data.plan.AutopayStatus
+import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
 import com.autoomstudio.mp3studio.data.plan.BillingState
 import com.autoomstudio.mp3studio.data.plan.PendingPayment
@@ -11,7 +12,7 @@ import com.autoomstudio.mp3studio.data.plan.SubscriptionStatus
 sealed interface BillingNotice {
     data object PaymentsUnavailable : BillingNotice
     data class PaymentPending(val txnId: String) : BillingNotice
-    data class AutopayOn(val nextBillingAt: Long?) : BillingNotice
+    data class AutopayOn(val nextBillingAt: Long?, val interval: BillingInterval = BillingInterval.Month) : BillingNotice
     data class AutopayNotSet(val expiresAt: Long?) : BillingNotice
     data class RenewSoon(val expiresAt: Long?) : BillingNotice
     data class PastDue(val graceEnd: Long?) : BillingNotice
@@ -22,7 +23,9 @@ sealed interface BillingNotice {
 }
 
 /** The button under it. */
-enum class BillingAction { GoPro, GoProAgain, FixPayment, SetUpAutopay, Renew, CheckPayment, CancelAutopay }
+enum class BillingAction {
+    GoPro, GoProAgain, FixPayment, SetUpAutopay, Renew, CheckPayment, SwitchToYearly, SwitchToMonthly, CancelAutopay,
+}
 
 data class BillingStatus(val notice: BillingNotice?, val actions: List<BillingAction>)
 
@@ -32,6 +35,9 @@ object BillingStatusRules {
 
     /** Warn about an autopay mandate ending this long before. */
     const val MANDATE_WARNING_MS = 30L * 24 * 60 * 60 * 1000
+
+    /** Switching between monthly and yearly opens this long before the paid period ends, as `begin_checkout` allows. */
+    const val SWITCH_WINDOW_MS = 31L * 24 * 60 * 60 * 1000
 
     fun of(
         plan: Plan,
@@ -78,7 +84,15 @@ object BillingStatusRules {
             if (mandateEnd != null && mandateEnd - now < MANDATE_WARNING_MS) {
                 return BillingStatus(BillingNotice.MandateEnding(mandateEnd), listOf(BillingAction.CancelAutopay))
             }
-            return BillingStatus(BillingNotice.AutopayOn(billing.nextBillingAt), listOf(BillingAction.CancelAutopay))
+            val switch = when {
+                billing.interval == BillingInterval.Month -> pay(BillingAction.SwitchToYearly)
+                billing.expiresAt == null || billing.expiresAt - now <= SWITCH_WINDOW_MS -> pay(BillingAction.SwitchToMonthly)
+                else -> emptyList()
+            }
+            return BillingStatus(
+                BillingNotice.AutopayOn(billing.nextBillingAt, billing.interval),
+                switch + BillingAction.CancelAutopay,
+            )
         }
         if (mode == BillingMode.Manual) {
             val renewOpen = billing.expiresAt == null || billing.expiresAt - now <= RENEW_WINDOW_MS

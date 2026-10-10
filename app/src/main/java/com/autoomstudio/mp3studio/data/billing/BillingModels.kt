@@ -1,5 +1,6 @@
 package com.autoomstudio.mp3studio.data.billing
 
+import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
 import com.autoomstudio.mp3studio.data.plan.Plan
 
@@ -12,6 +13,10 @@ enum class BillingError {
     /** Another payment attempt is still being confirmed. */
     PaymentInProgress,
     AlreadySubscribed,
+
+    /** A switch between monthly and yearly opens 31 days before the paid period ends. */
+    SwitchNotYet,
+    InvalidInterval,
 
     /** The old autopay couldn't be cancelled with PayU yet, so no new one can be set up (5.5). */
     MandateUpdatePending,
@@ -32,6 +37,8 @@ enum class BillingError {
             "invalid_phone" -> InvalidPhone
             "payment_in_progress" -> PaymentInProgress
             "already_subscribed", "mandate_active" -> AlreadySubscribed
+            "switch_not_yet" -> SwitchNotYet
+            "invalid_interval" -> InvalidInterval
             "mandate_update_pending" -> MandateUpdatePending
             "rate_limited" -> RateLimited
             "account_disabled" -> AccountDisabled
@@ -98,6 +105,7 @@ data class PaymentRecord(
     val state: PaymentState,
     val amountPaise: Int,
     val refundedPaise: Int,
+    val interval: BillingInterval = BillingInterval.Month,
     val method: String?,
     val createdAt: Long,
     val completedAt: Long?,

@@ -13,11 +13,14 @@ Deno.test("Indian mobile numbers are normalized and validated", () => {
 });
 
 Deno.test("Checkout and status requests", () => {
-  assertEquals(parseCheckoutRequest({}), { phone: null });
-  assertEquals(parseCheckoutRequest(null), { phone: null });
-  assertEquals(parseCheckoutRequest({ phone: "+919876543210" }), { phone: "9876543210" });
-  assertEquals(parseCheckoutRequest({ phone: "12" }), null);
-  assertEquals(parseCheckoutRequest({ amount: 1, phone: "9876543210" }), { phone: "9876543210" });
+  assertEquals(parseCheckoutRequest({}), { phone: null, interval: "month" });
+  assertEquals(parseCheckoutRequest(null), { phone: null, interval: "month" });
+  assertEquals(parseCheckoutRequest({ phone: "+919876543210" }), { phone: "9876543210", interval: "month" });
+  assertEquals(parseCheckoutRequest({ phone: "12" }), { error: "invalid_phone" });
+  assertEquals(parseCheckoutRequest({ amount: 1, phone: "9876543210" }), { phone: "9876543210", interval: "month" });
+  assertEquals(parseCheckoutRequest({ interval: "year" }), { phone: null, interval: "year" });
+  assertEquals(parseCheckoutRequest({ interval: "week" }), { error: "invalid_interval" });
+  assertEquals(parseCheckoutRequest({ interval: 12 }), { error: "invalid_interval" });
   assertEquals(parseStatusRequest({}), { txnId: null });
   assertEquals(parseStatusRequest({ txnId: "MPABC" }), { txnId: "MPABC" });
   assertEquals(parseStatusRequest({ txnId: "MP'; drop" }), null);

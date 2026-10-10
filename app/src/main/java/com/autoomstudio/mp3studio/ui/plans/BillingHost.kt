@@ -57,6 +57,7 @@ fun BillingHost(
         CheckoutSheet(
             state = it,
             onPhoneChange = viewModel::onPhoneChange,
+            onIntervalChange = viewModel::onIntervalChange,
             onPay = viewModel::pay,
             onDismiss = viewModel::dismissCheckout,
         )

@@ -91,6 +91,16 @@ Deno.test("An autopay link: fixed ₹99, one payment, no PayU messages, first de
   });
 });
 
+Deno.test("A yearly autopay link debits ₹999 once a year", () => {
+  const p = buildLinkPayload({ ...linkRequest, amountPaise: 99900, interval: "year" });
+  assertEquals(p.subAmount, 999);
+  assertEquals(p.description, "MP3 Studio Pro, 1 year");
+  assertEquals((p.siDetails as Record<string, unknown>).billingCycle, "YEARLY");
+  assertEquals((p.siDetails as Record<string, unknown>).billingAmount, "999.00");
+  assertEquals((p.siDetails as Record<string, unknown>).billingInterval, 1);
+  assertEquals(buildLinkPayload(linkRequest).description, "MP3 Studio Pro, 1 month");
+});
+
 Deno.test("A manual-renewal link has no standing instruction", () => {
   const p = buildLinkPayload({ ...linkRequest, mode: "manual" });
   assertEquals(p.siDetails, undefined);

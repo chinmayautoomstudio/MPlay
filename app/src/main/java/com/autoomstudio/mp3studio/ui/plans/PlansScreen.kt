@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoomstudio.mp3studio.R
+import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.Plan
 import com.autoomstudio.mp3studio.data.plan.TrialClaim
 import com.autoomstudio.mp3studio.ui.library.DetailBackButton
@@ -92,7 +93,9 @@ private fun BillingSection(state: PlanUiState, billing: BillingViewModel, onOpen
             null -> Unit
             BillingNotice.PaymentsUnavailable -> Notice(stringResource(R.string.plans_payments_unavailable))
             is BillingNotice.PaymentPending -> Notice(stringResource(R.string.plans_payment_pending))
-            is BillingNotice.AutopayOn -> Notice(stringResource(R.string.plans_autopay_on, date(notice.nextBillingAt)))
+            is BillingNotice.AutopayOn -> Notice(
+                stringResource(R.string.plans_autopay_on, date(notice.nextBillingAt), wholeRupees(pricePaise(notice.interval))),
+            )
             is BillingNotice.AutopayNotSet -> Notice(stringResource(R.string.plans_autopay_not_set, date(notice.expiresAt)))
             is BillingNotice.RenewSoon -> Notice(stringResource(R.string.plans_renew_reminder, date(notice.expiresAt)))
             is BillingNotice.PastDue -> Notice(stringResource(R.string.plans_past_due, date(notice.graceEnd)), warning = true)
@@ -143,6 +146,14 @@ private fun BillingSection(state: PlanUiState, billing: BillingViewModel, onOpen
                     onClick = { billing.onReturned((status.notice as? BillingNotice.PaymentPending)?.txnId) },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text(stringResource(R.string.plans_check_payment)) }
+                BillingAction.SwitchToYearly -> OutlinedButton(
+                    onClick = { billing.openCheckout(CheckoutPurpose.SwitchInterval) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.plans_switch_yearly)) }
+                BillingAction.SwitchToMonthly -> OutlinedButton(
+                    onClick = { billing.openCheckout(CheckoutPurpose.SwitchInterval) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.plans_switch_monthly)) }
                 BillingAction.CancelAutopay -> OutlinedButton(
                     onClick = billing::requestCancel,
                     modifier = Modifier.fillMaxWidth(),
@@ -267,6 +278,8 @@ fun planLabel(state: PlanUiState): String {
     return when {
         state.checkedAt == null -> stringResource(R.string.plan_checking)
         daysLeft != null -> pluralStringResource(R.plurals.plan_trial_days_left, daysLeft, daysLeft)
+        state.subscriptionInterval == BillingInterval.Year -> stringResource(R.string.plans_pro_yearly)
+        state.subscriptionInterval == BillingInterval.Month -> stringResource(R.string.plans_pro_monthly)
         else -> planName(state.plan)
     }
 }

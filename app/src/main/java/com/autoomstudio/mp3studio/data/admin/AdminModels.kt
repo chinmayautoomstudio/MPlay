@@ -124,6 +124,8 @@ data class AdminJob(
 data class AdminSubscription(
     val provider: String,
     val status: String,
+    /** `month` or `year`; null for rows from before yearly Pro and for admin grants. */
+    val interval: String? = null,
     val startedAt: String? = null,
     val expiresAt: String? = null,
     val nextBillingAt: String? = null,

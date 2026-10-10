@@ -1,6 +1,7 @@
 // Billing steps shared by the checkout, status, webhook, subscription, jobs, admin and delete-account functions.
 // PayU decides what happened; the SQL functions decide what that means for the subscription (payments PRD 6.2).
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import type { BillingInterval } from "./checkout.ts";
 import { type Customer, PayuClient, type PayuConfig, payuConfig, type VerifiedPayment } from "./payu.ts";
 import { classifyWebhook, type WebhookEvent } from "./webhook.ts";
 
@@ -136,6 +137,7 @@ export async function startCheckout(
   config: PayuConfig,
   userId: string,
   phone: string | null,
+  interval: BillingInterval,
 ): Promise<CheckoutOutcome> {
   const open = await rpc<{ txnId: string; si: boolean }[]>(admin, "payments_to_check", {
     p_user: userId,
@@ -144,7 +146,13 @@ export async function startCheckout(
   });
   await resolveAll(admin, payu, open);
 
-  const begin = () => rpc<BeginResult>(admin, "begin_checkout", { p_user: userId, p_phone: phone, p_mode: config.mode });
+  const begin = () =>
+    rpc<BeginResult>(admin, "begin_checkout", {
+      p_user: userId,
+      p_phone: phone,
+      p_mode: config.mode,
+      p_interval: interval,
+    });
   let started = await begin();
   if (started.error === "mandate_active" && started.subscriptionId) {
     if (!await cancelMandate(admin, payu, started.subscriptionId, false)) {
@@ -164,6 +172,7 @@ export async function startCheckout(
       periodEnd: new Date(started.periodEnd!),
       customer: started.customer!,
       mode: config.mode,
+      interval,
       successUrl: withQuery(config.successUrl, txnId),
       failureUrl: withQuery(config.failureUrl, txnId),
     });

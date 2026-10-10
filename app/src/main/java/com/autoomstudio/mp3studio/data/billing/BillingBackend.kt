@@ -1,5 +1,6 @@
 package com.autoomstudio.mp3studio.data.billing
 
+import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
 import com.autoomstudio.mp3studio.data.plan.Plan
 import com.autoomstudio.mp3studio.data.plan.epochMillis
@@ -22,8 +23,8 @@ import java.io.IOException
 
 /** Pro payments through the server (payments PRD). The app never talks to PayU; every call throws [BillingException]. */
 interface BillingBackend {
-    /** Creates a PayU payment link; [phone] is saved to the profile when given. */
-    suspend fun startCheckout(phone: String?): CheckoutLink
+    /** Creates a PayU payment link for [interval]; [phone] is saved to the profile when given. */
+    suspend fun startCheckout(phone: String?, interval: BillingInterval): CheckoutLink
 
     /** Checks [txnId] (or the latest attempt) with PayU on the server and returns where it stands. */
     suspend fun paymentStatus(txnId: String?): PaymentSummary
@@ -36,8 +37,14 @@ interface BillingBackend {
 
 class SupabaseBillingBackend(private val client: SupabaseClient) : BillingBackend {
 
-    override suspend fun startCheckout(phone: String?): CheckoutLink {
-        val dto = call<CheckoutDto>("start-checkout", buildJsonObject { phone?.let { put("phone", it) } })
+    override suspend fun startCheckout(phone: String?, interval: BillingInterval): CheckoutLink {
+        val dto = call<CheckoutDto>(
+            "start-checkout",
+            buildJsonObject {
+                phone?.let { put("phone", it) }
+                put("interval", interval.wire)
+            },
+        )
         return CheckoutLink(dto.url, dto.txnId, BillingMode.of(dto.mode))
     }
 
@@ -117,6 +124,7 @@ internal data class SummaryDto(
 internal data class PaymentRow(
     @SerialName("txn_id") val txnId: String,
     val kind: String,
+    @SerialName("billing_interval") val interval: String? = null,
     val status: String,
     @SerialName("amount_paise") val amountPaise: Int,
     @SerialName("refunded_paise") val refundedPaise: Int = 0,
@@ -130,6 +138,7 @@ internal data class PaymentRow(
     fun toRecord() = PaymentRecord(
         txnId = txnId,
         kind = kind,
+        interval = BillingInterval.of(interval),
         state = PaymentState.of(status),
         amountPaise = amountPaise,
         refundedPaise = refundedPaise,
@@ -143,7 +152,7 @@ internal data class PaymentRow(
 
     companion object {
         val COLUMNS = listOf(
-            "txn_id", "kind", "status", "amount_paise", "refunded_paise", "method", "created_at", "completed_at",
+            "txn_id", "kind", "billing_interval", "status", "amount_paise", "refunded_paise", "method", "created_at", "completed_at",
             "period_start", "period_end", "failure_reason",
         )
     }
@@ -167,6 +176,7 @@ internal fun billingErrorOf(status: Int, body: String): BillingError {
 }
 
 private val CODES = listOf(
-    "phone_required", "invalid_phone", "payment_in_progress", "already_subscribed", "mandate_active",
+    "phone_required", "invalid_phone", "invalid_interval", "payment_in_progress", "already_subscribed",
+    "switch_not_yet", "mandate_active",
     "mandate_update_pending", "rate_limited", "account_disabled", "payu_unavailable", "not_subscribed", "not_found",
 )

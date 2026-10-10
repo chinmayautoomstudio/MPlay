@@ -128,7 +128,7 @@ fun PaymentHistoryScreen(
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
                         ) {
                             Column(Modifier.weight(1f)) {
-                                Text(stringResource(paymentKindText(payment.kind)), style = MaterialTheme.typography.bodyLarge)
+                                Text(stringResource(paymentKindText(payment.kind, payment.interval)), style = MaterialTheme.typography.bodyLarge)
                                 Text(
                                     billingDate(context, payment.completedAt ?: payment.createdAt),
                                     style = MaterialTheme.typography.bodySmall,
@@ -168,7 +168,7 @@ private fun ReceiptDialog(payment: PaymentRecord, onDismiss: () -> Unit) {
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.receipt_seller), style = MaterialTheme.typography.titleSmall)
-                ReceiptRow(R.string.receipt_item, stringResource(paymentKindText(payment.kind)))
+                ReceiptRow(R.string.receipt_item, stringResource(paymentKindText(payment.kind, payment.interval)))
                 ReceiptRow(R.string.receipt_amount, rupees(payment.amountPaise))
                 if (payment.refundedPaise > 0) ReceiptRow(R.string.receipt_refunded, rupees(payment.refundedPaise))
                 ReceiptRow(R.string.receipt_status, stringResource(paymentStateText(payment.state)))

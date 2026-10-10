@@ -6,9 +6,13 @@ import com.autoomstudio.mp3studio.data.billing.BillingRepositoryTest.FakeBackend
 import com.autoomstudio.mp3studio.data.billing.BillingRepositoryTest.FakeStore
 import com.autoomstudio.mp3studio.data.billing.CancelResult
 import com.autoomstudio.mp3studio.data.billing.PaymentState
+import com.autoomstudio.mp3studio.data.plan.AutopayStatus
+import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
+import com.autoomstudio.mp3studio.data.plan.BillingState
 import com.autoomstudio.mp3studio.data.plan.Entitlements
 import com.autoomstudio.mp3studio.data.plan.Plan
+import com.autoomstudio.mp3studio.data.plan.SubscriptionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -18,6 +22,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -57,6 +62,43 @@ class BillingViewModelTest {
         val sheet = viewModel.state.value.checkout!!
         assertTrue(sheet.needsPhone)
         assertEquals(BillingMode.Autopay, sheet.mode)
+    }
+
+    @Test
+    fun newUsersStartOnMonthlyAndThePickedIntervalIsSent() {
+        entitlements = entitlements.copy(hasPhone = true)
+        viewModel.openCheckout()
+        val sheet = viewModel.state.value.checkout!!
+        assertEquals(BillingInterval.Month, sheet.interval)
+        assertFalse(sheet.intervalLocked)
+        viewModel.onIntervalChange(BillingInterval.Year)
+        assertEquals(BillingInterval.Year, viewModel.state.value.checkout!!.interval)
+        viewModel.pay()
+        assertEquals(listOf(BillingInterval.Year), backend.intervals)
+    }
+
+    @Test
+    fun checkoutDefaultsToTheCurrentIntervalAndASwitchLocksTheOther() {
+        val yearly = BillingState(
+            SubscriptionStatus.Active,
+            AutopayStatus.On,
+            expiresAt = 5_000L,
+            interval = BillingInterval.Year,
+        )
+        entitlements = entitlements.copy(hasPhone = true, billing = yearly)
+        viewModel.openCheckout(CheckoutPurpose.FixPayment)
+        assertEquals(BillingInterval.Year, viewModel.state.value.checkout!!.interval)
+        assertNull(viewModel.state.value.checkout!!.switchStartsAt)
+
+        viewModel.openCheckout(CheckoutPurpose.SwitchInterval)
+        val sheet = viewModel.state.value.checkout!!
+        assertEquals(BillingInterval.Month, sheet.interval)
+        assertTrue(sheet.intervalLocked)
+        assertEquals(5_000L, sheet.switchStartsAt)
+        viewModel.onIntervalChange(BillingInterval.Year)
+        assertEquals("A switch can't be changed back", BillingInterval.Month, viewModel.state.value.checkout!!.interval)
+        viewModel.pay()
+        assertEquals(listOf(BillingInterval.Month), backend.intervals)
     }
 
     @Test

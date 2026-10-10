@@ -6,6 +6,7 @@ import androidx.annotation.StringRes
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.billing.BillingError
 import com.autoomstudio.mp3studio.data.billing.PaymentState
+import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import java.util.Locale
 
 /** "₹99.00" from paise. */
@@ -25,6 +26,8 @@ fun billingErrorText(error: BillingError): Int = when (error) {
     BillingError.PhoneRequired, BillingError.InvalidPhone -> R.string.checkout_phone_invalid
     BillingError.PaymentInProgress -> R.string.checkout_error_in_progress
     BillingError.AlreadySubscribed -> R.string.checkout_error_subscribed
+    BillingError.SwitchNotYet -> R.string.checkout_error_switch_not_yet
+    BillingError.InvalidInterval -> R.string.checkout_error_other
     BillingError.MandateUpdatePending -> R.string.checkout_error_mandate
     BillingError.RateLimited -> R.string.checkout_error_rate_limited
     BillingError.AccountDisabled -> R.string.checkout_error_disabled
@@ -48,8 +51,14 @@ fun paymentStateText(state: PaymentState): Int = when (state) {
 }
 
 @StringRes
-fun paymentKindText(kind: String): Int = when (kind) {
-    "renewal" -> R.string.payment_kind_renewal
+fun paymentKindText(kind: String, interval: BillingInterval = BillingInterval.Month): Int = when (kind) {
+    "renewal" -> if (interval == BillingInterval.Year) R.string.payment_kind_renewal_yearly else R.string.payment_kind_renewal
     "replace" -> R.string.payment_kind_replace
     else -> R.string.payment_kind_first
 }
+
+/** Prices the app shows; the server charges `billing_price_paise`, which these must match. */
+fun pricePaise(interval: BillingInterval): Int = if (interval == BillingInterval.Year) 99_900 else 9_900
+
+/** "₹99" or "₹999". */
+fun wholeRupees(paise: Int): String = "₹" + (paise / 100)

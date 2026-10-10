@@ -1,6 +1,7 @@
 package com.autoomstudio.mp3studio.ui.plans
 
 import com.autoomstudio.mp3studio.data.plan.AutopayStatus
+import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
 import com.autoomstudio.mp3studio.data.plan.BillingState
 import com.autoomstudio.mp3studio.data.plan.PendingPayment
@@ -29,7 +30,8 @@ class BillingStatusRulesTest {
         expiresAt: Long = now + 20 * day,
         mandateEnd: Long? = null,
         cancelPending: Boolean = false,
-    ) = BillingState(status, autopay, expiresAt, expiresAt, now + 3 * day, mandateEnd, false, cancelPending)
+        interval: BillingInterval = BillingInterval.Month,
+    ) = BillingState(status, autopay, expiresAt, expiresAt, now + 3 * day, mandateEnd, false, cancelPending, interval)
 
     @Test
     fun freeUsersCanGoProOnlyWhenPaymentsAreSetUp() {
@@ -56,10 +58,31 @@ class BillingStatusRulesTest {
     }
 
     @Test
-    fun activeAutopayCanBeCancelled() {
+    fun activeMonthlyAutopayCanSwitchToYearlyOrBeCancelled() {
         val s = status(sub())
-        assertEquals(BillingNotice.AutopayOn(now + 20 * day), s.notice)
-        assertEquals(listOf(BillingAction.CancelAutopay), s.actions)
+        assertEquals(BillingNotice.AutopayOn(now + 20 * day, BillingInterval.Month), s.notice)
+        assertEquals(listOf(BillingAction.SwitchToYearly, BillingAction.CancelAutopay), s.actions)
+        assertEquals("No switch while payments are off", listOf(BillingAction.CancelAutopay),
+            status(sub(), enabled = false).actions)
+    }
+
+    @Test
+    fun yearlyCanSwitchToMonthlyOnlyInItsLastMonth() {
+        val early = status(sub(interval = BillingInterval.Year, expiresAt = now + 200 * day))
+        assertEquals(BillingNotice.AutopayOn(now + 200 * day, BillingInterval.Year), early.notice)
+        assertEquals(listOf(BillingAction.CancelAutopay), early.actions)
+        val late = status(sub(interval = BillingInterval.Year, expiresAt = now + 31 * day))
+        assertEquals(listOf(BillingAction.SwitchToMonthly, BillingAction.CancelAutopay), late.actions)
+    }
+
+    @Test
+    fun pricesMatchTheServer() {
+        assertEquals(9_900, pricePaise(BillingInterval.Month))
+        assertEquals(99_900, pricePaise(BillingInterval.Year))
+        assertEquals("₹999", wholeRupees(pricePaise(BillingInterval.Year)))
+        assertEquals(BillingInterval.Year, BillingInterval.of("year"))
+        assertEquals(BillingInterval.Month, BillingInterval.of(null))
+        assertEquals(BillingInterval.Month, BillingInterval.Year.other)
     }
 
     @Test

@@ -13,6 +13,7 @@ import com.autoomstudio.mp3studio.data.billing.CancelResult
 import com.autoomstudio.mp3studio.data.billing.PaymentState
 import com.autoomstudio.mp3studio.data.billing.PaymentSummary
 import com.autoomstudio.mp3studio.data.billing.PhoneNumber
+import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
 import com.autoomstudio.mp3studio.data.plan.Entitlements
 import kotlinx.coroutines.channels.Channel
@@ -24,14 +25,19 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Why the checkout sheet is open; only changes the wording. */
-enum class CheckoutPurpose { Subscribe, FixPayment, SetUpAutopay, Renew }
+/** Why the checkout sheet is open; changes the wording, and [SwitchInterval] fixes the interval to the other one. */
+enum class CheckoutPurpose { Subscribe, FixPayment, SetUpAutopay, Renew, SwitchInterval }
 
 /** The checkout sheet (payments PRD CK1, CK13). */
 data class CheckoutUi(
     val purpose: CheckoutPurpose,
     val mode: BillingMode,
     val needsPhone: Boolean,
+    val interval: BillingInterval = BillingInterval.Month,
+    /** True when switching: the picker is hidden. */
+    val intervalLocked: Boolean = false,
+    /** When switching, the end of the current paid period, where the new interval starts. */
+    val switchStartsAt: Long? = null,
     val phone: String = "",
     val phoneInvalid: Boolean = false,
     val busy: Boolean = false,
@@ -95,15 +101,28 @@ class BillingViewModel(
 
     fun openCheckout(purpose: CheckoutPurpose = CheckoutPurpose.Subscribe) {
         val current = entitlements()
+        val interval = current?.billing?.interval ?: BillingInterval.Month
+        val switching = purpose == CheckoutPurpose.SwitchInterval
         _state.update {
             it.copy(
                 checkout = CheckoutUi(
                     purpose = purpose,
                     mode = current?.billingMode ?: BillingMode.Autopay,
                     needsPhone = current?.hasPhone != true,
+                    interval = if (switching) interval.other else interval,
+                    intervalLocked = switching,
+                    switchStartsAt = current?.billing?.expiresAt?.takeIf { switching },
                 ),
                 result = null,
             )
+        }
+    }
+
+    fun onIntervalChange(interval: BillingInterval) {
+        _state.update { s ->
+            val sheet = s.checkout
+            if (sheet == null || sheet.busy || sheet.intervalLocked) s
+            else s.copy(checkout = sheet.copy(interval = interval, error = null))
         }
     }
 
@@ -115,7 +134,7 @@ class BillingViewModel(
         _state.update { s -> if (s.checkout?.busy == true) s else s.copy(checkout = null) }
     }
 
-    /** "Pay ₹99": asks the server for a PayU link and opens it. */
+    /** "Pay ₹99" or "Pay ₹999": asks the server for a PayU link and opens it. */
     fun pay() {
         val sheet = _state.value.checkout ?: return
         val userId = signedInUserId() ?: return
@@ -131,7 +150,7 @@ class BillingViewModel(
         _state.update { s -> s.copy(checkout = s.checkout?.copy(busy = true, error = null)) }
         viewModelScope.launch {
             try {
-                val link = repository.startCheckout(userId, phone)
+                val link = repository.startCheckout(userId, phone, sheet.interval)
                 awaitingReturn = link.txnId
                 _state.update { it.copy(checkout = null) }
                 _openUrl.send(link.url)

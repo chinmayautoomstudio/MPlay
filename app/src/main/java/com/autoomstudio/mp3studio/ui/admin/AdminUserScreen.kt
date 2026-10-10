@@ -368,7 +368,13 @@ private fun PlanCard(user: AdminUserDetail, onOpenPayments: (() -> Unit)?) {
             plan == "trial" -> R.string.admin_plan_trial_source
             else -> R.string.admin_plan_none
         },
-    )
+    ).let { base ->
+        when (sub?.interval.takeIf { sub?.provider == "payu" }) {
+            "year" -> base + " · " + stringResource(R.string.checkout_interval_yearly)
+            "month" -> base + " · " + stringResource(R.string.checkout_interval_monthly)
+            else -> base
+        }
+    }
     val renews = sub?.takeIf { it.provider == "payu" && it.status == "active" && !it.cancelAtPeriodEnd }
         ?.let { it.nextBillingAt ?: it.expiresAt }
     val ends = sub?.expiresAt ?: trial?.endsAt?.takeIf { plan == "trial" }

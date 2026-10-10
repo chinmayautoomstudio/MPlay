@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.autoomstudio.mp3studio.MPlayApp
+import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.EntitlementPolicy
 import com.autoomstudio.mp3studio.data.plan.Entitlements
 import com.autoomstudio.mp3studio.data.plan.Feature
@@ -40,6 +41,8 @@ data class PlanUiState(
     val subscriptionNextBillingAt: Long?,
     val cancelAtPeriodEnd: Boolean,
     val checkedAt: Long?,
+    /** Monthly or yearly Pro; null unless a PayU subscription gives Pro. */
+    val subscriptionInterval: BillingInterval? = null,
     /** Free users' AI Vocal Separator uses this week; null on Trial and Pro. */
     val usage: SeparatorUsage? = null,
     /** Shows the Admin entry in Settings; the server checks every admin call. */
@@ -70,6 +73,7 @@ data class PlanUiState(
                 subscriptionNextBillingAt = entitlements?.subscriptionNextBillingAt,
                 cancelAtPeriodEnd = entitlements?.cancelAtPeriodEnd ?: false,
                 checkedAt = entitlements?.checkedAt,
+                subscriptionInterval = entitlements?.subscriptionInterval?.takeIf { plan == Plan.Pro },
                 usage = EntitlementPolicy.separatorUsage(entitlements, now),
                 isAdmin = entitlements?.isAdmin == true,
                 billing = if (entitlements == null) {

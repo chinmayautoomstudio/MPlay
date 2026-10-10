@@ -8,12 +8,24 @@ export function normalizePhone(value: unknown): string | null {
   return /^[6-9][0-9]{9}$/.test(digits) ? digits : null;
 }
 
-/** `{ phone? }` from the app. Missing phone is fine (the profile may have one); a malformed one is not. */
-export function parseCheckoutRequest(body: unknown): { phone: string | null } | null {
+export type BillingInterval = "month" | "year";
+
+export type CheckoutRequest = { phone: string | null; interval: BillingInterval };
+
+/**
+ * `{ phone?, interval? }` from the app. Missing phone is fine (the profile may have one); a malformed one is not.
+ * The interval defaults to "month" for app versions that don't send it.
+ */
+export function parseCheckoutRequest(body: unknown): CheckoutRequest | { error: "invalid_phone" | "invalid_interval" } {
   const b = (body ?? {}) as Record<string, unknown>;
-  if (b.phone === undefined || b.phone === null || b.phone === "") return { phone: null };
+  let interval: BillingInterval = "month";
+  if (b.interval !== undefined && b.interval !== null) {
+    if (b.interval !== "month" && b.interval !== "year") return { error: "invalid_interval" };
+    interval = b.interval;
+  }
+  if (b.phone === undefined || b.phone === null || b.phone === "") return { phone: null, interval };
   const phone = normalizePhone(b.phone);
-  return phone ? { phone } : null;
+  return phone ? { phone, interval } : { error: "invalid_phone" };
 }
 
 const TXN = /^[A-Za-z0-9]{1,25}$/;
@@ -38,5 +50,6 @@ export const CHECKOUT_REFUSALS: Record<string, number> = {
   payment_in_progress: 409,
   rate_limited: 429,
   already_subscribed: 409,
+  switch_not_yet: 409,
   mandate_update_pending: 409,
 };

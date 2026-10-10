@@ -53,6 +53,8 @@ data class EntitlementsResponse(
     @Serializable
     data class SubscriptionDto(
         val status: String,
+        val provider: String? = null,
+        val interval: String? = null,
         val expiresAt: String? = null,
         val nextBillingAt: String? = null,
         val cancelAtPeriodEnd: Boolean = false,
@@ -62,6 +64,7 @@ data class EntitlementsResponse(
     data class BillingDto(
         val status: String,
         val autopayStatus: String? = null,
+        val interval: String? = null,
         val expiresAt: String? = null,
         val nextBillingAt: String? = null,
         val graceEnd: String? = null,
@@ -72,6 +75,7 @@ data class EntitlementsResponse(
         fun toState() = BillingState(
             status = SubscriptionStatus.of(status) ?: SubscriptionStatus.Unknown,
             autopayStatus = AutopayStatus.of(autopayStatus),
+            interval = BillingInterval.of(interval),
             expiresAt = expiresAt?.let(::epochMillis),
             nextBillingAt = nextBillingAt?.let(::epochMillis),
             graceEnd = graceEnd?.let(::epochMillis),
@@ -105,6 +109,7 @@ data class EntitlementsResponse(
         trialStartedAt = trial?.startedAt?.let(::epochMillis),
         trialEndsAt = trial?.endsAt?.let(::epochMillis),
         subscriptionStatus = SubscriptionStatus.of(subscription?.status),
+        subscriptionInterval = subscription?.takeIf { it.provider == "payu" }?.let { BillingInterval.of(it.interval) },
         subscriptionExpiresAt = subscription?.expiresAt?.let(::epochMillis),
         subscriptionNextBillingAt = subscription?.nextBillingAt?.let(::epochMillis),
         cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?: false,

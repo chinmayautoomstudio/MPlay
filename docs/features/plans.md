@@ -4,7 +4,7 @@
 
 ## Summary
 
-Every account is on Free, Trial or Pro (PRD v3.2 section 6.3, M2). The server decides the plan; the app caches it and locks BPM detection and Sing Along on Free, showing an upgrade sheet instead. Free users can separate 10 songs a week (M3). New accounts get a one-time 30-day trial with everything in Pro, at most once per normalized email and per phone. Settings > Plans shows the plan, its dates, what each plan includes and, for paying users, the billing status. "Go Pro" (₹99 a month) opens the PayU checkout described in [payments](payments.md); it is disabled with "Payments aren't available yet." while the server has no PayU secrets.
+Every account is on Free, Trial or Pro (PRD v3.2 section 6.3, M2). The server decides the plan; the app caches it and locks BPM detection and Sing Along on Free, showing an upgrade sheet instead. Free users can separate 10 songs a week (M3). New accounts get a one-time 30-day trial with everything in Pro, at most once per normalized email and per phone. Settings > Plans shows the plan, its dates, what each plan includes and, for paying users, the billing status. "Go Pro" (₹99 a month or ₹999 a year) opens the PayU checkout described in [payments](payments.md), and a paying user's plan reads "Pro · Monthly" or "Pro · Yearly" (`PlanUiState.subscriptionInterval`); it is disabled with "Payments aren't available yet." while the server has no PayU secrets.
 
 ## Key files
 
@@ -99,6 +99,7 @@ None. Uses the existing `INTERNET` permission.
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-10 | - | Yearly Pro at ₹999 next to monthly; the plan label shows the interval. |
 | 2026-10-08 | - | Plans and gating (M2): entitlements functions, trial with abuse checks, cache with 7-day grace, BPM and Sing Along gates, upgrade sheet, Plans screen, Account plan row, trial banner. |
 | 2026-10-08 | - | Usage limit (M3): `SeparatorUsage` in the cache, `separatorUsage()`, usage on the Plans card, limit-reached upgrade sheet. |
 | 2026-10-08 | - | M6: offline grace checked end to end on the emulator. |

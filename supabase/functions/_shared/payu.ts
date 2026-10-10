@@ -3,6 +3,7 @@
 // (`postservice.php` commands signed with SHA-512 over key and salt) for status checks, recurring debits, mandate
 // cancellation and refunds. Endpoint paths, command names and field names follow PayU's developer documentation as
 // of 2026-10; verify with PayU before going live (PRD section 4 note).
+import type { BillingInterval } from "./checkout.ts";
 
 export type BillingMode = "autopay" | "manual";
 
@@ -143,10 +144,12 @@ export type LinkRequest = {
   txnId: string;
   amountPaise: number;
   expiresAt: Date;
-  /** End of the month being paid for; the standing instruction's first debit date (PRD 4: never on day one). */
+  /** End of the period being paid for; the standing instruction's first debit date (PRD 4: never on day one). */
   periodEnd: Date;
   customer: Customer;
   mode: BillingMode;
+  /** What one payment buys and how often the standing instruction debits; "month" when not given. */
+  interval?: BillingInterval;
   successUrl: string;
   failureUrl: string;
   /** Mandate tenure (PRD 5.6, proposed 5 years). */
@@ -155,16 +158,17 @@ export type LinkRequest = {
 
 /**
  * Body for PayU's Create Payment Link API. One payment per link, fixed amount, no partial payment, PayU sends
- * nothing to the customer (CK10), and in autopay mode a monthly standing instruction for the same amount.
+ * nothing to the customer (CK10), and in autopay mode a monthly or yearly standing instruction for the same amount.
  */
 export function buildLinkPayload(req: LinkRequest): Record<string, unknown> {
+  const yearly = req.interval === "year";
   const mandateEnd = new Date(req.periodEnd);
   mandateEnd.setUTCFullYear(mandateEnd.getUTCFullYear() + (req.mandateYears ?? 5));
   const payload: Record<string, unknown> = {
     invoiceNumber: req.txnId,
     subAmount: Number(rupees(req.amountPaise)),
     currency: "INR",
-    description: "MP3 Studio Pro, 1 month",
+    description: yearly ? "MP3 Studio Pro, 1 year" : "MP3 Studio Pro, 1 month",
     source: req.mode === "autopay" ? "si_payment_link" : "API",
     isPartialPaymentAllowed: false,
     isAmountFilledByCustomer: false,
@@ -182,7 +186,7 @@ export function buildLinkPayload(req: LinkRequest): Record<string, unknown> {
     payload.siDetails = {
       billingAmount: rupees(req.amountPaise),
       billingCurrency: "INR",
-      billingCycle: "MONTHLY",
+      billingCycle: yearly ? "YEARLY" : "MONTHLY",
       billingInterval: 1,
       paymentStartDate: istDate(req.periodEnd),
       paymentEndDate: istDate(mandateEnd),

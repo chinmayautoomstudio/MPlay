@@ -5,7 +5,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(65);
+select plan(76);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -15,7 +15,9 @@ values
     ('dddddddd-0000-0000-0000-000000000004', 'nomandate@example.com', '{"name": "No Mandate"}'),
     ('dddddddd-0000-0000-0000-000000000005', 'manual@example.com', '{"name": "Manual"}'),
     ('dddddddd-0000-0000-0000-000000000006', 'billingadmin@example.com', '{"name": "Billing Admin"}'),
-    ('dddddddd-0000-0000-0000-000000000007', 'revoke@example.com', '{"name": "Revoke"}');
+    ('dddddddd-0000-0000-0000-000000000007', 'revoke@example.com', '{"name": "Revoke"}'),
+    ('dddddddd-0000-0000-0000-000000000008', 'yearly@example.com', '{"name": "Yearly"}'),
+    ('dddddddd-0000-0000-0000-000000000009', 'switch@example.com', '{"name": "Switch"}');
 update public.profiles set phone = '98765000' || right(id::text, 2) where id::text like 'dddddddd-%';
 update public.profiles set role = 'admin' where id = 'dddddddd-0000-0000-0000-000000000006';
 
@@ -28,10 +30,13 @@ create function pg_temp.ok_result(p_txn text, p_ref text, p_mandate text, p_meth
     select jsonb_build_object('status', 'success', 'txnId', p_txn, 'payuRef', p_ref, 'amountPaise', 9900,
                               'method', p_method, 'mandateRef', p_mandate)
 $$;
+create function pg_temp.ok_yearly(p_txn text, p_ref text, p_mandate text) returns jsonb language sql as $$
+    select pg_temp.ok_result(p_txn, p_ref, p_mandate, 'UPI') || jsonb_build_object('amountPaise', 99900)
+$$;
 
 -- First payment with autopay (SV1-SV6) ----------------------------------------------------------------------
 
-insert into c values ('auto', public.begin_checkout('dddddddd-0000-0000-0000-000000000001', null, 'autopay'));
+insert into c values ('auto', public.begin_checkout('dddddddd-0000-0000-0000-000000000001', null, 'autopay', 'month'));
 select public.attach_payment_link(pg_temp.txn('auto'), 'https://pay.example/auto', 'L-auto');
 
 select is(public.apply_payment_result(pg_temp.txn('auto'), pg_temp.ok_result(pg_temp.txn('auto'), 'P-auto', 'M-auto', 'UPI'))
@@ -116,7 +121,7 @@ select ok(public.claim_notices(200) @> jsonb_build_array(jsonb_build_object(
 
 -- Tampering and unresolved attempts (SV3, CK9) ----------------------------------------------------------------
 
-insert into c values ('tamper', public.begin_checkout('dddddddd-0000-0000-0000-000000000002', null, 'autopay'));
+insert into c values ('tamper', public.begin_checkout('dddddddd-0000-0000-0000-000000000002', null, 'autopay', 'month'));
 select public.attach_payment_link(pg_temp.txn('tamper'), 'https://pay.example/tamper', null);
 select is(public.apply_payment_result(pg_temp.txn('tamper'),
     jsonb_build_object('status', 'success', 'txnId', pg_temp.txn('tamper'), 'payuRef', 'P-t', 'amountPaise', 100))
@@ -126,19 +131,19 @@ select is(public.compute_entitlements('dddddddd-0000-0000-0000-000000000002') ->
 select ok(exists (select 1 from public.payment_events where txn_id = pg_temp.txn('tamper')
                   and event_type = 'verification_mismatch'), 'The mismatch is logged');
 
-insert into c values ('tamper2', public.begin_checkout('dddddddd-0000-0000-0000-000000000002', null, 'autopay'));
+insert into c values ('tamper2', public.begin_checkout('dddddddd-0000-0000-0000-000000000002', null, 'autopay', 'month'));
 select public.attach_payment_link(pg_temp.txn('tamper2'), 'https://pay.example/tamper2', null);
 update public.payments set link_expires_at = now() - interval '1 hour' where txn_id = pg_temp.txn('tamper2');
 select is(public.apply_payment_result(pg_temp.txn('tamper2'), jsonb_build_object('status', 'not_found', 'txnId', pg_temp.txn('tamper2')))
     ->> 'status', 'failed', 'An expired link PayU never saw is closed');
 select is((pg_temp.sub('dddddddd-0000-0000-0000-000000000002')).status, 'failed', 'and its subscription fails');
 
-insert into c values ('slow', public.begin_checkout('dddddddd-0000-0000-0000-000000000003', null, 'autopay'));
+insert into c values ('slow', public.begin_checkout('dddddddd-0000-0000-0000-000000000003', null, 'autopay', 'month'));
 select public.attach_payment_link(pg_temp.txn('slow'), 'https://pay.example/slow', null);
 select public.apply_payment_result(pg_temp.txn('slow'), jsonb_build_object('status', 'pending', 'txnId', pg_temp.txn('slow'), 'method', 'ENACH'));
 select is((select resolve_until from public.payments where txn_id = pg_temp.txn('slow')), now() + interval '2 hours 3 days',
     'eNACH gets 3 days after the link expires before it is failed');
-select is(public.begin_checkout('dddddddd-0000-0000-0000-000000000003', null, 'autopay') ->> 'error', 'payment_in_progress',
+select is(public.begin_checkout('dddddddd-0000-0000-0000-000000000003', null, 'autopay', 'month') ->> 'error', 'payment_in_progress',
     'A payment still being resolved blocks a new attempt');
 update public.payments set resolve_until = now() - interval '1 minute' where txn_id = pg_temp.txn('slow');
 select public.apply_payment_result(pg_temp.txn('slow'), jsonb_build_object('status', 'pending', 'txnId', pg_temp.txn('slow')));
@@ -147,7 +152,7 @@ select is((select failure_reason from public.payments where txn_id = pg_temp.txn
 
 -- Without a mandate, manual mode (SV4, 5.4) -----------------------------------------------------------------
 
-insert into c values ('nomandate', public.begin_checkout('dddddddd-0000-0000-0000-000000000004', null, 'autopay'));
+insert into c values ('nomandate', public.begin_checkout('dddddddd-0000-0000-0000-000000000004', null, 'autopay', 'month'));
 select public.attach_payment_link(pg_temp.txn('nomandate'), 'https://pay.example/nm', null);
 select public.apply_payment_result(pg_temp.txn('nomandate'), pg_temp.ok_result(pg_temp.txn('nomandate'), 'P-nm', null, 'CC'));
 select is((pg_temp.sub('dddddddd-0000-0000-0000-000000000004')).autopay_status, 'not_set',
@@ -156,7 +161,7 @@ select ok((pg_temp.sub('dddddddd-0000-0000-0000-000000000004')).cancel_at_period
 select is(public.begin_cancel('dddddddd-0000-0000-0000-000000000004') ->> 'result', 'cancelled',
     'Without a mandate cancelling is immediate');
 
-insert into c values ('manual', public.begin_checkout('dddddddd-0000-0000-0000-000000000005', null, 'manual'));
+insert into c values ('manual', public.begin_checkout('dddddddd-0000-0000-0000-000000000005', null, 'manual', 'month'));
 select public.attach_payment_link(pg_temp.txn('manual'), 'https://pay.example/manual', null);
 select public.apply_payment_result(pg_temp.txn('manual'), pg_temp.ok_result(pg_temp.txn('manual'), 'P-manual', null, 'UPI'));
 select is((pg_temp.sub('dddddddd-0000-0000-0000-000000000005')).autopay_status, 'off', 'Manual mode has autopay off');
@@ -199,7 +204,7 @@ select ok(jsonb_array_length(public.admin_user_detail('dddddddd-0000-0000-0000-0
 
 -- Admin revoke subscription ---------------------------------------------------------------------------------
 
-insert into c values ('revoke', public.begin_checkout('dddddddd-0000-0000-0000-000000000007', null, 'autopay'));
+insert into c values ('revoke', public.begin_checkout('dddddddd-0000-0000-0000-000000000007', null, 'autopay', 'month'));
 select public.attach_payment_link(pg_temp.txn('revoke'), 'https://pay.example/revoke', 'L-revoke');
 select public.apply_payment_result(pg_temp.txn('revoke'), pg_temp.ok_result(pg_temp.txn('revoke'), 'P-revoke', 'M-revoke', 'UPI'));
 
@@ -229,6 +234,58 @@ select is(public.revoke_subscription((pg_temp.sub('dddddddd-0000-0000-0000-00000
 select is(public.plan_of('dddddddd-0000-0000-0000-000000000004'), 'free', 'and that user is Free too');
 select is(public.revoke_subscription((pg_temp.sub('dddddddd-0000-0000-0000-000000000004')).id) ->> 'error',
     'not_subscribed', 'Revoking twice changes nothing');
+
+-- Yearly Pro -----------------------------------------------------------------------------------------------
+
+insert into c values ('year1', public.begin_checkout('dddddddd-0000-0000-0000-000000000008', null, 'autopay', 'year'));
+select public.attach_payment_link(pg_temp.txn('year1'), 'https://pay.example/year1', 'L-year1');
+select public.apply_payment_result(pg_temp.txn('year1'), pg_temp.ok_yearly(pg_temp.txn('year1'), 'P-year1', 'M-year1'));
+select is((pg_temp.sub('dddddddd-0000-0000-0000-000000000008')).billing_interval, 'year',
+    'A yearly payment makes a yearly subscription');
+select is((pg_temp.sub('dddddddd-0000-0000-0000-000000000008')).expires_at,
+    public.billing_period_end('year', extract(day from now() at time zone 'Asia/Kolkata')::integer, now()),
+    'The paid year ends on the anchor day next year');
+select is(public.compute_entitlements('dddddddd-0000-0000-0000-000000000008') -> 'billing' ->> 'interval', 'year',
+    'The app is told the plan is yearly');
+
+update public.subscriptions
+set expires_at = now() - interval '1 hour', next_billing_at = now() - interval '1 hour',
+    pre_debit_for = now() - interval '1 hour', pre_debit_sent_at = now() - interval '25 hours'
+where id = (pg_temp.sub('dddddddd-0000-0000-0000-000000000008')).id;
+insert into c select 'year_renew', e from jsonb_array_elements(public.claim_renewals(50)) e
+where e ->> 'subscriptionId' = (pg_temp.sub('dddddddd-0000-0000-0000-000000000008')).id::text;
+select is(((select r from c where who = 'year_renew') ->> 'amountPaise')::int, 99900, 'A yearly renewal debits ₹999');
+select is((select billing_interval from public.payments where txn_id = pg_temp.txn('year_renew')), 'year',
+    'and is recorded as yearly');
+select public.apply_payment_result(pg_temp.txn('year_renew'), pg_temp.ok_yearly(pg_temp.txn('year_renew'), 'P-year2', null));
+select is((pg_temp.sub('dddddddd-0000-0000-0000-000000000008')).expires_at,
+    public.billing_period_end('year', (pg_temp.sub('dddddddd-0000-0000-0000-000000000008')).billing_anchor_day,
+                              now() - interval '1 hour'),
+    'A yearly renewal extends by a year from the old period end');
+
+insert into c values ('month9', public.begin_checkout('dddddddd-0000-0000-0000-000000000009', null, 'autopay', 'month'));
+select public.attach_payment_link(pg_temp.txn('month9'), 'https://pay.example/month9', 'L-month9');
+select public.apply_payment_result(pg_temp.txn('month9'), pg_temp.ok_result(pg_temp.txn('month9'), 'P-month9', 'M-month9', 'UPI'));
+create temp table old_period as select (pg_temp.sub('dddddddd-0000-0000-0000-000000000009')).expires_at as ends;
+select is(public.begin_checkout('dddddddd-0000-0000-0000-000000000009', null, 'autopay', 'year') ->> 'error',
+    'mandate_active', 'Switching to yearly cancels the monthly mandate first');
+select public.request_mandate_cancel((pg_temp.sub('dddddddd-0000-0000-0000-000000000009')).id, false);
+select public.confirm_mandate_cancelled((pg_temp.sub('dddddddd-0000-0000-0000-000000000009')).id, false);
+insert into c values ('switch9', public.begin_checkout('dddddddd-0000-0000-0000-000000000009', null, 'autopay', 'year'));
+select is((select r ->> 'kind' from c where who = 'switch9'), 'replace', 'Then a yearly link replaces the monthly setup');
+select is((select (r ->> 'periodEnd')::timestamptz from c where who = 'switch9'),
+    public.billing_period_end('year', (pg_temp.sub('dddddddd-0000-0000-0000-000000000009')).billing_anchor_day,
+                              (select ends from old_period)),
+    'The year starts when the paid month ends');
+select public.attach_payment_link(pg_temp.txn('switch9'), 'https://pay.example/switch9', 'L-switch9');
+select public.apply_payment_result(pg_temp.txn('switch9'), pg_temp.ok_yearly(pg_temp.txn('switch9'), 'P-switch9', 'M-switch9'));
+select is((pg_temp.sub('dddddddd-0000-0000-0000-000000000009')).billing_interval || ' '
+          || (pg_temp.sub('dddddddd-0000-0000-0000-000000000009')).expires_at,
+    'year ' || (select (r ->> 'periodEnd')::timestamptz from c where who = 'switch9'),
+    'The subscription is now yearly, paid to a year after the old period end');
+select is((pg_temp.sub('dddddddd-0000-0000-0000-000000000009')).autopay_status || ' '
+          || (pg_temp.sub('dddddddd-0000-0000-0000-000000000009')).mandate_ref,
+    'on M-switch9', 'with the new yearly mandate');
 
 -- Account deletion keeps payment records (CN6) --------------------------------------------------------------
 

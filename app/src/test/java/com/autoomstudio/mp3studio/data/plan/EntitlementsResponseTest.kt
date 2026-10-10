@@ -63,6 +63,27 @@ class EntitlementsResponseTest {
         assertTrue(e.hasPhone)
         assertTrue(e.paymentsEnabled)
         assertEquals(BillingMode.Manual, e.billingMode)
+        assertEquals("No interval from an older server means monthly", BillingInterval.Month, e.subscriptionInterval)
+        assertEquals(BillingInterval.Month, e.billing?.interval)
+    }
+
+    @Test
+    fun theIntervalIsReadAndAdminGrantsHaveNone() {
+        val json = Json { ignoreUnknownKeys = true }
+        val yearly = """
+            {"plan":"pro","subscription":{"status":"active","provider":"payu","interval":"year"},
+             "billing":{"status":"active","autopayStatus":"on","interval":"year"},
+             "serverTime":"2027-02-01T10:00:00+00:00"}
+        """.trimIndent()
+        val e = json.decodeFromString<EntitlementsResponse>(yearly).toEntitlements("u", 0)
+        assertEquals(BillingInterval.Year, e.subscriptionInterval)
+        assertEquals(BillingInterval.Year, e.billing?.interval)
+
+        val granted = """
+            {"plan":"pro","subscription":{"status":"active","provider":"admin","interval":"month"},
+             "serverTime":"2027-02-01T10:00:00+00:00"}
+        """.trimIndent()
+        assertNull(json.decodeFromString<EntitlementsResponse>(granted).toEntitlements("u", 0).subscriptionInterval)
     }
 
     @Test

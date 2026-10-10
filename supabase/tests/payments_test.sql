@@ -4,7 +4,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(31);
+select plan(44);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -13,7 +13,9 @@ values
     ('cccccccc-0000-0000-0000-000000000003', 'noauto@example.com', '{"name": "No Auto"}'),
     ('cccccccc-0000-0000-0000-000000000004', 'spam@example.com', '{"name": "Spam"}'),
     ('cccccccc-0000-0000-0000-000000000005', 'off@example.com', '{"name": "Off"}'),
-    ('cccccccc-0000-0000-0000-000000000006', 'rules@example.com', '{"name": "Rules"}');
+    ('cccccccc-0000-0000-0000-000000000006', 'rules@example.com', '{"name": "Rules"}'),
+    ('cccccccc-0000-0000-0000-000000000007', 'yearly@example.com', '{"name": "Yearly"}'),
+    ('cccccccc-0000-0000-0000-000000000008', 'annual@example.com', '{"name": "Annual"}');
 
 -- Billing dates (5.3) --------------------------------------------------------------------------------------
 
@@ -27,6 +29,14 @@ select is(public.next_billing_date(31, '2028-01-31 10:00+05:30'), '2028-02-29 10
     'A leap year renews on 29 Feb');
 select is(public.next_billing_date(15, '2026-12-15 23:30+05:30'), '2027-01-15 23:30+05:30'::timestamptz,
     'The year rolls over in India time');
+select is(public.billing_period_end('month', 31, '2027-01-31 10:00+05:30'), '2027-02-28 10:00+05:30'::timestamptz,
+    'A monthly period ends like next_billing_date');
+select is(public.billing_period_end('year', 15, '2026-12-15 23:30+05:30'), '2027-12-15 23:30+05:30'::timestamptz,
+    'A yearly period ends on the same day next year');
+select is(public.billing_period_end('year', 29, '2028-02-29 10:00+05:30'), '2029-02-28 10:00+05:30'::timestamptz,
+    '29 Feb renews on 28 Feb when next year has no 29th');
+select is(public.billing_price_paise('month'), 9900, '₹99 a month');
+select is(public.billing_price_paise('year'), 99900, '₹999 a year');
 
 -- Constraints ----------------------------------------------------------------------------------------------
 
@@ -71,24 +81,24 @@ select is(public.plan_of('cccccccc-0000-0000-0000-000000000002'), 'pro', 'plan_o
 
 -- Checkout (CK2, CK3, CK13) --------------------------------------------------------------------------------
 
-select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000001', null, 'autopay') ->> 'error', 'phone_required',
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000001', null, 'autopay', 'month') ->> 'error', 'phone_required',
     'Checkout asks for a mobile number first');
-select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000001', '5876543210', 'autopay') ->> 'error',
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000001', '5876543210', 'autopay', 'month') ->> 'error',
     'invalid_phone', 'An invalid mobile number is refused');
 
 create temp table first_try as
-select public.begin_checkout('cccccccc-0000-0000-0000-000000000001', '9876543210', 'autopay') as r;
+select public.begin_checkout('cccccccc-0000-0000-0000-000000000001', '9876543210', 'autopay', 'month') as r;
 select is((select r ->> 'kind' from first_try), 'first', 'A first checkout creates an attempt');
 select is((select phone from public.profiles where id = 'cccccccc-0000-0000-0000-000000000001'), '9876543210',
     'The mobile number is saved for renewals');
 select is(
     (select amount_paise from public.payments where txn_id = (select r ->> 'txnId' from first_try)), 9900,
     'The amount is fixed on the server');
-select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000001', null, 'autopay') ->> 'error',
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000001', null, 'autopay', 'month') ->> 'error',
     'payment_in_progress', 'An attempt without a link yet blocks a second one');
 
 select public.attach_payment_link((select r ->> 'txnId' from first_try), 'https://pay.example/abc', 'L1');
-select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000001', null, 'autopay') ->> 'url',
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000001', null, 'autopay', 'month') ->> 'url',
     'https://pay.example/abc', 'A live link is handed out again instead of a second one');
 select is(
     public.compute_entitlements('cccccccc-0000-0000-0000-000000000001') -> 'pendingPayment' ->> 'txnId',
@@ -100,10 +110,10 @@ select is(
     'failed', 'A failed first attempt fails its subscription');
 
 update public.profiles set disabled = true, phone = '9876543212' where id = 'cccccccc-0000-0000-0000-000000000005';
-select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000005', null, 'autopay') ->> 'error',
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000005', null, 'autopay', 'month') ->> 'error',
     'account_disabled', 'A disabled account cannot check out');
 
-select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000002', '9876543211', 'autopay') ->> 'error',
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000002', '9876543211', 'autopay', 'month') ->> 'error',
     'mandate_active', 'Fix payment needs the old mandate cancelled first (5.5)');
 
 insert into public.subscriptions (user_id, status, provider, started_at, expires_at, autopay_status,
@@ -111,23 +121,55 @@ insert into public.subscriptions (user_id, status, provider, started_at, expires
 values ('cccccccc-0000-0000-0000-000000000003', 'active', 'payu', now() - interval '20 days',
         now() + interval '10 days', 'on', 5);
 update public.profiles set phone = '9876543213' where id = 'cccccccc-0000-0000-0000-000000000003';
-select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000003', null, 'autopay') ->> 'error',
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000003', null, 'autopay', 'month') ->> 'error',
     'already_subscribed', 'An active subscription with autopay cannot buy again');
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000003', null, 'autopay', 'year') ->> 'error',
+    'mandate_active', 'A monthly subscriber switching to yearly has the monthly mandate cancelled first');
 update public.subscriptions set autopay_status = 'off' where user_id = 'cccccccc-0000-0000-0000-000000000003';
-select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000003', null, 'manual') ->> 'error',
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000003', null, 'manual', 'month') ->> 'error',
     'already_subscribed', 'Manual renewal opens only in the last week');
 create temp table setup_autopay as
-select public.begin_checkout('cccccccc-0000-0000-0000-000000000003', null, 'autopay') as r;
+select public.begin_checkout('cccccccc-0000-0000-0000-000000000003', null, 'autopay', 'month') as r;
 select is((select r ->> 'kind' from setup_autopay), 'replace', 'Setting up autopay replaces the payment setup');
 select is((select (r ->> 'periodEnd')::timestamptz from setup_autopay),
     (select public.next_billing_date(5, expires_at) from public.subscriptions
      where user_id = 'cccccccc-0000-0000-0000-000000000003'),
     'The new month is added after the current paid period, on the anchor day');
 
+-- Yearly Pro ------------------------------------------------------------------------------------------------
+
+insert into public.subscriptions (user_id, status, provider, started_at, expires_at, autopay_status,
+                                  billing_anchor_day, billing_interval)
+values ('cccccccc-0000-0000-0000-000000000007', 'active', 'payu', now() - interval '165 days',
+        now() + interval '200 days', 'on', 5, 'year');
+update public.profiles set phone = '9876543217' where id = 'cccccccc-0000-0000-0000-000000000007';
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000007', null, 'autopay', 'month') ->> 'error',
+    'switch_not_yet', 'Yearly to monthly waits for the last month of the year');
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000007', null, 'autopay', 'year') ->> 'error',
+    'already_subscribed', 'A yearly subscriber cannot buy yearly again');
+update public.subscriptions set expires_at = now() + interval '20 days'
+where user_id = 'cccccccc-0000-0000-0000-000000000007';
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000007', null, 'autopay', 'month') ->> 'error',
+    'mandate_active', 'In the last month the switch goes ahead');
+
+create temp table yearly_try as
+select public.begin_checkout('cccccccc-0000-0000-0000-000000000008', '9876543218', 'autopay', 'year') as r;
+select is((select r ->> 'interval' from yearly_try), 'year', 'A yearly checkout is yearly');
+select is(
+    (select amount_paise || ' ' || billing_interval from public.payments
+     where txn_id = (select r ->> 'txnId' from yearly_try)),
+    '99900 year', 'and costs ₹999');
+select is((select (r ->> 'periodEnd')::timestamptz from yearly_try),
+    public.billing_period_end('year', extract(day from now() at time zone 'Asia/Kolkata')::integer, now()),
+    'It pays for a year from today');
+select public.attach_payment_link((select r ->> 'txnId' from yearly_try), 'https://pay.example/yearly', 'LY');
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000008', null, 'autopay', 'month') ->> 'error',
+    'payment_in_progress', 'A live yearly link is not handed out for a monthly checkout');
+
 update public.profiles set phone = '9876543214' where id = 'cccccccc-0000-0000-0000-000000000004';
 insert into public.payments (txn_id, user_id, kind, status, amount_paise)
 select 'SPAM' || g, 'cccccccc-0000-0000-0000-000000000004', 'first', 'failed', 9900 from generate_series(1, 5) g;
-select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000004', null, 'autopay') ->> 'error', 'rate_limited',
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000004', null, 'autopay', 'month') ->> 'error', 'rate_limited',
     'At most 5 checkout attempts an hour');
 
 select * from finish();

@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 
@@ -60,9 +61,9 @@ class BillingRepository(
     private val refreshPlan: suspend (userId: String) -> Unit,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
 ) {
-    /** Creates the link and remembers its transaction for [userId]; throws [BillingException]. */
-    suspend fun startCheckout(userId: String, phone: String?): CheckoutLink {
-        val link = backend.startCheckout(phone)
+    /** Creates the link for [interval] and remembers its transaction for [userId]; throws [BillingException]. */
+    suspend fun startCheckout(userId: String, phone: String?, interval: BillingInterval): CheckoutLink {
+        val link = backend.startCheckout(phone, interval)
         store.write(userId, link.txnId)
         return link
     }

@@ -1,5 +1,6 @@
 package com.autoomstudio.mp3studio.data.billing
 
+import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -26,8 +27,10 @@ class BillingRepositoryTest {
         val asked = mutableListOf<String?>()
         var fail: BillingError? = null
         var cancels = 0
+        val intervals = mutableListOf<BillingInterval>()
 
-        override suspend fun startCheckout(phone: String?): CheckoutLink {
+        override suspend fun startCheckout(phone: String?, interval: BillingInterval): CheckoutLink {
+            intervals += interval
             fail?.let { throw BillingException(it) }
             return CheckoutLink("https://u.payu.in/x", "MPNEW", BillingMode.Autopay)
         }
@@ -54,8 +57,9 @@ class BillingRepositoryTest {
 
     @Test
     fun checkoutRemembersTheTransactionForTheUser() = runTest {
-        val link = repository.startCheckout("u1", "9876543210")
+        val link = repository.startCheckout("u1", "9876543210", BillingInterval.Year)
         assertEquals("MPNEW", link.txnId)
+        assertEquals(listOf(BillingInterval.Year), backend.intervals)
         assertEquals("u1" to "MPNEW", store.value)
         assertEquals("MPNEW", repository.pendingTxnId("u1"))
         assertNull("Another account doesn't see it", repository.pendingTxnId("u2"))
@@ -65,7 +69,7 @@ class BillingRepositoryTest {
     fun aFailedCheckoutRemembersNothing() = runTest {
         backend.fail = BillingError.PaymentInProgress
         try {
-            repository.startCheckout("u1", null)
+            repository.startCheckout("u1", null, BillingInterval.Month)
             fail()
         } catch (e: BillingException) {
             assertEquals(BillingError.PaymentInProgress, e.error)
@@ -144,6 +148,8 @@ class BillingRepositoryTest {
         assertEquals(BillingError.PhoneRequired, billingErrorOf(409, """{"error":"phone_required"}"""))
         assertEquals(BillingError.MandateUpdatePending, billingErrorOf(409, """{"error":"mandate_update_pending"}"""))
         assertEquals(BillingError.AlreadySubscribed, billingErrorOf(409, """{"error":"already_subscribed"}"""))
+        assertEquals(BillingError.SwitchNotYet, billingErrorOf(409, """{"error":"switch_not_yet"}"""))
+        assertEquals(BillingError.InvalidInterval, billingErrorOf(400, """{"error":"invalid_interval"}"""))
         assertEquals(BillingError.RateLimited, billingErrorOf(429, """{"error":"rate_limited"}"""))
         assertEquals(BillingError.Unavailable, billingErrorOf(503, """{"error":"payu_unavailable"}"""))
         assertEquals(BillingError.Unavailable, billingErrorOf(503, ""))

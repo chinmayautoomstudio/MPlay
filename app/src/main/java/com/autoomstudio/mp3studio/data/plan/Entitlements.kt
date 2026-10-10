@@ -42,6 +42,17 @@ enum class AutopayStatus {
     }
 }
 
+/** How long one Pro payment lasts (`billing_interval`): ₹99 a month or ₹999 a year, priced on the server. */
+enum class BillingInterval(val wire: String) {
+    Month("month"), Year("year");
+
+    val other: BillingInterval get() = if (this == Month) Year else Month
+
+    companion object {
+        fun of(value: String?): BillingInterval = if (value == "year") Year else Month
+    }
+}
+
 /** Server flag `PAYU_BILLING_MODE`: recurring autopay links, or one-time links renewed by hand each month. */
 enum class BillingMode {
     Autopay, Manual;
@@ -63,6 +74,8 @@ data class Entitlements(
     val trialEndsAt: Long? = null,
     /** The subscription that gives Pro now, if any. */
     val subscriptionStatus: SubscriptionStatus? = null,
+    /** Monthly or yearly for a paid PayU subscription; null for Admin-granted Pro. */
+    val subscriptionInterval: BillingInterval? = null,
     val subscriptionExpiresAt: Long? = null,
     val subscriptionNextBillingAt: Long? = null,
     val cancelAtPeriodEnd: Boolean = false,
@@ -95,6 +108,7 @@ data class BillingState(
     val cancelAtPeriodEnd: Boolean = false,
     /** Cancellation asked for but PayU hasn't confirmed the mandate is revoked yet (CN4). */
     val cancelPending: Boolean = false,
+    val interval: BillingInterval = BillingInterval.Month,
 )
 
 /** An unfinished payment attempt; [resolveUntil] is set while the bank hasn't answered. */
