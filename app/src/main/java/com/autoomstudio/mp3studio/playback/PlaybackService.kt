@@ -315,22 +315,38 @@ class PlaybackService : MediaSessionService() {
 
     private inner class SessionCallback : MediaSession.Callback {
 
-        /** Only MPlay's own controllers may use the sleep timer and lofi commands. */
+        /**
+         * Nothing controls playback while signed out (PRD AU4). Signed in, MPlay's own controllers get everything,
+         * trusted system controllers get playback controls without changing the queue, and other apps are refused.
+         */
         @OptIn(UnstableApi::class)
         override fun onConnectAsync(
             session: MediaSession,
             controller: MediaSession.ControllerInfo,
         ): ListenableFuture<MediaSession.ConnectionResult> = serviceScope.future {
-            // Nothing controls playback while signed out (PRD AU4): not the app, the notification or the system.
-            if (authRepository.awaitReady() !is AuthState.SignedIn) {
-                return@future MediaSession.ConnectionResult.reject()
-            }
+            val access = controllerAccess(
+                signedIn = authRepository.awaitReady() is AuthState.SignedIn,
+                ownPackage = controller.packageName == packageName,
+                trusted = controller.isTrusted ||
+                    session.isMediaNotificationController(controller) ||
+                    session.isAutoCompanionController(controller) ||
+                    session.isAutomotiveController(controller),
+            )
             val result = MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
                 .setSessionExtras(session.sessionExtras)
-            if (controller.packageName == packageName) {
-                val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
-                PlaybackCommands.all.forEach(commands::add)
-                result.setAvailableSessionCommands(commands.build())
+            when (access) {
+                ControllerAccess.Rejected -> {
+                    Log.d(TAG, "Refused controller ${controller.packageName}")
+                    return@future MediaSession.ConnectionResult.reject()
+                }
+                ControllerAccess.Transport -> result.setAvailablePlayerCommands(
+                    transportPlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS),
+                )
+                ControllerAccess.Full -> {
+                    val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                    PlaybackCommands.all.forEach(commands::add)
+                    result.setAvailableSessionCommands(commands.build())
+                }
             }
             result.build()
         }
@@ -378,13 +394,17 @@ class PlaybackService : MediaSessionService() {
             )
         }
 
-        /** Every item added by any controller plays the version matching the current mode. */
+        /** Only MPlay itself adds songs; each plays the version matching the current mode. */
         override fun onAddMediaItems(
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
             mediaItems: MutableList<MediaItem>,
         ): ListenableFuture<MutableList<MediaItem>> =
-            Futures.immediateFuture(mediaItems.mapTo(ArrayList(mediaItems.size), ::resolve))
+            if (controller.packageName != packageName) {
+                Futures.immediateFailedFuture(UnsupportedOperationException("Only MPlay may add songs"))
+            } else {
+                Futures.immediateFuture(mediaItems.mapTo(ArrayList(mediaItems.size), ::resolve))
+            }
     }
 
     /**
@@ -435,6 +455,7 @@ class PlaybackService : MediaSessionService() {
     private companion object {
         const val PERIODIC_SAVE_MS = 10_000L
         const val SWITCH_TAG = "StemSwitch"
+        const val TAG = "PlaybackService"
 
         /** Slightly slowed, with the pitch kept close to the original so voices don't turn deep. */
         val LOFI_PLAYBACK = PlaybackParameters(0.85f, 0.98f)

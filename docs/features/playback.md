@@ -29,6 +29,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `ui/playback/MiniPlayer.kt` | Title/artist, play/pause, next, scrub strip, metronome indicator. |
 | `ui/playback/NowPlayingScreen.kt` | Artwork, seek bar, transport, `StemModeSelector`, chip row (lofi, metronome, separator, sing-along), sheets. |
 | `ui/playback/PlayPauseIcon.kt` | Lottie play/pause morph with icon fallback. |
+| `playback/ControllerAccess.kt` | `ControllerAccess` (Full, Transport, Rejected), `controllerAccess()` and `transportPlayerCommands()` for controllers of the exported service. |
 | `ui/playback/SwipeToSkip.kt` | `swipeToSkip` modifier, `SwipeSkipState` and `swipeDecision()`: swipe the album art or mini player to change song. |
 | `ui/playback/SleepTimerSheet.kt` | Presets, end of song, 1-180 min slider, remaining-time chip. |
 
@@ -42,10 +43,10 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 - The session activity `PendingIntent` opens `MainActivity` with `EXTRA_OPEN_NOW_PLAYING`. Notifications use Media3's default provider.
 - The session's bitmap loader is `CacheBitmapLoader(AlbumArtBitmapLoader(...))`. Album-art URIs go through `AlbumArtLoader`, so songs in `Download/` (where MediaProvider refuses thumbnails) get their embedded cover in the notification. Other URIs go to `DataSourceBitmapLoader`. When a song has no art, the future fails and Media3 logs "Failed to load bitmap", which is expected. See [library](library.md#album-art).
 - `SessionCallback`:
-  - `onConnectAsync` waits for `AuthRepository.awaitReady()` and rejects every controller (app, notification, system UI, Bluetooth) while signed out (PRD AU4). Signed in, it grants `PlaybackCommands.all` only to the app's own package.
+  - `onConnectAsync` waits for `AuthRepository.awaitReady()` and rejects every controller (app, notification, system UI, Bluetooth) while signed out (PRD AU4). Signed in, `controllerAccess()` decides: the app's own package (app, widget) gets `Full` (default commands plus `PlaybackCommands.all`); a trusted controller (`isTrusted`, the media notification controller, Android Auto companion or Automotive) gets `Transport` (`transportPlayerCommands()`: default player commands minus `NON_TRANSPORT_COMMANDS`, so no queue, volume, speed or track changes); any other app is rejected and logged at debug level.
   - `onCustomCommand` handles the commands below; anything else returns `ERROR_NOT_SUPPORTED`.
   - `onPlaybackResumption` rebuilds the saved queue for play requests from the widget, headset or system UI. It throws while signed out.
-  - `onAddMediaItems` maps items through `resolve()` so the current `StemMode` applies.
+  - `onAddMediaItems` refuses items from any other package (failed future) and maps the app's own items through `resolve()` so the current `StemMode` applies.
 - After a sign-in, a collector on `AuthRepository.state` waits for `SignedOut`, then `stopForSignOut()` saves the queue, cancels the sleep timer, stops and clears the player and calls `stopSelf()`. The saved queue (DataStore `playback_session`) is kept, so the next sign-in can resume it.
 - `onTaskRemoved` (app swiped away from recents) always saves the queue, cancels the sleep timer, calls `TaskRemoval.onTaskRemoved()` (stops the metronome, sing-along and separation, see [architecture](../architecture.md#removal-from-recents)) and calls Media3's `pauseAllPlayersAndStopSelf()`, which pauses, dismisses the notification and stops the service, so music never keeps playing without the app. A plain `stopSelf()` isn't enough: Media3 re-posts the notification for the loaded queue and restarts the service. The saved queue lets the next launch, the widget or a headset press resume it. `onDestroy` clears `musicPlaying`, saves, publishes a paused widget state and releases.
 
@@ -106,6 +107,7 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 - `playback/SessionRestoreTest.kt`: missing songs, index shift, fallback, clamping.
 - `playback/SleepTimerTest.kt`: start, clamp, extend, expiry, fade curve, speed-adjusted end of song.
 - `ui/playback/SwipeToSkipTest.kt`: swipe threshold, fling, blocked directions.
+- `playback/ControllerAccessTest.kt`: access per controller kind, transport keeps playback controls and drops queue changes.
 - No tests for the service, controller, runner or the rest of the UI.
 
 ## Known limitations and TODOs
@@ -134,3 +136,4 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 | 2026-10-08 | - | `onTaskRemoved` also reports the removal to `TaskRemoval`, which stops the other background features. |
 | 2026-10-10 | - | `AlbumArtBitmapLoader` on the session, so the notification shows the cover of songs in `Download/`. |
 | 2026-10-10 | - | Swipe the album art or mini player left/right for the next/previous song (`SwipeToSkip.kt`, `PlayerActions.previousTrack()`). |
+| 2026-10-10 | - | Controller policy for the exported service: other apps refused, trusted system controllers transport-only, `onAddMediaItems` limited to the app (`ControllerAccess.kt`). |

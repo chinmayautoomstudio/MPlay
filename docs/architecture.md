@@ -117,7 +117,7 @@ flowchart LR
 
 | Component | Kind | Foreground type | Notes |
 |---|---|---|---|
-| `playback.PlaybackService` | `MediaSessionService`, exported | `mediaPlayback` | Owns ExoPlayer and MediaSession. Rejects all controllers while signed out and stops on sign-out. See [playback](features/playback.md). |
+| `playback.PlaybackService` | `MediaSessionService`, exported | `mediaPlayback` | Owns ExoPlayer and MediaSession. Rejects all controllers while signed out and stops on sign-out. Exported only for system controls: signed in, MPlay's own controllers get full access, trusted system controllers (notification, System UI, Bluetooth, Android Auto/Automotive, notification listeners) get playback controls without changing the queue, and other apps are refused (`playback/ControllerAccess.kt`). See [playback](features/playback.md). |
 | `metronome.MetronomeService` | Service | `mediaPlayback` | Separate so the metronome runs while music is paused. Notification ID 4201. |
 | `singalong.RecordingService` | Service | `microphone` | Only while a take is being prepared or recorded. Notification ID 4301. |
 | `SeparationWorker` (via WorkManager `SystemForegroundService`) | `CoroutineWorker` | `mediaProcessing` (35+) / `dataSync` (29-34) | Notification IDs 4101/4102. |
@@ -187,3 +187,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-10 | - | `albumArtLoader` in `AppContainer`; `MPlayApp` is the Coil `SingletonImageLoader.Factory` (registers `AlbumArtFetcher`). |
 | 2026-10-10 | - | Payments: `billingRepository` in `AppContainer`, `androidx.browser`, the `/pay/return` App Link on `MainActivity` (`pay.returnHost`, `BuildConfig.PAY_RETURN_HOST`), `BillingHost` in `MPlayRoot`, `ProfilePage.PaymentHistory`, `AdminPage.Payments`; `web/` folder with the return page and `assetlinks.json` template. |
 | 2026-10-10 | - | `AdminActivityWorker` (periodic, scheduled by `AuthEffects` for admins) and notification channel `admin_activity`; `MainActivity` handles `ACTION_OPEN_ADMIN_ACTIVITY`. |
+| 2026-10-10 | - | `PlaybackService` controller policy: other apps are refused, trusted system controllers get transport-only commands (`ControllerAccess`). |
