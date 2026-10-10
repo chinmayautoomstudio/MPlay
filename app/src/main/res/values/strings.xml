@@ -294,6 +294,9 @@
     <string name="admin_cancel_subscription">Cancel subscription</string>
     <string name="admin_cancel_subscription_title">Cancel this subscription?</string>
     <string name="admin_cancel_subscription_message">The PayU autopay for %1$s is cancelled. Pro stays until the paid period ends.</string>
+    <string name="admin_revoke_subscription">Revoke subscription</string>
+    <string name="admin_revoke_subscription_title">Revoke this subscription?</string>
+    <string name="admin_revoke_subscription_message">Pro ends now for %1$s. Any PayU autopay is cancelled. Nothing is refunded; use Refund on the payment if needed.</string>
     <string name="admin_health_title">Billing health</string>
     <string name="admin_health_ok">All billing jobs ran on time and nothing needs attention.</string>
     <string name="admin_health_job">%1$s: last run %2$s</string>
@@ -308,6 +311,8 @@
     <string name="admin_msg_refund_requested">Refund requested; it applies when PayU confirms it</string>
     <string name="admin_msg_subscription_cancelled">Subscription cancelled</string>
     <string name="admin_msg_cancel_pending">Renewals stopped; PayU hasn\'t confirmed the cancellation yet and it is retried automatically</string>
+    <string name="admin_msg_subscription_revoked">Subscription revoked; Pro has ended</string>
+    <string name="admin_msg_revoke_pending">Pro has ended; PayU hasn\'t confirmed the autopay cancellation yet and it is retried automatically</string>
     <string name="admin_error_not_refundable">This payment can\'t be refunded</string>
     <string name="admin_error_not_subscribed">This user has no active PayU subscription</string>
     <string name="admin_error_payu_refused">PayU refused the request. Try again later.</string>
@@ -373,6 +378,8 @@
     <string name="admin_audit_revoke_invite">Revoked the admin invite for %s</string>
     <string name="admin_audit_grant_pro">Granted Pro to %1$s until %2$s</string>
     <string name="admin_audit_revoke_pro">Removed Pro from %s</string>
+    <string name="admin_audit_cancel_subscription">Cancelled the subscription of %s</string>
+    <string name="admin_audit_revoke_subscription">Revoked the subscription of %s</string>
     <string name="admin_audit_account_deleted">A user deleted their account (%s plan)</string>
     <string name="admin_audit_account_owner">the account owner</string>
     <string name="admin_audit_other">%1$s: %2$s</string>

@@ -368,6 +368,8 @@ private fun auditText(context: Context, entry: AuditEntry): String {
         "revoke_invite" -> res.getString(R.string.admin_audit_revoke_invite, target)
         "grant_pro" -> res.getString(R.string.admin_audit_grant_pro, target, formatDate(context, detail("until")))
         "revoke_pro" -> res.getString(R.string.admin_audit_revoke_pro, target)
+        "cancel_subscription" -> res.getString(R.string.admin_audit_cancel_subscription, target)
+        "revoke_subscription" -> res.getString(R.string.admin_audit_revoke_subscription, target)
         ACCOUNT_DELETED -> res.getString(
             R.string.admin_audit_account_deleted,
             res.getString(

@@ -45,7 +45,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
-private enum class Confirm { MakeAdmin, RemoveAdmin, Disable, RemovePro, CancelSubscription }
+private enum class Confirm { MakeAdmin, RemoveAdmin, Disable, RemovePro, CancelSubscription, RevokeSubscription }
 
 /**
  * One user's details and the Admin actions on them (PRD AD3, AD5-AD8, AD10), with their PayU payments, refunds and
@@ -160,6 +160,11 @@ private fun UserDetail(user: AdminUserDetail, isMe: Boolean, busy: Boolean, view
                 Text(stringResource(R.string.admin_cancel_subscription))
             }
         }
+        if (user.revocableSubscription(System.currentTimeMillis()) != null) {
+            OutlinedButton(onClick = { confirm = Confirm.RevokeSubscription }, enabled = !busy) {
+                Text(stringResource(R.string.admin_revoke_subscription))
+            }
+        }
     }
     user.adminGrant?.let {
         Text(
@@ -223,6 +228,8 @@ private fun UserDetail(user: AdminUserDetail, isMe: Boolean, busy: Boolean, view
             Confirm.RemovePro -> R.string.admin_remove_pro_title to R.string.admin_remove_pro_message
             Confirm.CancelSubscription ->
                 R.string.admin_cancel_subscription_title to R.string.admin_cancel_subscription_message
+            Confirm.RevokeSubscription ->
+                R.string.admin_revoke_subscription_title to R.string.admin_revoke_subscription_message
         }
         AlertDialog(
             onDismissRequest = { confirm = null },
@@ -237,6 +244,7 @@ private fun UserDetail(user: AdminUserDetail, isMe: Boolean, busy: Boolean, view
                         Confirm.Disable -> viewModel.setDisabled(profile.id, true)
                         Confirm.RemovePro -> viewModel.revokePro(profile.id)
                         Confirm.CancelSubscription -> viewModel.cancelSubscription(profile.id)
+                        Confirm.RevokeSubscription -> viewModel.revokeSubscription(profile.id)
                     }
                 }) { Text(stringResource(android.R.string.ok)) }
             },

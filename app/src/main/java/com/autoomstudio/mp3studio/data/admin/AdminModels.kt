@@ -2,6 +2,7 @@ package com.autoomstudio.mp3studio.data.admin
 
 import com.autoomstudio.mp3studio.data.plan.EntitlementsResponse
 import com.autoomstudio.mp3studio.data.plan.UsageDto
+import com.autoomstudio.mp3studio.data.plan.epochMillis
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
@@ -42,7 +43,15 @@ enum class AdminError {
 }
 
 /** What a billing action did once PayU answered. */
-enum class AdminBillingResult { Checked, RefundRequested, Cancelled, CancelPending }
+enum class AdminBillingResult {
+    Checked, RefundRequested, Cancelled, CancelPending,
+
+    /** Pro ended now and any autopay mandate is cancelled. */
+    Revoked,
+
+    /** Pro ended now; PayU hasn't confirmed the mandate cancellation yet and the renewals job retries it. */
+    RevokePending,
+}
 
 class AdminException(val error: AdminError, cause: Throwable? = null) : Exception(error.name, cause)
 
@@ -208,7 +217,15 @@ data class AdminUserDetail(
     /** The PayU subscription an Admin can cancel. */
     val payuSubscription: AdminSubscription?
         get() = subscriptions.firstOrNull { it.provider == "payu" && (it.status == "active" || it.status == "past_due") }
+
+    /** The PayU subscription an Admin can revoke: one that still gives Pro at [now], including a cancelled one. */
+    fun revocableSubscription(now: Long): AdminSubscription? = subscriptions.firstOrNull { sub ->
+        sub.provider == "payu" && sub.status in REVOCABLE_STATUSES &&
+            sub.expiresAt?.let { runCatching { epochMillis(it) > now }.getOrDefault(false) } == true
+    }
 }
+
+private val REVOCABLE_STATUSES = setOf("active", "past_due", "cancelled")
 
 @Serializable
 data class AdminTopUser(val id: String, val email: String? = null, val name: String? = null, val completed: Int)

@@ -42,6 +42,9 @@ interface AdminBackend {
     /** Cancels the user's PayU autopay; Pro stays until the paid period ends. */
     suspend fun cancelSubscription(userId: String): AdminBillingResult
 
+    /** Ends the user's PayU Pro now and cancels any autopay mandate; nothing is refunded. */
+    suspend fun revokeSubscription(userId: String): AdminBillingResult
+
     companion object {
         const val PAGE_SIZE = 50
     }
@@ -133,6 +136,12 @@ class SupabaseAdminBackend(private val client: SupabaseClient) : AdminBackend {
         when (call<ResultDto>("cancelSubscription") { put("userId", userId) }.result) {
             "cancelled" -> AdminBillingResult.Cancelled
             else -> AdminBillingResult.CancelPending
+        }
+
+    override suspend fun revokeSubscription(userId: String): AdminBillingResult =
+        when (call<ResultDto>("revokeSubscription") { put("userId", userId) }.result) {
+            "revoked" -> AdminBillingResult.Revoked
+            else -> AdminBillingResult.RevokePending
         }
 
     private suspend inline fun <reified T> call(action: String, fields: JsonObjectBuilder.() -> Unit = {}): T {

@@ -2,7 +2,8 @@
 // The caller's id comes from the verified token and the SQL functions refuse anyone who isn't an enabled Admin, so
 // the app's own isAdmin flag only decides whether the Admin screens are shown. Billing actions are checked and
 // audit-logged in SQL first, then call PayU: reverify re-checks a payment or refund, refundPayment asks PayU for a
-// full refund (state changes only when PayU confirms it), cancelSubscription cancels the user's mandate.
+// full refund (state changes only when PayU confirms it), cancelSubscription cancels the user's mandate (Pro stays
+// to the period end), revokeSubscription ends Pro now and cancels any mandate (nothing is refunded).
 import { confirmRevoked, payuFromEnv, resolvePayment, resolveRefund, rpc } from "../_shared/billing.ts";
 import { type AdminCall, parseAdminRequest, REFUSALS } from "../_shared/admin.ts";
 import { adminClient, caller, json, readJson } from "../_shared/server.ts";
@@ -16,9 +17,27 @@ type ActionInfo = {
   refundablePaise?: number;
   refundRequestId?: string | null;
   userId?: string;
+  subscriptionId?: string;
 };
 
+/** Ends the subscription now, then cancels a live mandate with PayU; without a mandate PayU isn't needed. */
+async function revokeStep(admin: SupabaseClient, subscriptionId: string): Promise<Response> {
+  const revoked = await rpc<{ result?: string; error?: string; mandateRef?: string; method?: string }>(
+    admin,
+    "revoke_subscription",
+    { p_sub: subscriptionId },
+  );
+  if (revoked.error) return json({ error: revoked.error }, 409);
+  if (!revoked.mandateRef) return json({ result: "revoked" });
+  const env = payuFromEnv();
+  const ok = env
+    ? await confirmRevoked(admin, env.payu, subscriptionId, revoked.mandateRef, revoked.method ?? null)
+    : false;
+  return json({ result: ok ? "revoked" : "revoke_pending" });
+}
+
 async function payuStep(admin: SupabaseClient, call: AdminCall, info: ActionInfo): Promise<Response> {
+  if (call.payu === "revoke_subscription") return await revokeStep(admin, info.subscriptionId!);
   const env = payuFromEnv();
   if (!env) return json({ error: "payu_unavailable" }, 503);
 

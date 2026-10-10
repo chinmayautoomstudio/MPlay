@@ -5,7 +5,7 @@ const TXN = /^[A-Za-z0-9]{1,25}$/;
 export const PAGE_MAX = 100;
 
 /** A billing action that also calls PayU after `admin_billing_action` has checked and logged it. */
-export type PayuStep = "reverify" | "refund" | "cancel_subscription";
+export type PayuStep = "reverify" | "refund" | "cancel_subscription" | "revoke_subscription";
 
 /** The SQL function an admin request maps to and its arguments, without `p_actor`. */
 export type AdminCall = { fn: string; args: Record<string, unknown>; payu?: PayuStep };
@@ -120,15 +120,11 @@ export function parseAdminRequest(body: unknown): AdminCall | null {
       const step: PayuStep = b.action === "refundPayment" ? "refund" : "reverify";
       return t ? { fn: "admin_billing_action", args: { p_action: step, p_user: null, p_txn: t }, payu: step } : null;
     }
-    case "cancelSubscription": {
+    case "cancelSubscription":
+    case "revokeSubscription": {
       const id = userId(b.userId);
-      return id
-        ? {
-          fn: "admin_billing_action",
-          args: { p_action: "cancel_subscription", p_user: id, p_txn: null },
-          payu: "cancel_subscription",
-        }
-        : null;
+      const step: PayuStep = b.action === "revokeSubscription" ? "revoke_subscription" : "cancel_subscription";
+      return id ? { fn: "admin_billing_action", args: { p_action: step, p_user: id, p_txn: null }, payu: step } : null;
     }
     case "audit": {
       const limit = count(b.limit, 50, PAGE_MAX);

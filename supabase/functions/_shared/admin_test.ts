@@ -61,6 +61,12 @@ Deno.test("Billing actions", () => {
   assertEquals(parseAdminRequest({ action: "payments", filter: "stolen" }), null);
   assertEquals(parseAdminRequest({ action: "refundPayment", txnId: "MP-1; x" }), null);
   assertEquals(parseAdminRequest({ action: "cancelSubscription", userId: "1" }), null);
+  assertEquals(parseAdminRequest({ action: "revokeSubscription", userId: id }), {
+    fn: "admin_billing_action",
+    args: { p_action: "revoke_subscription", p_user: id, p_txn: null },
+    payu: "revoke_subscription",
+  });
+  assertEquals(parseAdminRequest({ action: "revokeSubscription", userId: "1" }), null);
 });
 
 Deno.test("Malformed requests are rejected", () => {

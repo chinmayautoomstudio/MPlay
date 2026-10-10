@@ -91,6 +91,8 @@ Scheduled by pg_cron through `run_billing_job()` and the `billing-jobs` function
 
 Cancel autopay (`subscription` with `{action: "cancel"}`) stops renewals at once and asks PayU to revoke the mandate. Pro stays until the paid period ends. If PayU doesn't confirm, the answer is `cancel_pending` and the `renewals` job retries.
 
+An Admin can also revoke a PayU subscription (`revokeSubscription`, [admin](admin.md)): Pro ends at once (`revoke_subscription()` sets it `expired` now), renewals stop and any mandate is cancelled, retried by the `renewals` job if PayU doesn't confirm. Nothing is refunded.
+
 Deleting the account cancels any live mandate first; if PayU refuses, deletion stops with `mandate_cancel_failed` ("We couldn't cancel your autopay...", [accounts](accounts.md)).
 
 ### Refunds and disputes
@@ -134,6 +136,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-10 | - | Admin revoke subscription: ends PayU Pro now and cancels any mandate, without a refund. |
 | 2026-10-10 | - | Payment-link payments are verified under PayU's own txnid (from the webhook or the link's transactions); a webhook hash mismatch no longer drops the event. First test payment confirmed. |
 | 2026-10-10 | - | Deployed to the live server in PayU test mode with manual renewal. |
 | 2026-10-10 | - | PayU Payment Links: checkout with autopay or manual mode, server verification, Plans billing status, cancel autopay, renewals and expiry jobs, refunds and disputes, payment history and receipts, admin payments. |

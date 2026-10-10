@@ -13,6 +13,7 @@ import com.autoomstudio.mp3studio.data.admin.AdminPaymentPage
 import com.autoomstudio.mp3studio.data.admin.AdminPaymentRow
 import com.autoomstudio.mp3studio.data.admin.PaymentFilter
 import com.autoomstudio.mp3studio.data.admin.AdminProfile
+import com.autoomstudio.mp3studio.data.admin.AdminSubscription
 import com.autoomstudio.mp3studio.data.admin.AdminUsage
 import com.autoomstudio.mp3studio.data.admin.AdminUserDetail
 import com.autoomstudio.mp3studio.data.admin.AdminUserPage
@@ -20,6 +21,7 @@ import com.autoomstudio.mp3studio.data.admin.AdminUserRow
 import com.autoomstudio.mp3studio.data.admin.AuditEntry
 import com.autoomstudio.mp3studio.data.admin.UserFilter
 import com.autoomstudio.mp3studio.data.plan.UsageDto
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,7 +59,10 @@ class AdminViewModelTest {
             failWith?.let { throw AdminException(it) }
         }
 
+        var overviewGate: CompletableDeferred<Unit>? = null
+
         override suspend fun overview(): AdminOverview {
+            overviewGate?.await()
             check()
             return AdminOverview(3, 0, 1, 2, 0, 1, 4, 0, 1, "2026-10-05")
         }
@@ -115,6 +120,14 @@ class AdminViewModelTest {
             return AdminBillingResult.RefundRequested
         }
         override suspend fun cancelSubscription(userId: String) = cancelResult.also { check() }
+
+        val revoked = mutableListOf<String>()
+        var revokeResult = AdminBillingResult.Revoked
+        override suspend fun revokeSubscription(userId: String): AdminBillingResult {
+            check()
+            revoked += userId
+            return revokeResult
+        }
     }
 
     private val backend = FakeBackend()
@@ -139,6 +152,46 @@ class AdminViewModelTest {
         assertEquals(3, vm.activity.value.data?.size)
         assertEquals(Instant.parse("2026-10-08T10:00:00Z").toEpochMilli(), seenAt.value)
         assertEquals(0, vm.unread.value)
+    }
+
+    @Test
+    fun pullToRefreshShowsItsIndicatorUntilEveryPartHasAnswered() = runTest(dispatcher) {
+        val vm = viewModel()
+        backend.overviewGate = CompletableDeferred()
+        backend.queries.clear()
+        vm.refresh()
+        assertTrue(vm.refreshing.value)
+        assertFalse("The page's own spinner stays hidden", vm.overview.value.loading)
+        assertEquals(listOf("" to UserFilter.All), backend.queries)
+        backend.overviewGate!!.complete(Unit)
+        assertFalse(vm.refreshing.value)
+        assertEquals(3, vm.overview.value.data?.users)
+    }
+
+    @Test
+    fun aFailedPullShowsTheErrorButAFailedAutoRefreshKeepsTheData() = runTest(dispatcher) {
+        val vm = viewModel()
+        backend.failWith = AdminError.Offline
+        vm.autoRefresh()
+        assertEquals(3, vm.overview.value.data?.users)
+        assertEquals(null, vm.overview.value.error)
+        assertEquals(null, vm.users.value.error)
+        assertEquals(listOf("u1"), vm.users.value.users.map { it.id })
+
+        vm.refresh()
+        assertFalse(vm.refreshing.value)
+        assertEquals(AdminError.Offline, vm.users.value.error)
+        assertEquals(listOf("u1"), vm.users.value.users.map { it.id })
+    }
+
+    @Test
+    fun autoRefreshFetchesTheVisiblePageQuietly() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.open(AdminPage.Payments)
+        backend.paymentQueries.clear()
+        vm.autoRefresh()
+        assertEquals(listOf("" to PaymentFilter.All), backend.paymentQueries)
+        assertFalse(vm.payments.value.loading)
     }
 
     @Test
@@ -215,6 +268,40 @@ class AdminViewModelTest {
         backend.failWith = AdminError.NotRefundable
         vm.refundPayment("MP1")
         assertEquals(AdminMessage.Failed(AdminError.NotRefundable), vm.messages.first())
+    }
+
+    @Test
+    fun revokingASubscriptionReportsWhetherPayUConfirmed() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.revokeSubscription("u1")
+        assertEquals(listOf("u1"), backend.revoked)
+        assertEquals(AdminMessage.Billing(AdminBillingResult.Revoked), vm.messages.first())
+        assertTrue("Someone else's plan isn't refreshed", refreshed.isEmpty())
+
+        backend.revokeResult = AdminBillingResult.RevokePending
+        vm.revokeSubscription("me")
+        assertEquals(AdminMessage.Billing(AdminBillingResult.RevokePending), vm.messages.first())
+        assertEquals("Revoking your own subscription refreshes your plan", listOf("me"), refreshed)
+
+        backend.failWith = AdminError.NotSubscribed
+        vm.revokeSubscription("u1")
+        assertEquals(AdminMessage.Failed(AdminError.NotSubscribed), vm.messages.first())
+    }
+
+    @Test
+    fun onlyAPayUSubscriptionThatStillGivesProCanBeRevoked() {
+        val now = Instant.parse("2026-10-10T00:00:00Z").toEpochMilli()
+        fun detail(vararg subs: AdminSubscription) = AdminUserDetail(
+            profile = AdminProfile("u1", role = "user", disabled = false, createdAt = "2026-10-08T00:00:00+00:00"),
+            usage = UsageDto(10, 0, 0, 10, "2026-10-11T18:30:00+00:00", false),
+            subscriptions = subs.toList(),
+        )
+        val later = "2026-11-10T00:00:00+00:00"
+        assertEquals("cancelled", detail(AdminSubscription("payu", "cancelled", expiresAt = later)).revocableSubscription(now)?.status)
+        assertEquals("active", detail(AdminSubscription("payu", "active", expiresAt = later)).revocableSubscription(now)?.status)
+        assertEquals(null, detail(AdminSubscription("payu", "cancelled", expiresAt = "2026-10-09T00:00:00+00:00")).revocableSubscription(now))
+        assertEquals(null, detail(AdminSubscription("payu", "expired", expiresAt = later)).revocableSubscription(now))
+        assertEquals(null, detail(AdminSubscription("admin", "active", expiresAt = later)).revocableSubscription(now))
     }
 
     @Test

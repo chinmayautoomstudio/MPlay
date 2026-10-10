@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 
 /** Pages inside Settings > Admin; the first is the home page. */
@@ -61,6 +62,12 @@ data class PaymentListState(
 
 /** One page's data as fetched from the server. */
 data class Loadable<T>(val data: T? = null, val loading: Boolean = false, val error: AdminError? = null)
+
+/**
+ * How a fetch shows itself: [Normal] with the page's own spinners, [Pull] under the pull-to-refresh indicator, and
+ * [Auto] (the periodic refresh) without any indicator, keeping the shown data when it fails.
+ */
+private enum class LoadMode { Normal, Pull, Auto }
 
 data class UserListState(
     val query: String = "",
@@ -146,6 +153,11 @@ class AdminViewModel(
     /** An action is running; action buttons are disabled meanwhile. */
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
 
+    private val _refreshing = MutableStateFlow(false)
+
+    /** A pull-to-refresh is running. */
+    val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()
+
     private val _closed = MutableStateFlow(false)
     val closed: StateFlow<Boolean> = _closed.asStateFlow()
 
@@ -177,20 +189,56 @@ class AdminViewModel(
 
     /** Fetches the current page again. */
     fun reload() {
-        when (val page = _page.value) {
-            AdminPage.Home -> loadHome()
+        loadPage(LoadMode.Normal)
+    }
+
+    /** Pull-to-refresh: fetches the current page again and keeps [refreshing] set until every part has answered. */
+    fun refresh() {
+        if (_refreshing.value || _closed.value) return
+        _refreshing.value = true
+        viewModelScope.launch {
+            try {
+                loadPage(LoadMode.Pull).joinAll()
+            } finally {
+                _refreshing.value = false
+            }
+        }
+    }
+
+    /**
+     * The periodic refresh: quietly fetches the current page again. Skipped while an action, a pull or a load is
+     * running, and lists the admin has paged past their first page are left alone so their scroll position holds.
+     */
+    fun autoRefresh() {
+        if (_busy.value || _refreshing.value || _closed.value) return
+        loadPage(LoadMode.Auto)
+    }
+
+    private fun loadPage(mode: LoadMode): List<Job> {
+        val auto = mode == LoadMode.Auto
+        return when (val page = _page.value) {
+            AdminPage.Home -> listOfNotNull(
+                load(_overview, mode) { backend.overview() },
+                loadActivity(markSeen = false, mode),
+                _users.value.takeUnless { auto && (it.loading || it.users.size > AdminBackend.PAGE_SIZE) }
+                    ?.let { searchUsers(immediately = true, mode) },
+            )
             is AdminPage.User -> {
                 if (_detail.value.data?.profile?.id != page.id) _detail.value = Loadable()
-                load(_detail) { backend.user(page.id) }
+                listOf(load(_detail, mode) { backend.user(page.id) })
             }
-            AdminPage.Admins -> load(_admins) { backend.admins() }
-            AdminPage.Usage -> load(_usage) { backend.usage() }
-            AdminPage.Audit -> loadAudit(more = false)
-            AdminPage.Activity -> loadActivity(markSeen = true)
-            AdminPage.Payments -> {
-                load(_health) { backend.billingHealth() }
-                searchPayments(immediately = true)
-            }
+            AdminPage.Admins -> listOf(load(_admins, mode) { backend.admins() })
+            AdminPage.Usage -> listOf(load(_usage, mode) { backend.usage() })
+            AdminPage.Audit -> listOfNotNull(
+                _audit.value.takeUnless { auto && it.entries.size > AdminBackend.PAGE_SIZE }
+                    ?.let { loadAudit(more = false, mode) },
+            )
+            AdminPage.Activity -> listOf(loadActivity(markSeen = true, mode))
+            AdminPage.Payments -> listOfNotNull(
+                load(_health, mode) { backend.billingHealth() },
+                _payments.value.takeUnless { auto && (it.loading || it.payments.size > AdminBackend.PAGE_SIZE) }
+                    ?.let { searchPayments(immediately = true, mode) },
+            )
         }
     }
 
@@ -204,20 +252,22 @@ class AdminViewModel(
         searchPayments(immediately = true)
     }
 
-    private fun searchPayments(immediately: Boolean) {
+    private fun searchPayments(immediately: Boolean, mode: LoadMode = LoadMode.Normal): Job {
         searchJob?.cancel()
-        searchJob = viewModelScope.launch {
+        return viewModelScope.launch {
             if (!immediately) delay(searchDelayMillis)
             val state = _payments.value
-            _payments.update { it.copy(loading = true, error = null) }
+            if (mode == LoadMode.Normal) _payments.update { it.copy(loading = true, error = null) }
             try {
                 val page = backend.payments(state.query.trim(), state.filter, offset = 0)
-                _payments.update { it.copy(payments = page.payments, total = page.total, loading = false) }
+                _payments.update {
+                    it.copy(payments = page.payments, total = page.total, loading = false, error = null)
+                }
             } catch (e: AdminException) {
-                _payments.update { it.copy(loading = false, error = e.error) }
+                if (mode != LoadMode.Auto) _payments.update { it.copy(loading = false, error = e.error) }
                 onForbidden(e.error)
             }
-        }
+        }.also { searchJob = it }
     }
 
     fun loadMorePayments() {
@@ -245,25 +295,24 @@ class AdminViewModel(
         AdminMessage.Billing(result)
     }
 
-    private fun loadHome() {
-        load(_overview) { backend.overview() }
-        loadActivity(markSeen = false)
-        searchUsers(immediately = true)
+    fun revokeSubscription(userId: String) = actFor {
+        val result = backend.revokeSubscription(userId)
+        if (userId == currentUserId()) refreshOwnPlan(userId)
+        AdminMessage.Billing(result)
     }
 
-    private fun loadActivity(markSeen: Boolean) {
+    private fun loadActivity(markSeen: Boolean, mode: LoadMode = LoadMode.Normal): Job =
         viewModelScope.launch {
-            _activity.update { it.copy(loading = true, error = null) }
+            if (mode == LoadMode.Normal) _activity.update { it.copy(loading = true, error = null) }
             try {
                 val events = backend.activity()
                 _activity.value = Loadable(data = events)
                 if (markSeen) events.maxOfOrNull(::eventMillis)?.let { markActivitySeen(it) }
             } catch (e: AdminException) {
-                _activity.update { it.copy(loading = false, error = e.error) }
+                if (mode != LoadMode.Auto) _activity.update { it.copy(loading = false, error = e.error) }
                 onForbidden(e.error)
             }
         }
-    }
 
     fun setQuery(query: String) {
         _users.update { it.copy(query = query) }
@@ -275,20 +324,20 @@ class AdminViewModel(
         searchUsers(immediately = true)
     }
 
-    private fun searchUsers(immediately: Boolean) {
+    private fun searchUsers(immediately: Boolean, mode: LoadMode = LoadMode.Normal): Job {
         searchJob?.cancel()
-        searchJob = viewModelScope.launch {
+        return viewModelScope.launch {
             if (!immediately) delay(searchDelayMillis)
             val state = _users.value
-            _users.update { it.copy(loading = true, error = null) }
+            if (mode == LoadMode.Normal) _users.update { it.copy(loading = true, error = null) }
             try {
                 val page = backend.users(state.query.trim(), state.filter, offset = 0)
-                _users.update { it.copy(users = page.users, total = page.total, loading = false) }
+                _users.update { it.copy(users = page.users, total = page.total, loading = false, error = null) }
             } catch (e: AdminException) {
-                _users.update { it.copy(loading = false, error = e.error) }
+                if (mode != LoadMode.Auto) _users.update { it.copy(loading = false, error = e.error) }
                 onForbidden(e.error)
             }
-        }
+        }.also { searchJob = it }
     }
 
     fun loadMoreUsers() {
@@ -307,11 +356,15 @@ class AdminViewModel(
     }
 
     fun loadAudit(more: Boolean) {
+        loadAudit(more, LoadMode.Normal)
+    }
+
+    private fun loadAudit(more: Boolean, mode: LoadMode): Job? {
         val state = _audit.value
-        if (state.loading) return
+        if (state.loading) return null
         val before = if (more) state.entries.lastOrNull()?.id else null
-        viewModelScope.launch {
-            _audit.update { it.copy(loading = true, error = null) }
+        return viewModelScope.launch {
+            if (mode == LoadMode.Normal) _audit.update { it.copy(loading = true, error = null) }
             try {
                 val entries = backend.audit(before)
                 _audit.update {
@@ -319,10 +372,11 @@ class AdminViewModel(
                         entries = if (more) it.entries + entries else entries,
                         hasMore = entries.size >= AdminBackend.PAGE_SIZE,
                         loading = false,
+                        error = null,
                     )
                 }
             } catch (e: AdminException) {
-                _audit.update { it.copy(loading = false, error = e.error) }
+                if (mode != LoadMode.Auto) _audit.update { it.copy(loading = false, error = e.error) }
                 onForbidden(e.error)
             }
         }
@@ -389,15 +443,19 @@ class AdminViewModel(
         }
     }
 
-    private fun <T> load(target: MutableStateFlow<Loadable<T>>, fetch: suspend () -> T) {
-        viewModelScope.launch {
-            target.update { it.copy(loading = true, error = null) }
-            try {
-                target.value = Loadable(data = fetch())
-            } catch (e: AdminException) {
+    private fun <T> load(
+        target: MutableStateFlow<Loadable<T>>,
+        mode: LoadMode = LoadMode.Normal,
+        fetch: suspend () -> T,
+    ): Job = viewModelScope.launch {
+        if (mode == LoadMode.Normal) target.update { it.copy(loading = true, error = null) }
+        try {
+            target.value = Loadable(data = fetch())
+        } catch (e: AdminException) {
+            if (mode != LoadMode.Auto || target.value.data == null) {
                 target.update { it.copy(loading = false, error = e.error) }
-                onForbidden(e.error)
             }
+            onForbidden(e.error)
         }
     }
 
@@ -416,6 +474,9 @@ class AdminViewModel(
     }
 
     companion object {
+        /** How often the visible Admin page is fetched again while the app is in the foreground. */
+        const val AUTO_REFRESH_MILLIS = 30_000L
+
         val Factory = viewModelFactory {
             initializer {
                 val container = (this[APPLICATION_KEY] as MPlayApp).container

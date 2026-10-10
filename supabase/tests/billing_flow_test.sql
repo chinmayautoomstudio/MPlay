@@ -5,7 +5,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(54);
+select plan(65);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -14,7 +14,8 @@ values
     ('dddddddd-0000-0000-0000-000000000003', 'slow@example.com', '{"name": "Slow"}'),
     ('dddddddd-0000-0000-0000-000000000004', 'nomandate@example.com', '{"name": "No Mandate"}'),
     ('dddddddd-0000-0000-0000-000000000005', 'manual@example.com', '{"name": "Manual"}'),
-    ('dddddddd-0000-0000-0000-000000000006', 'billingadmin@example.com', '{"name": "Billing Admin"}');
+    ('dddddddd-0000-0000-0000-000000000006', 'billingadmin@example.com', '{"name": "Billing Admin"}'),
+    ('dddddddd-0000-0000-0000-000000000007', 'revoke@example.com', '{"name": "Revoke"}');
 update public.profiles set phone = '98765000' || right(id::text, 2) where id::text like 'dddddddd-%';
 update public.profiles set role = 'admin' where id = 'dddddddd-0000-0000-0000-000000000006';
 
@@ -195,6 +196,39 @@ select is(public.admin_billing_action('dddddddd-0000-0000-0000-000000000006', 'r
     ->> 'error', 'not_refundable', 'Only a paid payment can be refunded');
 select ok(jsonb_array_length(public.admin_user_detail('dddddddd-0000-0000-0000-000000000006',
     'dddddddd-0000-0000-0000-000000000001') -> 'payments') = 3, 'The user detail lists their payments');
+
+-- Admin revoke subscription ---------------------------------------------------------------------------------
+
+insert into c values ('revoke', public.begin_checkout('dddddddd-0000-0000-0000-000000000007', null, 'autopay'));
+select public.attach_payment_link(pg_temp.txn('revoke'), 'https://pay.example/revoke', 'L-revoke');
+select public.apply_payment_result(pg_temp.txn('revoke'), pg_temp.ok_result(pg_temp.txn('revoke'), 'P-revoke', 'M-revoke', 'UPI'));
+
+select throws_ok($$ select public.admin_billing_action('dddddddd-0000-0000-0000-000000000002', 'revoke_subscription',
+    'dddddddd-0000-0000-0000-000000000007', null) $$, '42501', null, 'A normal user cannot revoke a subscription');
+select is(public.admin_billing_action('dddddddd-0000-0000-0000-000000000006', 'revoke_subscription',
+    'dddddddd-0000-0000-0000-000000000002', null) ->> 'error', 'not_subscribed',
+    'A user without Pro from PayU has nothing to revoke');
+insert into c values ('revoke_action', public.admin_billing_action('dddddddd-0000-0000-0000-000000000006',
+    'revoke_subscription', 'dddddddd-0000-0000-0000-000000000007', null));
+select is((select r ->> 'subscriptionId' from c where who = 'revoke_action'),
+    (pg_temp.sub('dddddddd-0000-0000-0000-000000000007')).id::text, 'Revoking names the live subscription');
+select ok(exists (select 1 from public.admin_audit_log where action = 'revoke_subscription'
+    and target_user_id = 'dddddddd-0000-0000-0000-000000000007'), 'and is audit-logged');
+insert into c values ('revoked', public.revoke_subscription(
+    ((select r ->> 'subscriptionId' from c where who = 'revoke_action'))::uuid));
+select is((select r ->> 'mandateRef' from c where who = 'revoked'), 'M-revoke',
+    'A live mandate is handed back for cancelling with PayU');
+select is((pg_temp.sub('dddddddd-0000-0000-0000-000000000007')).status, 'expired', 'The subscription expires now');
+select is(public.plan_of('dddddddd-0000-0000-0000-000000000007'), 'free', 'and the user is Free at once');
+select ok((pg_temp.sub('dddddddd-0000-0000-0000-000000000007')).mandate_cancel_requested_at is not null
+    and (pg_temp.sub('dddddddd-0000-0000-0000-000000000007')).next_billing_at is null,
+    'Renewals stop and the mandate cancellation is retried until PayU confirms');
+
+select is(public.revoke_subscription((pg_temp.sub('dddddddd-0000-0000-0000-000000000004')).id),
+    '{"result": "revoked"}'::jsonb, 'A cancelled subscription with time left is revoked without PayU');
+select is(public.plan_of('dddddddd-0000-0000-0000-000000000004'), 'free', 'and that user is Free too');
+select is(public.revoke_subscription((pg_temp.sub('dddddddd-0000-0000-0000-000000000004')).id) ->> 'error',
+    'not_subscribed', 'Revoking twice changes nothing');
 
 -- Account deletion keeps payment records (CN6) --------------------------------------------------------------
 

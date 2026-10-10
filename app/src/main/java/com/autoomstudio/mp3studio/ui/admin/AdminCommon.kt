@@ -78,6 +78,8 @@ internal fun AdminMessage.text(resources: Resources): String = when (this) {
             AdminBillingResult.RefundRequested -> R.string.admin_msg_refund_requested
             AdminBillingResult.Cancelled -> R.string.admin_msg_subscription_cancelled
             AdminBillingResult.CancelPending -> R.string.admin_msg_cancel_pending
+            AdminBillingResult.Revoked -> R.string.admin_msg_subscription_revoked
+            AdminBillingResult.RevokePending -> R.string.admin_msg_revoke_pending
         },
     )
 }

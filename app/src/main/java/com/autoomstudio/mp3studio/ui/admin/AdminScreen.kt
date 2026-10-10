@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -43,6 +44,7 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -53,6 +55,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,15 +80,24 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.admin.AdminOverview
 import com.autoomstudio.mp3studio.data.admin.AdminUserRow
 import com.autoomstudio.mp3studio.data.admin.UserFilter
 import com.autoomstudio.mp3studio.ui.components.MPlayWordmark
+import kotlinx.coroutines.delay
 
-/** Profile > Admin (PRD section 6.7). Only offered to Admins; the server refuses everyone else. */
+/**
+ * Profile > Admin (PRD section 6.7). Only offered to Admins; the server refuses everyone else. Every page can be
+ * pulled down to refresh, and the visible page refreshes itself every [AdminViewModel.AUTO_REFRESH_MILLIS] while it
+ * is on screen and the app is in the foreground.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminScreen(
     onBack: () -> Unit,
@@ -107,14 +121,44 @@ fun AdminScreen(
     val goBack = { if (!viewModel.back()) onBack() }
     BackHandler(enabled = backEnabled, onBack = goBack)
 
-    when (val current = page) {
-        AdminPage.Home -> AdminHome(viewModel, modifier)
-        is AdminPage.User -> AdminUserScreen(viewModel, current.id, goBack, modifier)
-        AdminPage.Admins -> AdminAdminsScreen(viewModel, goBack, modifier)
-        AdminPage.Usage -> AdminUsageScreen(viewModel, goBack, modifier)
-        AdminPage.Audit -> AdminAuditScreen(viewModel, goBack, modifier)
-        AdminPage.Activity -> AdminActivityScreen(viewModel, goBack, modifier)
-        AdminPage.Payments -> AdminPaymentsScreen(viewModel, goBack, modifier)
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(viewModel, lifecycle, backEnabled) {
+        if (!backEnabled) return@LaunchedEffect
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                delay(AdminViewModel.AUTO_REFRESH_MILLIS)
+                viewModel.autoRefresh()
+            }
+        }
+    }
+
+    val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+    val pullState = rememberPullToRefreshState()
+    PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = viewModel::refresh,
+        modifier = modifier,
+        state = pullState,
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = pullState,
+                isRefreshing = refreshing,
+                modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        },
+    ) {
+        val pageModifier = Modifier.fillMaxSize()
+        when (val current = page) {
+            AdminPage.Home -> AdminHome(viewModel, pageModifier)
+            is AdminPage.User -> AdminUserScreen(viewModel, current.id, goBack, pageModifier)
+            AdminPage.Admins -> AdminAdminsScreen(viewModel, goBack, pageModifier)
+            AdminPage.Usage -> AdminUsageScreen(viewModel, goBack, pageModifier)
+            AdminPage.Audit -> AdminAuditScreen(viewModel, goBack, pageModifier)
+            AdminPage.Activity -> AdminActivityScreen(viewModel, goBack, pageModifier)
+            AdminPage.Payments -> AdminPaymentsScreen(viewModel, goBack, pageModifier)
+        }
     }
 }
 
