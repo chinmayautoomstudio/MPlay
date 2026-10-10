@@ -66,12 +66,13 @@ ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `Sepa
 
 ## Startup
 
-1. `MPlayApp.onCreate` builds the container. In the main process only, it calls `authRepository.start()` (reads the saved session), `separationController.start()`, `AuthEffects(...).start()` (refreshes the plan, schedules `UsageSyncWorker` and resumes the separation queue after sign-in, stops background features on sign-out, refreshes the widget) and `singAlongSession.cleanUpLeftovers()`. The `:separator` process skips all of these.
+1. `MPlayApp.onCreate` builds the container. In the main process only, it calls `authRepository.start()` (reads the saved session), `separationController.start()`, `AuthEffects(...).start()` (refreshes the plan, schedules `UsageSyncWorker` and resumes the separation queue after sign-in, keeps `AdminActivityWorker` scheduled for admins, stops background features on sign-out, refreshes the widget) and `singAlongSession.cleanUpLeftovers()`. The `:separator` process skips all of these.
 2. The system splash (`Theme.MPlay.Splash`) shows `drawable-nodpi/splash_logo` on `splash_screen_background` (`#030013`); the launcher icons come from Android Studio's Image Asset wizard, and `tools/generate_logo_assets.py` rebuilds the splash and in-app logo from `logos/mp3-studio-logo-v1.png`. `MainActivity.onCreate` keeps the splash screen until `SettingsViewModel.theme` has loaded (avoids a theme flash) and `AuthState` is no longer `Loading`. Signed out, it renders `SignInScreen`; signed in, `MPlayAppTheme { MPlayRoot(...) }` inside the signed-in `ViewModelStoreOwner`. `onStart` runs `AuthViewModel.verifyAccount()` (disabled or revoked accounts are signed out). See [accounts](features/accounts.md).
 3. `handleIntent` (also from `onNewIntent`; the activity is `singleTop`) turns these into one-shot UI flags:
    - `EXTRA_OPEN_NOW_PLAYING` from the media notification and widget
    - `SeparationLinks.ACTION_OPEN_QUEUE` from the separation notification
    - `EXTRA_OPEN_METRONOME` from the metronome notification
+   - `AdminNotifications.ACTION_OPEN_ADMIN_ACTIVITY` from an Admin activity notification (opens Profile > Admin > Activity)
    - the payment App Link `https://<pay.returnHost>/pay/return?txn=...` (`PaymentReturnLink.parse`), passed to `BillingHost` as a return request
 4. `MPlayRoot` requests the audio permission (shows `PermissionRationaleScreen` while denied), asks for `POST_NOTIFICATIONS` once on Android 13+, calls `LibraryViewModel.onAppForeground()` on every resume, and renders `MainScreen` with `BillingHost` above it (checkout sheet, payment result, cancel dialog, and a payment check on every resume).
 
@@ -121,6 +122,7 @@ flowchart LR
 | `singalong.RecordingService` | Service | `microphone` | Only while a take is being prepared or recorded. Notification ID 4301. |
 | `SeparationWorker` (via WorkManager `SystemForegroundService`) | `CoroutineWorker` | `mediaProcessing` (35+) / `dataSync` (29-34) | Notification IDs 4101/4102. |
 | `data.usage.UsageSyncWorker` | `CoroutineWorker`, unique `"usage-sync"`, needs a network | none | Sends separation outcomes to `finish-separation`; scheduled after each job ends and on sign-in. |
+| `data.admin.AdminActivityWorker` | Periodic `CoroutineWorker` (15 min), unique `"admin-activity"`, needs a network | none | Posts new Admin activity to channel `admin_activity` (notification IDs 4401, 5000-6023). `AuthEffects` keeps it scheduled while the user is an admin with the switch on. See [admin](features/admin.md). |
 | `separation.worker.SeparatorService` | Bound service, `:separator` process | none | Runs the model so a native crash or OOM never kills playback. |
 | `separation.worker.SeparationTaskWatcher` | Started service, not exported | none | Runs while `SeparationWorker` does; its `onTaskRemoved` pauses separation when the app is swiped away. |
 | `playback.SignedInMediaButtonReceiver` | Receiver, exported | | Headset/widget play-pause; extends Media3's `MediaButtonReceiver` and doesn't start the service while signed out. |
@@ -184,3 +186,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-08 | - | `TaskRemoval` in `AppContainer`: removal from recents stops music, metronome, sing-along and separation; hooks in `onTaskRemoved` of `PlaybackService`, `MetronomeService`, `RecordingService` and the new `SeparationTaskWatcher` service; `MainActivity.onCreate` resumes separation. |
 | 2026-10-10 | - | `albumArtLoader` in `AppContainer`; `MPlayApp` is the Coil `SingletonImageLoader.Factory` (registers `AlbumArtFetcher`). |
 | 2026-10-10 | - | Payments: `billingRepository` in `AppContainer`, `androidx.browser`, the `/pay/return` App Link on `MainActivity` (`pay.returnHost`, `BuildConfig.PAY_RETURN_HOST`), `BillingHost` in `MPlayRoot`, `ProfilePage.PaymentHistory`, `AdminPage.Payments`; `web/` folder with the return page and `assetlinks.json` template. |
+| 2026-10-10 | - | `AdminActivityWorker` (periodic, scheduled by `AuthEffects` for admins) and notification channel `admin_activity`; `MainActivity` handles `ACTION_OPEN_ADMIN_ACTIVITY`. |

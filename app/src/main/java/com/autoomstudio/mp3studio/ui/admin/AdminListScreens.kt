@@ -1,7 +1,15 @@
 package com.autoomstudio.mp3studio.ui.admin
 
+import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.text.format.DateUtils
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,11 +31,13 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -41,6 +51,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.admin.AdminActivity
@@ -277,10 +289,12 @@ internal fun AdminAuditScreen(viewModel: AdminViewModel, onBack: () -> Unit, mod
 @Composable
 internal fun AdminActivityScreen(viewModel: AdminViewModel, onBack: () -> Unit, modifier: Modifier) {
     val activity by viewModel.activity.collectAsStateWithLifecycle()
+    val notificationsEnabled by viewModel.notificationsEnabled.collectAsStateWithLifecycle()
 
     LazyColumn(modifier) {
         item { DetailBackButton(onBack = onBack) }
         item { PageTitle(stringResource(R.string.admin_activity_title)) }
+        item { PhoneNotificationsRow(notificationsEnabled, viewModel::setNotificationsEnabled) }
         item {
             LoadableContent(activity, onRetry = viewModel::reload) { events ->
                 Column(
@@ -295,6 +309,76 @@ internal fun AdminActivityScreen(viewModel: AdminViewModel, onBack: () -> Unit, 
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * The switch for phone notifications of new activity. Turning it on asks for POST_NOTIFICATIONS (Android 13+); if
+ * notifications are blocked for the app, a button opens its notification settings. Re-checked on every resume.
+ */
+@Composable
+private fun PhoneNotificationsRow(enabled: Boolean, onEnabledChange: (Boolean) -> Unit) {
+    val context = LocalContext.current
+    var allowed by remember { mutableStateOf(context.notificationsAllowed()) }
+    LifecycleResumeEffect(context) {
+        allowed = context.notificationsAllowed()
+        onPauseOrDispose { }
+    }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        allowed = context.notificationsAllowed()
+    }
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.admin_phone_notifications)) },
+        supportingContent = {
+            Column {
+                Text(
+                    stringResource(
+                        if (enabled && !allowed) {
+                            R.string.admin_phone_notifications_blocked
+                        } else {
+                            R.string.admin_phone_notifications_detail
+                        },
+                    ),
+                )
+                if (enabled && !allowed) {
+                    OutlinedButton(
+                        onClick = { context.openNotificationSettings() },
+                        modifier = Modifier.padding(top = 8.dp),
+                    ) {
+                        Text(stringResource(R.string.admin_phone_notifications_open))
+                    }
+                }
+            }
+        },
+        trailingContent = {
+            Switch(
+                checked = enabled,
+                onCheckedChange = { on ->
+                    onEnabledChange(on)
+                    if (on && !allowed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                },
+            )
+        },
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+    )
+}
+
+private fun Context.notificationsAllowed(): Boolean = NotificationManagerCompat.from(this).areNotificationsEnabled()
+
+private fun Context.openNotificationSettings() {
+    val intents = listOf(
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName),
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)),
+    )
+    for (intent in intents) {
+        try {
+            startActivity(intent)
+            return
+        } catch (_: ActivityNotFoundException) {
+            // Fall through to the app details page.
         }
     }
 }

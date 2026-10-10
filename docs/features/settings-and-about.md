@@ -60,6 +60,8 @@ All keys in DataStore `app_settings`:
 | `metronome_volume` | Float | 0.8 (0-1) | Metronome |
 | `singalong_note_seen` | Boolean | `false` | [Sing-along](sing-along.md) |
 | `admin_activity_seen_at` | Long | 0 (epoch ms) | [Admin](admin.md) Activity bell |
+| `admin_notifications_enabled` | Boolean | `true` | [Admin](admin.md) phone notifications switch |
+| `admin_activity_notified_at` | Long | 0 (epoch ms; cleared on sign-out) | [Admin](admin.md) newest event posted as a notification |
 
 Other DataStores: `playback_session`, `library_prefs`, `widget_state`, and `auth_session` (key `session`: the Supabase session, encrypted with Tink, excluded from backup; see [accounts](accounts.md)). The Tink keyset lives in SharedPreferences `auth_keyset_prefs`. DataStore `entitlements` (key `entitlements_json`: the last plan answer from the server, cleared on sign-out; see [plans](plans.md)). DataStore `billing` (keys `pending_payment_user` and `pending_payment_txn`: the PayU payment the app is waiting for, cleared when it settles and on sign-out; see [payments](payments.md)).
 
@@ -99,3 +101,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-09 | - | About shows only "Version x.y.z"; the build number is hidden (3.2.1). |
 | 2026-10-10 | - | DataStore `billing` (`pending_payment_user`, `pending_payment_txn`) for PayU payments ([payments](payments.md)). |
 | 2026-10-09 | - | About shows the new MP3 Studio logo (`ic_mp3studio_logo`) in both themes; `ic_mplay_logo`/`ic_mplay_logo_dark` removed (3.2.3). |
+| 2026-10-10 | - | Keys `admin_notifications_enabled` and `admin_activity_notified_at` for Admin phone notifications ([admin](admin.md)). |

@@ -133,6 +133,7 @@ class AdminViewModelTest {
     private val backend = FakeBackend()
     private val refreshed = mutableListOf<String>()
     private val seenAt = MutableStateFlow(0L)
+    private val notificationsOn = MutableStateFlow(true)
 
     private fun viewModel() = AdminViewModel(
         backend = backend,
@@ -140,8 +141,21 @@ class AdminViewModelTest {
         refreshOwnPlan = { refreshed += it },
         activitySeenAt = seenAt,
         markActivitySeen = { seenAt.value = it },
+        notificationsEnabled = notificationsOn,
+        saveNotificationsEnabled = { notificationsOn.value = it },
         searchDelayMillis = 300,
     ).also { it.enter() }
+
+    @Test
+    fun phoneNotificationsSwitchFollowsTheSetting() = runTest(dispatcher) {
+        val vm = viewModel()
+        assertTrue(vm.notificationsEnabled.value)
+        vm.setNotificationsEnabled(false)
+        assertFalse(notificationsOn.value)
+        assertFalse(vm.notificationsEnabled.value)
+        vm.setNotificationsEnabled(true)
+        assertTrue(vm.notificationsEnabled.value)
+    }
 
     @Test
     fun newActivityIsUnreadUntilTheFeedIsOpened() = runTest(dispatcher) {

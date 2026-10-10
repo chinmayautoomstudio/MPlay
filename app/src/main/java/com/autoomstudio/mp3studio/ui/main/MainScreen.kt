@@ -190,6 +190,8 @@ fun MainScreen(
     onOpenSeparationHandled: () -> Unit,
     openMetronomeRequest: Boolean,
     onOpenMetronomeHandled: () -> Unit,
+    openAdminActivityRequest: Boolean = false,
+    onOpenAdminActivityHandled: () -> Unit = {},
     modifier: Modifier = Modifier,
     plansViewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
     accountViewModel: AccountViewModel = viewModel(factory = AccountViewModel.Factory),
@@ -224,6 +226,14 @@ fun MainScreen(
             destination = Destination.Metronome
             onShowNowPlayingChange(false)
             onOpenMetronomeHandled()
+        }
+    }
+    LaunchedEffect(openAdminActivityRequest) {
+        // AdminScreen opens its Activity page and consumes the request.
+        if (openAdminActivityRequest) {
+            openProfile()
+            profilePage = ProfilePage.Admin
+            onShowNowPlayingChange(false)
         }
     }
     val openPlans = {
@@ -650,6 +660,8 @@ fun MainScreen(
                                         onMessage = showMessage,
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
+                                        openActivityRequest = openAdminActivityRequest,
+                                        onOpenActivityHandled = onOpenAdminActivityHandled,
                                     )
                                 }
                             }

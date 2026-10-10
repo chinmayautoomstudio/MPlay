@@ -227,6 +227,16 @@
     <string name="admin_activity_deleted">Account deleted (%1$s plan)</string>
     <string name="admin_activity_deleted_detail">The account and its email are gone</string>
     <string name="admin_activity_empty">No activity yet.</string>
+    <string name="admin_phone_notifications">Phone notifications</string>
+    <string name="admin_phone_notifications_detail">Get a notification for new sign-ups, subscriptions and deleted accounts. Checked about every 15 minutes.</string>
+    <string name="admin_phone_notifications_blocked">Notifications are turned off for MP3 Studio, so none will show.</string>
+    <string name="admin_phone_notifications_open">Open notification settings</string>
+    <string name="admin_channel_name">Admin activity</string>
+    <string name="admin_channel_description">New sign-ups, subscriptions and deleted accounts, for admins</string>
+    <plurals name="admin_notification_summary">
+        <item quantity="one">%d new admin event</item>
+        <item quantity="other">%d new admin events</item>
+    </plurals>
     <string name="admin_overview_users">Users</string>
     <string name="admin_overview_admins">Admins</string>
     <string name="admin_overview_disabled">Disabled</string>

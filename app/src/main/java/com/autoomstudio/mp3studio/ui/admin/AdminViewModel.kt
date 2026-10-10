@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -109,8 +110,18 @@ class AdminViewModel(
     private val refreshOwnPlan: suspend (userId: String) -> Unit,
     activitySeenAt: Flow<Long>,
     private val markActivitySeen: suspend (epochMillis: Long) -> Unit,
+    notificationsEnabled: Flow<Boolean> = flowOf(true),
+    private val saveNotificationsEnabled: suspend (Boolean) -> Unit = {},
     private val searchDelayMillis: Long = 300,
 ) : ViewModel() {
+
+    /** Whether new activity is also posted as phone notifications (`AdminActivityWorker`). */
+    val notificationsEnabled: StateFlow<Boolean> =
+        notificationsEnabled.stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch { saveNotificationsEnabled(enabled) }
+    }
 
     private val stack = MutableStateFlow<List<AdminPage>>(listOf(AdminPage.Home))
     private val _page = MutableStateFlow<AdminPage>(AdminPage.Home)
@@ -486,6 +497,8 @@ class AdminViewModel(
                     refreshOwnPlan = { container.entitlementsRepository.refresh(it) },
                     activitySeenAt = container.appSettings.adminActivitySeenAt,
                     markActivitySeen = container.appSettings::setAdminActivitySeenAt,
+                    notificationsEnabled = container.appSettings.adminNotificationsEnabled,
+                    saveNotificationsEnabled = container.appSettings::setAdminNotificationsEnabled,
                 )
             }
         }

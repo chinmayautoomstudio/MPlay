@@ -104,6 +104,8 @@ fun AdminScreen(
     onMessage: (String) -> Unit,
     modifier: Modifier = Modifier,
     backEnabled: Boolean = true,
+    openActivityRequest: Boolean = false,
+    onOpenActivityHandled: () -> Unit = {},
     viewModel: AdminViewModel = viewModel(factory = AdminViewModel.Factory),
 ) {
     val page by viewModel.page.collectAsStateWithLifecycle()
@@ -114,6 +116,13 @@ fun AdminScreen(
         if (!entered) {
             entered = true
             viewModel.enter()
+        }
+    }
+    LaunchedEffect(viewModel, openActivityRequest) {
+        if (openActivityRequest) {
+            viewModel.enter()
+            viewModel.open(AdminPage.Activity)
+            onOpenActivityHandled()
         }
     }
     LaunchedEffect(viewModel) { viewModel.messages.collect { onMessage(it.text(resources)) } }

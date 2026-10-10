@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoomstudio.mp3studio.data.account.AuthState
+import com.autoomstudio.mp3studio.data.admin.AdminNotifications
 import com.autoomstudio.mp3studio.data.settings.ThemeSettings
 import com.autoomstudio.mp3studio.ui.auth.AuthViewModel
 import com.autoomstudio.mp3studio.ui.auth.SignInScreen
@@ -57,6 +58,9 @@ class MainActivity : ComponentActivity() {
 
     /** Set when launched from the metronome notification; consumed once by the UI. */
     private var openMetronomeRequest by mutableStateOf(false)
+
+    /** Set when launched from an Admin activity notification; consumed once by the Admin screen. */
+    private var openAdminActivityRequest by mutableStateOf(false)
 
     /** Set when the PayU return page opened the app: the transaction ID from the link, or "". Consumed once. */
     private var paymentReturnRequest by mutableStateOf<String?>(null)
@@ -101,6 +105,8 @@ class MainActivity : ComponentActivity() {
                                 onOpenSeparationHandled = { openSeparationRequest = false },
                                 openMetronomeRequest = openMetronomeRequest,
                                 onOpenMetronomeHandled = { openMetronomeRequest = false },
+                                openAdminActivityRequest = openAdminActivityRequest,
+                                onOpenAdminActivityHandled = { openAdminActivityRequest = false },
                                 paymentReturnRequest = paymentReturnRequest,
                                 onPaymentReturnHandled = { paymentReturnRequest = null },
                                 themeSettings = theme,
@@ -129,6 +135,7 @@ class MainActivity : ComponentActivity() {
         }
         if (intent?.action == SeparationLinks.ACTION_OPEN_QUEUE) openSeparationRequest = true
         if (intent?.getBooleanExtra(EXTRA_OPEN_METRONOME, false) == true) openMetronomeRequest = true
+        if (intent?.action == AdminNotifications.ACTION_OPEN_ADMIN_ACTIVITY) openAdminActivityRequest = true
         PaymentReturnLink.parse(intent?.data)?.let { paymentReturnRequest = it }
     }
 
@@ -146,6 +153,8 @@ private fun MPlayRoot(
     onOpenSeparationHandled: () -> Unit,
     openMetronomeRequest: Boolean,
     onOpenMetronomeHandled: () -> Unit,
+    openAdminActivityRequest: Boolean,
+    onOpenAdminActivityHandled: () -> Unit,
     paymentReturnRequest: String?,
     onPaymentReturnHandled: () -> Unit,
     themeSettings: ThemeSettings,
@@ -244,6 +253,8 @@ private fun MPlayRoot(
             onOpenSeparationHandled = onOpenSeparationHandled,
             openMetronomeRequest = openMetronomeRequest,
             onOpenMetronomeHandled = onOpenMetronomeHandled,
+            openAdminActivityRequest = openAdminActivityRequest,
+            onOpenAdminActivityHandled = onOpenAdminActivityHandled,
         )
     }
     BillingHost(returnRequest = paymentReturnRequest, onReturnHandled = onPaymentReturnHandled)
