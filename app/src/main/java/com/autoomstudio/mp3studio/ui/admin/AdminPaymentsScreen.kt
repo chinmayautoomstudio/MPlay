@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -202,15 +204,21 @@ internal fun AdminPaymentItem(
     onReverify: () -> Unit,
     onRefund: () -> Unit,
     onOpenUser: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var menu by remember { mutableStateOf(false) }
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(start = 16.dp, top = 8.dp, bottom = 8.dp),
     ) {
+        leading?.let {
+            it()
+            Spacer(Modifier.width(12.dp))
+        }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             if (showEmail) {
                 Text(

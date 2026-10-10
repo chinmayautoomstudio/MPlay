@@ -714,7 +714,7 @@ private fun PlanChip(plan: String) {
 private fun displayName(user: AdminUserRow): String =
     user.name?.takeIf { it.isNotBlank() } ?: user.email ?: stringResource(R.string.admin_no_name)
 
-private fun initials(name: String): String =
+internal fun initials(name: String): String =
     name.substringBefore('@')
         .split(' ', '.', '_', '-')
         .filter { it.isNotBlank() }

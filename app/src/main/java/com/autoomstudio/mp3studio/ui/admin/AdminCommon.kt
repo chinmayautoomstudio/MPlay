@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.autoomstudio.mp3studio.R
@@ -188,6 +190,58 @@ internal fun IconTile(icon: Painter, tint: Color, size: Dp = 40.dp) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(size * 0.55f))
+    }
+}
+
+/** Icon and title at the top of a profile card, with an optional control at the end. */
+@Composable
+internal fun CardHeader(icon: Painter, title: String, trailing: @Composable (() -> Unit)? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 10.dp),
+        )
+        trailing?.invoke()
+    }
+}
+
+@Composable
+internal fun StatusPill(text: String, color: Color) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = color,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(color.copy(alpha = 0.16f))
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+    )
+}
+
+/** A label on the left and its value from the middle of the row. */
+@Composable
+internal fun DetailRow(label: String, value: String, valueColor: Color = Color.Unspecified) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 8.dp),
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (valueColor == Color.Unspecified) MaterialTheme.colorScheme.onSurface else valueColor,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
