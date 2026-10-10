@@ -127,6 +127,29 @@ class BillingStatusRulesTest {
     }
 
     @Test
+    fun theProCardButtonFollowsTheToggle() {
+        val month = BillingInterval.Month
+        val year = BillingInterval.Year
+        fun button(plan: Plan, current: BillingInterval?, s: BillingStatus, selected: BillingInterval) =
+            ProCardButton.of(plan, current, s, selected)
+
+        assertEquals(ProCardButton.Buy(BillingAction.GoPro), button(Plan.Free, null, status(null, Plan.Free), year))
+        val cancelled = status(sub(status = SubscriptionStatus.Cancelled, autopay = AutopayStatus.Off))
+        assertEquals(ProCardButton.Buy(BillingAction.GoProAgain), button(Plan.Pro, month, cancelled, month))
+
+        val monthly = status(sub())
+        assertEquals(ProCardButton.CurrentPlan, button(Plan.Pro, month, monthly, month))
+        assertEquals(ProCardButton.Switch(year, enabled = true), button(Plan.Pro, month, monthly, year))
+
+        val yearlyFarFromEnd = status(sub(interval = year, expiresAt = now + 200 * day))
+        assertEquals(ProCardButton.CurrentPlan, button(Plan.Pro, year, yearlyFarFromEnd, year))
+        assertEquals(ProCardButton.Switch(month, enabled = false), button(Plan.Pro, year, yearlyFarFromEnd, month))
+
+        assertEquals("Admin-granted Pro", ProCardButton.CurrentPlan, button(Plan.Pro, null, status(null), year))
+        assertEquals(ProCardButton.Unavailable, button(Plan.Free, null, status(null, Plan.Free, enabled = false), month))
+    }
+
+    @Test
     fun returnLinksMustBeOurs() {
         assertEquals("MP1", PaymentReturnLink.parse("https", "pay.example.com", "/pay/return", "MP1", "pay.example.com"))
         assertEquals("MP1", PaymentReturnLink.parse("https", "pay.example.com", "/pay/return/", "MP1", "pay.example.com"))

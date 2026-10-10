@@ -99,10 +99,11 @@ class BillingViewModel(
     private var awaitingReturn: String? = null
     private var checking = false
 
-    fun openCheckout(purpose: CheckoutPurpose = CheckoutPurpose.Subscribe) {
+    /** [preselect] picks the interval the sheet starts on; a switch ignores it and locks the other interval. */
+    fun openCheckout(purpose: CheckoutPurpose = CheckoutPurpose.Subscribe, preselect: BillingInterval? = null) {
         val current = entitlements()
-        val interval = current?.billing?.interval ?: BillingInterval.Month
         val switching = purpose == CheckoutPurpose.SwitchInterval
+        val interval = (if (switching) null else preselect) ?: current?.billing?.interval ?: BillingInterval.Month
         _state.update {
             it.copy(
                 checkout = CheckoutUi(

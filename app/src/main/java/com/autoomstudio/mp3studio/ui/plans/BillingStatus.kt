@@ -29,6 +29,30 @@ enum class BillingAction {
 
 data class BillingStatus(val notice: BillingNotice?, val actions: List<BillingAction>)
 
+/** The Pro card's button on the Plans screen for the interval picked in the Monthly/Yearly toggle. */
+sealed interface ProCardButton {
+    data class Buy(val action: BillingAction) : ProCardButton
+    data class Switch(val to: BillingInterval, val enabled: Boolean) : ProCardButton
+    data object CurrentPlan : ProCardButton
+    data object Unavailable : ProCardButton
+
+    companion object {
+        /** Actions the Pro card handles, so the subscription section leaves them out. */
+        val HANDLED = setOf(
+            BillingAction.GoPro, BillingAction.GoProAgain, BillingAction.SwitchToYearly, BillingAction.SwitchToMonthly,
+        )
+
+        /** [current] is the paid interval, null for Admin-granted Pro or no subscription. */
+        fun of(plan: Plan, current: BillingInterval?, status: BillingStatus, selected: BillingInterval): ProCardButton {
+            status.actions.firstOrNull { it == BillingAction.GoPro || it == BillingAction.GoProAgain }?.let { return Buy(it) }
+            if (plan != Plan.Pro) return Unavailable
+            if (current == null || current == selected) return CurrentPlan
+            val switch = if (selected == BillingInterval.Year) BillingAction.SwitchToYearly else BillingAction.SwitchToMonthly
+            return Switch(selected, enabled = switch in status.actions)
+        }
+    }
+}
+
 object BillingStatusRules {
     /** A manual-mode renewal opens this long before the paid month ends, as `begin_checkout` allows. */
     const val RENEW_WINDOW_MS = 7L * 24 * 60 * 60 * 1000

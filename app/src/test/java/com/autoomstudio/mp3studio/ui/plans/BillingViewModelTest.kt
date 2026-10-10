@@ -102,6 +102,18 @@ class BillingViewModelTest {
     }
 
     @Test
+    fun thePlansToggleSetsTheStartingIntervalExceptForASwitch() {
+        val monthly = BillingState(SubscriptionStatus.Active, AutopayStatus.On, expiresAt = 5_000L)
+        entitlements = entitlements.copy(hasPhone = true, billing = monthly)
+        viewModel.openCheckout(CheckoutPurpose.Subscribe, preselect = BillingInterval.Year)
+        assertEquals(BillingInterval.Year, viewModel.state.value.checkout!!.interval)
+        assertFalse(viewModel.state.value.checkout!!.intervalLocked)
+
+        viewModel.openCheckout(CheckoutPurpose.SwitchInterval, preselect = BillingInterval.Month)
+        assertEquals(BillingInterval.Year, viewModel.state.value.checkout!!.interval)
+    }
+
+    @Test
     fun aBadPhoneIsCaughtBeforeCallingTheServer() {
         viewModel.openCheckout()
         viewModel.onPhoneChange("12345")

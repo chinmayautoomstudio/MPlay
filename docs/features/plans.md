@@ -21,7 +21,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 | `data/plan/DeviceId.kt` | SHA-256 of `ANDROID_ID` sent for the one-trial-per-phone check. |
 | `data/tempo/TempoDetectionGate.kt` | `TempoSource` and the gate that lets cached tempos through and locks new detections. |
 | `ui/plans/PlansViewModel.kt` | `PlanUiState` for screens, `canUse()`, manual `refresh()`, the "See plans" request. |
-| `ui/plans/PlansScreen.kt` | Settings > Plans; `planLabel()` shared with the Account card. |
+| `ui/plans/PlansScreen.kt` | Settings > Plans: the subscription section, interval toggle, Free and Pro cards, Compare Plans; `planLabel()` shared with the Account card. |
 | `ui/plans/UpgradeSheet.kt` | The locked-feature sheet; Go Pro opens the checkout. |
 | `ui/plans/BillingStatus.kt`, `BillingViewModel.kt`, `CheckoutSheet.kt`, `PaymentHistoryScreen.kt` | Billing status, checkout and payment history; see [payments](payments.md). |
 | `supabase/functions/entitlements/`, `claim-trial/`, `_shared/` | Edge Functions; see [backend](../backend.md#edge-functions). |
@@ -63,6 +63,17 @@ sequenceDiagram
   - AI Vocal Separator: Free users get 10 songs a week, reserved on the server when queued (M3, see [vocal separation](vocal-separation.md#weekly-usage-limit-prd-us1-us9-pl5)). Running out opens the upgrade sheet with `limitResetsAt`: "Weekly limit reached" and the reset day.
 - Usage display (US6): `entitlements` also returns `usage` (`usage_summary`), cached as `Entitlements.usage` (`SeparatorUsage`) and updated by `EntitlementsRepository.updateUsage` from each reserve and finish answer. `EntitlementPolicy.separatorUsage` shows it only on Free and starts a fresh week once the cached `resetsAt` has passed. `PlanUiState.usage` feeds the Plans card, the separation Settings section, the queue screen and the time notice (`ui/plans/UsageText.kt`).
 - "See plans" in the upgrade sheet sets `PlansViewModel.openPlansRequest`; Now Playing closes its sheets and `MainScreen` collapses the player and opens Settings > Plans.
+- Plans screen layout (`PlansScreen.kt`), from top to bottom:
+  - The title is "Upgrade to Pro", or "Your plan" on Pro.
+  - "Your subscription": the plan label and dates, usage, stale warning, Refresh, billing notices, Payment history, and the billing actions the Pro card doesn't handle (`Renew`, `FixPayment`, `SetUpAutopay`, `CheckPayment`, `CancelAutopay`).
+  - A Monthly/Yearly toggle, which starts on the current `subscriptionInterval`.
+  - Free and Pro cards of equal height. The Pro card's price follows the toggle.
+  - The Pro card's button comes from `ProCardButton.of(plan, subscriptionInterval, billing, toggle)`:
+    - `Buy` (Go Pro or Go Pro again) opens checkout with `openCheckout(Subscribe, preselect = toggle)`.
+    - `CurrentPlan` (disabled) when the toggle matches the paid interval, and for Admin-granted Pro.
+    - `Switch` ("Switch to Yearly" or "Switch to Monthly") opens the switch checkout. It is enabled only when `SwitchToYearly` or `SwitchToMonthly` is offered.
+    - `Unavailable` (disabled Go Pro) otherwise.
+  - Compare Plans: six feature rows with icons. The Pro column is highlighted.
 - Account card: a Plan row ("Free trial, 23 days left", "Pro", "Free") that opens Plans.
 - Trial banner (TR6): in the last 3 days of the trial, a dismissible banner above the main content opens Plans; dismissing hides it until the app process restarts.
 
@@ -80,6 +91,7 @@ None. Uses the existing `INTERNET` permission.
 - `data/plan/EntitlementPolicyTest.kt`: access table for Free, Trial and Pro, no cache, ended trial, expired subscription with and without a trial, 7-day grace boundary, clock turned back, server time deciding end dates, days-left rounding, usage shown only on Free and rolled over after the reset.
 - `data/plan/EntitlementsRepositoryTest.kt`: refresh stores and maps the server answer, offline refresh keeps the cache, another account's cache unlocks nothing, clear, unknown plan values.
 - `data/plan/EntitlementsResponseTest.kt`: `role` maps to `isAdmin`; billing state, pending and last payment, billing mode and `paymentsEnabled` are mapped, unknown statuses become `Unknown`.
+- `ui/plans/BillingStatusRulesTest.kt` (`theProCardButtonFollowsTheToggle`) and `BillingViewModelTest.kt` (`thePlansToggleSetsTheStartingIntervalExceptForASwitch`): the Pro card button for each plan and toggle position, and the toggle's preselected interval.
 - `data/tempo/TempoDetectionGateTest.kt`: cached tempo on Free, locked new detection, detection with BPM Detector.
 - `supabase/tests/plans_test.sql` (pgTAP, 16 checks): plan computation, claim idempotence, email and device reuse denied, disabled account, both functions not executable by `authenticated`.
 - `supabase/functions/_shared/trial_test.ts` (Deno, 5 tests): email normalization, device ID validation, peppered hashing.
@@ -99,6 +111,7 @@ None. Uses the existing `INTERNET` permission.
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-10 | - | Plans screen redesign: "Your subscription" section at the top, Monthly/Yearly toggle, Free and Pro cards whose Pro button follows the toggle (Current Plan or Switch for subscribers), icon-based Compare Plans table. |
 | 2026-10-10 | - | Yearly Pro at ₹999 next to monthly; the plan label shows the interval. |
 | 2026-10-08 | - | Plans and gating (M2): entitlements functions, trial with abuse checks, cache with 7-day grace, BPM and Sing Along gates, upgrade sheet, Plans screen, Account plan row, trial banner. |
 | 2026-10-08 | - | Usage limit (M3): `SeparatorUsage` in the cache, `separatorUsage()`, usage on the Plans card, limit-reached upgrade sheet. |
