@@ -50,7 +50,6 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.GraphicEq
-import androidx.compose.material.icons.outlined.HighlightOff
 import androidx.compose.material.icons.outlined.HourglassTop
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.MusicNote
@@ -121,7 +120,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
-private enum class Confirm { MakeAdmin, RemoveAdmin, Disable, RemovePro, CancelSubscription, RevokeSubscription }
+private enum class Confirm { MakeAdmin, RemoveAdmin, Disable, RemovePro, RevokeSubscription }
 
 private const val RECENT_PAYMENTS = 3
 private const val RECENT_EVENTS = 5
@@ -213,8 +212,6 @@ private fun UserDetail(user: AdminUserDetail, isMe: Boolean, busy: Boolean, view
             Confirm.RemoveAdmin -> R.string.admin_remove_admin_title to R.string.admin_remove_admin_message
             Confirm.Disable -> R.string.admin_disable_title to R.string.admin_disable_message
             Confirm.RemovePro -> R.string.admin_remove_pro_title to R.string.admin_remove_pro_message
-            Confirm.CancelSubscription ->
-                R.string.admin_cancel_subscription_title to R.string.admin_cancel_subscription_message
             Confirm.RevokeSubscription ->
                 R.string.admin_revoke_subscription_title to R.string.admin_revoke_subscription_message
         }
@@ -230,7 +227,6 @@ private fun UserDetail(user: AdminUserDetail, isMe: Boolean, busy: Boolean, view
                         Confirm.RemoveAdmin -> viewModel.setRole(profile.id, label, admin = false)
                         Confirm.Disable -> viewModel.setDisabled(profile.id, true)
                         Confirm.RemovePro -> viewModel.revokePro(profile.id)
-                        Confirm.CancelSubscription -> viewModel.cancelSubscription(profile.id)
                         Confirm.RevokeSubscription -> viewModel.revokeSubscription(profile.id)
                     }
                 }) { Text(stringResource(android.R.string.ok)) }
@@ -558,7 +554,6 @@ private fun AdminActions(
     val personRemove = rememberVectorPainter(Icons.Outlined.PersonRemove)
     val block = rememberVectorPainter(Icons.Outlined.Block)
     val unlock = rememberVectorPainter(Icons.Outlined.LockOpen)
-    val cancel = rememberVectorPainter(Icons.Outlined.HighlightOff)
     val remove = rememberVectorPainter(Icons.Outlined.RemoveCircleOutline)
 
     val left = buildList {
@@ -584,13 +579,6 @@ private fun AdminActions(
             add(ProfileAction(stringResource(R.string.admin_enable), unlock, false, onEnable))
         } else if (!isMe) {
             add(ProfileAction(stringResource(R.string.admin_disable), block, true) { onConfirm(Confirm.Disable) })
-        }
-        if (user.payuSubscription != null) {
-            add(
-                ProfileAction(stringResource(R.string.admin_cancel_subscription), cancel, true) {
-                    onConfirm(Confirm.CancelSubscription)
-                },
-            )
         }
         if (user.revocableSubscription(System.currentTimeMillis()) != null) {
             add(

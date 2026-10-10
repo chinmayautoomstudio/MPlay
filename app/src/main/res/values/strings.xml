@@ -325,9 +325,6 @@
     <string name="admin_payment_open_user">Open user</string>
     <string name="admin_payment_refund_title">Refund %1$s?</string>
     <string name="admin_payment_refund_message">PayU refunds %1$s for transaction %2$s. If it paid for the current month, Pro ends when PayU confirms the refund.</string>
-    <string name="admin_cancel_subscription">Cancel subscription</string>
-    <string name="admin_cancel_subscription_title">Cancel this subscription?</string>
-    <string name="admin_cancel_subscription_message">The PayU autopay for %1$s is cancelled. Pro stays until the paid period ends.</string>
     <string name="admin_revoke_subscription">Revoke subscription</string>
     <string name="admin_revoke_subscription_title">Revoke this subscription?</string>
     <string name="admin_revoke_subscription_message">Pro ends now for %1$s. Any PayU autopay is cancelled. Nothing is refunded; use Refund on the payment if needed.</string>

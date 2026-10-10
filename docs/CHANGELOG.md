@@ -23,6 +23,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 - `Entitlements.subscriptionStatus` is now a `SubscriptionStatus` enum and the cache carries billing state, pending and last payment, phone presence, billing mode and `paymentsEnabled`; older caches are refetched. Pro now also covers `past_due` during its grace period and one day after the period end while autopay renews. ([plans](features/plans.md))
 
 ### Removed
+- "Cancel subscription" button on the Admin User Profile (strings `admin_cancel_subscription*`); admins use Revoke subscription instead. `AdminViewModel.cancelSubscription` and the server action are kept. ([admin](features/admin.md))
 - Razorpay and Google Play as subscription providers (never used): admin provider labels `admin_provider_razorpay` and `admin_provider_play`, the `active_subscription` deletion refusal (`account_delete_subscription`), and the "Payments coming soon" button (`plans_go_pro_soon`). ([admin](features/admin.md), [accounts](features/accounts.md))
 
 ### Database
