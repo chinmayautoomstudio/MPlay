@@ -1,0 +1,45 @@
+<!doctype html>
+<!--
+  PayU return page for MP3 Studio (payments PRD CK5). Host it at https://<pay.returnHost>/pay/return/ and set the
+  payu-return Edge Function's PAYU_RETURN_PAGE to that URL. On Android with the app installed, the verified App Link
+  opens MP3 Studio directly and this page is never shown. Otherwise the button retries the App Link.
+  This page decides nothing: the app asks the server, which checks the payment with PayU.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>MP3 Studio payment</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; min-height: 100vh; display: flex; align-items: center;
+           justify-content: center; background: #121212; color: #f2f2f2; text-align: center; }
+    main { max-width: 420px; padding: 32px; }
+    h1 { font-size: 1.4rem; margin: 0 0 12px; }
+    p { color: #bdbdbd; line-height: 1.5; }
+    a.button { display: inline-block; margin-top: 16px; padding: 14px 24px; border-radius: 24px; background: #8ab4f8;
+               color: #121212; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+<main>
+  <h1 id="title">Return to MP3 Studio</h1>
+  <p id="note">Open the app to see your payment. We confirm it with PayU before turning on Pro.</p>
+  <a class="button" id="open" href="./">Return to MP3 Studio</a>
+</main>
+<script>
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var txn = params.get("txn");
+    var link = location.origin + "/pay/return" + (txn && /^[A-Za-z0-9]{1,25}$/.test(txn) ? "?txn=" + txn : "");
+    var intent = "intent://" + location.host + "/pay/return" + (txn ? "?txn=" + encodeURIComponent(txn) : "") +
+      "#Intent;scheme=https;package=com.autoomstudio.mp3studio;end";
+    var isAndroid = /Android/i.test(navigator.userAgent);
+    document.getElementById("open").href = isAndroid ? intent : link;
+    if (params.get("result") === "failure") {
+      document.getElementById("title").textContent = "Payment not completed";
+    }
+  })();
+</script>
+</body>
+</html>

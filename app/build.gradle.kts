@@ -27,6 +27,8 @@ val backendConfig = mapOf(
     "SUPABASE_KEY" to localProperties.getProperty("supabase.key", "").trim(),
     "GOOGLE_WEB_CLIENT_ID" to localProperties.getProperty("google.webClientId", "").trim(),
 )
+// Host of the PayU return page (https://<host>/pay/return), which must serve /.well-known/assetlinks.json.
+val payReturnHost = localProperties.getProperty("pay.returnHost", "").trim().ifEmpty { "autoomstudio.com" }
 
 android {
     namespace = "com.autoomstudio.mp3studio"
@@ -44,6 +46,8 @@ android {
         val modelHash = rootProject.file("models/htdemucs.onnx.sha256").readText().trim().substringBefore(' ').lowercase()
         buildConfigField("String", "MODEL_SHA256", "\"$modelHash\"")
         backendConfig.forEach { (name, value) -> buildConfigField("String", name, "\"$value\"") }
+        manifestPlaceholders["payReturnHost"] = payReturnHost
+        buildConfigField("String", "PAY_RETURN_HOST", "\"$payReturnHost\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -258,6 +262,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.browser)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(platform(libs.androidx.compose.bom))

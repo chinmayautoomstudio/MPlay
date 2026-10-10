@@ -14,8 +14,8 @@ enum class DeletionError {
     /** The account is the last enabled Admin; make someone else Admin first. */
     LastAdmin,
 
-    /** A paid subscription still renews; cancel it first. */
-    ActiveSubscription,
+    /** The server couldn't cancel the PayU autopay first, so nothing was deleted (payments PRD CN6). */
+    MandateCancelFailed,
     Offline,
     Other,
 }
@@ -55,6 +55,6 @@ internal fun deletionErrorOf(e: Throwable): DeletionError = when (e) {
 internal fun deletionErrorOf(status: Int, body: String): DeletionError = when {
     status != 409 -> DeletionError.Other
     "last_admin" in body -> DeletionError.LastAdmin
-    "active_subscription" in body -> DeletionError.ActiveSubscription
+    "mandate_cancel_failed" in body -> DeletionError.MandateCancelFailed
     else -> DeletionError.Other
 }

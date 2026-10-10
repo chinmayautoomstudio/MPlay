@@ -53,6 +53,7 @@ class AuthEffects(private val context: Context, private val container: AppContai
         container.metronomeController.stop()
         container.profileRepository.clear()
         container.entitlementsRepository.clear()
+        container.billingRepository.clear()
         container.separationController.onSignedOut()
     }
 

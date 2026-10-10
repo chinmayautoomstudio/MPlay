@@ -1,6 +1,6 @@
 # Accounts and Google sign-in
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-08
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-10
 
 ## Summary
 
@@ -82,9 +82,9 @@ The Profile tab icon (`ProfileTabIcon`) and the `ProfileScreen` header show the 
 Delete account (at the bottom of the Edit page, in the error color) opens a dialog that says what is deleted (account, plan, trial, AI Vocal Separator history; no second trial on signing up again) and what stays on the phone (music, playlists, stems, recordings). Delete is enabled only after typing `DELETE`.
 
 1. `AccountViewModel.deleteAccount()` runs on the application scope and calls `AuthRepository.deleteAccount()`.
-2. `SupabaseAccountDeletionBackend` posts `{"confirm": "DELETE"}` to the `delete-account` Edge Function, which calls `delete_account()` for the user in the token. That deletes the `auth.users` row; the foreign keys delete the profile, subscriptions, trial and usage, and keep `trial_claims` and `payment_events` without the user ID ([backend](../backend.md)).
-3. On success `AuthBackend.signOutLocally()` clears the session on the phone only (the server no longer knows it), the state becomes `SignedOut`, `AuthEffects` clears the profile and plan as for a log-out, and `UsageReporter.forget()` drops the account's pending usage reports.
-4. Refusals keep the user signed in and show in the dialog: `LastAdmin` ("You're the only admin..."), `ActiveSubscription` (a renewing paid subscription, from M4), `Offline`, `Other`.
+2. `SupabaseAccountDeletionBackend` posts `{"confirm": "DELETE"}` to the `delete-account` Edge Function. If the user has a live PayU autopay mandate, the function first cancels it with PayU ([payments](payments.md)); if PayU doesn't confirm, nothing is deleted. Then it calls `delete_account()` for the user in the token. That deletes the `auth.users` row; the foreign keys delete the profile, subscriptions, trial and usage, and keep `trial_claims`, `payment_events` and `payments` without the user ID (unpaid payment links are cancelled and link URLs cleared) ([backend](../backend.md)).
+3. On success `AuthBackend.signOutLocally()` clears the session on the phone only (the server no longer knows it), the state becomes `SignedOut`, `AuthEffects` clears the profile, plan and any awaited payment as for a log-out, and `UsageReporter.forget()` drops the account's pending usage reports.
+4. Refusals keep the user signed in and show in the dialog: `LastAdmin` ("You're the only admin..."), `MandateCancelFailed` (409 `mandate_cancel_failed`: "We couldn't cancel your autopay..."), `Offline`, `Other`. A paid subscription no longer blocks deletion.
 
 ## Data and persistence
 
@@ -121,7 +121,7 @@ Delete account (at the bottom of the Edit page, in the error color) opens a dial
 - `data/account/NonceTest.kt`: SHA-256 hex, nonce length and alphabet.
 - `data/account/AuthRepositoryTest.kt`: `reduce()` (offline refresh keeps the user), `verifyAccount()` with a fake backend (disabled, revoked, offline, active), `deleteAccount()` (local sign-out only on success, refusal keeps the user).
 - `data/account/AccountDeletionTest.kt`: refusal codes from 409 bodies, other statuses, network failures.
-- `supabase/tests/abuse_test.sql`: `delete_account()` removes the user's rows, keeps trial claims and payments, refuses the last Admin and renewing subscriptions; no second trial after deleting.
+- `supabase/tests/abuse_test.sql`: `delete_account()` removes the user's rows, keeps trial claims and payments, refuses the last Admin and an account whose autopay is still on; no second trial after deleting.
 - Checked live on 2026-10-08: the last-admin refusal in the app, and a full deletion through the Edge Function with a throwaway user.
 - `supabase/tests/rls_test.sql`: server-side access rules ([backend](../backend.md#testing-rls)).
 - No tests for `SecureSessionStore` (needs the Keystore), the Credential Manager flow, the screens or `AuthEffects`.
@@ -149,3 +149,4 @@ Delete account (at the bottom of the Edit page, in the error color) opens a dial
 | 2026-10-08 | - | Account card replaced by the Profile tab (photo as tab icon) and an Edit page; Delete account moved into Edit, Log out below About. |
 | 2026-10-08 | - | Fixed the two left floating notes on the sign-in screen being drawn clipped: each note now has its own `VectorPainter` (a shared one caches a single rendering). |
 | 2026-10-09 | - | 3.2.3: sign-in logo is the new MP3 Studio logo (`ic_mp3studio_logo`); the stand-in `ic_mp3studio_mark` was removed. |
+| 2026-10-10 | - | Delete account cancels a PayU autopay mandate first; `DeletionError.MandateCancelFailed` replaces `ActiveSubscription`; sign-out also clears the awaited payment. |

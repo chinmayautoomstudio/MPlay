@@ -5,7 +5,6 @@ import android.content.ContentUris
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import androidx.core.net.toUri
 import com.autoomstudio.mp3studio.data.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -84,7 +83,7 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
                         albumId = albumId,
                         durationMs = durationMs,
                         dateAdded = cursor.getLong(dateAddedCol),
-                        albumArtUri = ContentUris.withAppendedId(ALBUM_ART_URI, albumId),
+                        albumArtUri = ContentUris.withAppendedId(AlbumArtLoader.ALBUM_ART_URI, albumId),
                         // MediaStore encodes disc and track as disc * 1000 + track.
                         trackNumber = cursor.getInt(trackCol) % 1000,
                         sizeBytes = sizeBytes,
@@ -103,6 +102,5 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
 
     private companion object {
         const val MIN_DURATION_MS = 30_000L
-        val ALBUM_ART_URI: Uri = "content://media/external/audio/albumart".toUri()
     }
 }

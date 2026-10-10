@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-10-08
+> Last updated: 2026-10-10
 
 ## Modules
 
@@ -13,7 +13,7 @@ Defined in [`settings.gradle.kts`](../settings.gradle.kts).
 
 The application ID changed from `com.autoomstudio.mplay` to `com.autoomstudio.mp3studio` with the rename. Android treats MP3 Studio as a new app, so old MPlay installs don't upgrade in place and their playlists, stems index and settings aren't carried over. This was accepted in M6 (MPlay had no wide distribution); there is no import from the old app.
 
-Other top-level folders: `supabase/` (backend config, migrations, Edge Functions and SQL tests, see [backend](backend.md)), `models/` (the `htdemucs.onnx` model, gitignored, plus its committed `.sha256`), `tools/` (Python scripts to export the model and generate DSP test references), `logos/`, `mockup-design/`.
+Other top-level folders: `supabase/` (backend config, migrations, Edge Functions and SQL tests, see [backend](backend.md)), `web/` (static files for `pay.returnHost`: the `/pay/return` page and the `assetlinks.json` template, see [payments](features/payments.md)), `models/` (the `htdemucs.onnx` model, gitignored, plus its committed `.sha256`), `tools/` (Python scripts to export the model and generate DSP test references), `logos/`, `mockup-design/`.
 
 ## Build
 
@@ -22,6 +22,7 @@ Other top-level folders: `supabase/` (backend config, migrations, Edge Functions
 - `compileSdk 37`, `minSdk 26`, `targetSdk 37`, Java 17, Compose, KSP, Room Gradle plugin (schemas exported to `app/schemas/`).
 - `BuildConfig.MODEL_SHA256` comes from `models/htdemucs.onnx.sha256`. `BuildConfig.SEPARATION_ABIS` is `arm64-v8a,x86_64` in debug and `arm64-v8a` in release.
 - `BuildConfig.SUPABASE_URL`, `SUPABASE_KEY` and `GOOGLE_WEB_CLIENT_ID` come from `local.properties` (`supabase.url`, `supabase.key`, `google.webClientId`). See [accounts](features/accounts.md#build-configuration).
+- `pay.returnHost` in `local.properties` (default `autoomstudio.com`) sets the payment App Link host: the manifest placeholder `payReturnHost` and `BuildConfig.PAY_RETURN_HOST`. See [payments](features/payments.md).
 - The Kotlin serialization plugin is applied (supabase-kt models).
 - Release signing reads an uncommitted `keystore.properties`. Release enables R8 optimisation.
 - `androidResources.noCompress += "onnx"` so the model can be memory-mapped from the APK.
@@ -31,7 +32,7 @@ Other top-level folders: `supabase/` (backend config, migrations, Edge Functions
   - `check<Variant>Permissions` (`CheckAllowedPermissions`): fails `assemble`/`bundle` if the merged manifest has a `uses-permission` outside `ALLOWED_PERMISSIONS` (plus the app's own `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`). Writes the list to `build/reports/permissions/<variant>.txt`.
   - `check<Variant>BackendConfig` (`CheckBackendConfig`): fails release builds when a Supabase or Google setting is blank; warns in debug.
 
-Key libraries: Compose BOM 2026.09.00, Material 3, Media3 1.11.1 (ExoPlayer, Session, Transformer), Room 2.8.5, WorkManager 2.10.1, Glance 1.2.0, DataStore 1.2.1, Coil 3 (with `coil-network-okhttp` for profile photos), Lottie 6.7.1, Coroutines 1.11.0, ONNX Runtime Android 1.22.0 (in `:separation`), supabase-kt 3.8.0 (Auth, Postgrest, Functions) on Ktor OkHttp 3.5.1, Credential Manager 1.6.0 with `googleid` 1.2.1, Tink 1.23.0.
+Key libraries: Compose BOM 2026.09.00, Material 3, Media3 1.11.1 (ExoPlayer, Session, Transformer), Room 2.8.5, WorkManager 2.10.1, Glance 1.2.0, DataStore 1.2.1, Coil 3 (with `coil-network-okhttp` for profile photos), Lottie 6.7.1, Coroutines 1.11.0, ONNX Runtime Android 1.22.0 (in `:separation`), supabase-kt 3.8.0 (Auth, Postgrest, Functions) on Ktor OkHttp 3.5.1, Credential Manager 1.6.0 with `googleid` 1.2.1, Tink 1.23.0, `androidx.browser` 1.9.0 (Custom Tabs for PayU checkout).
 
 ## Dependency injection
 
@@ -43,6 +44,8 @@ There is no DI framework. [`di/AppContainer.kt`](../app/src/main/java/com/autoom
 - Plans: `entitlementsRepository` (`SupabaseEntitlementsBackend` with `DeviceId`, `DataStoreEntitlementsCache`). `MetronomeViewModel` gets a `TempoDetectionGate` over `tempoAnalyzer`. See [plans](features/plans.md).
 - Usage limit: a private `usageBackend` (`SupabaseUsageBackend`), `usageGate` (`SeparationUsageGate`, passed to `separationController` with `signedInUserId`) and `usageReporter` (`UsageReporter` over `stemRepository`'s `usage_reports`). `stemRepository` gets `onUsageReported = { UsageSyncWorker.schedule(...) }`. See [vocal separation](features/vocal-separation.md#weekly-usage-limit-prd-us1-us9-pl5).
 - Admin: `adminBackend` (`SupabaseAdminBackend` over the `admin` Edge Function). `AdminViewModel` also gets `signedInUserId` and `entitlementsRepository.refresh`. See [admin](features/admin.md).
+- Payments: `billingRepository` (`BillingRepository` over `SupabaseBillingBackend` and `DataStorePendingPaymentStore`, with `refreshPlan = entitlementsRepository::refresh`). `AuthEffects` clears it on sign-out. `BillingViewModel` and `PaymentHistoryViewModel` use it. See [payments](features/payments.md).
+- `albumArtLoader` (`AlbumArtLoader`) is shared by Coil, the media session and the widget. `MPlayApp` implements Coil's `SingletonImageLoader.Factory` and registers `AlbumArtFetcher` on it. See [library](features/library.md#album-art).
 - `musicPlaying: MutableStateFlow<Boolean>` is shared state: `PlaybackService` writes it, `MetronomeController` reads it.
 - A private `mainScope` (`Dispatchers.Main.immediate`) backs a private app-scoped `PlaybackController` (`restoresSession = false`) passed to `MetronomeController` as its `MusicTimeline`, for syncing with the song. It binds to `PlaybackService` only while sync is on.
 - Factories: `createWidgetStatePublisher()` and `createPlaybackController(scope)` return new instances per call.
@@ -57,7 +60,7 @@ companion object {
 }
 ```
 
-ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `SeparationViewModel`, `SettingsViewModel`, `MetronomeViewModel`, `SingAlongViewModel`, `TrimEditorViewModel`, `AuthViewModel`, `AccountViewModel`, `AdminViewModel`, `PlansViewModel` (shared by the main screen, Now Playing, the metronome sheet, the Profile screen and the Plans screen). State is exposed as `StateFlow` and collected with `collectAsStateWithLifecycle`; one-off events (snackbar messages) are `Flow`s.
+ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `SeparationViewModel`, `SettingsViewModel`, `MetronomeViewModel`, `SingAlongViewModel`, `TrimEditorViewModel`, `AuthViewModel`, `AccountViewModel`, `AdminViewModel`, `PlansViewModel` (shared by the main screen, Now Playing, the metronome sheet, the Profile screen and the Plans screen), `BillingViewModel` (one per signed-in user, shared by `BillingHost`, the Plans screen and the upgrade sheet), `PaymentHistoryViewModel`. State is exposed as `StateFlow` and collected with `collectAsStateWithLifecycle`; one-off events (snackbar messages) are `Flow`s.
 
 `SettingsViewModel` and `AuthViewModel` belong to `MainActivity`. Everything under `MPlayRoot` gets its ViewModels from `SignedInViewModelScope` (an activity ViewModel holding a separate `ViewModelStore` per user), provided as `LocalViewModelStoreOwner`. The store is cleared on sign-out, which releases the playback `MediaController` and all per-user state, and survives rotation.
 
@@ -69,14 +72,15 @@ ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `Sepa
    - `EXTRA_OPEN_NOW_PLAYING` from the media notification and widget
    - `SeparationLinks.ACTION_OPEN_QUEUE` from the separation notification
    - `EXTRA_OPEN_METRONOME` from the metronome notification
-4. `MPlayRoot` requests the audio permission (shows `PermissionRationaleScreen` while denied), asks for `POST_NOTIFICATIONS` once on Android 13+, calls `LibraryViewModel.onAppForeground()` on every resume, and renders `MainScreen`.
+   - the payment App Link `https://<pay.returnHost>/pay/return?txn=...` (`PaymentReturnLink.parse`), passed to `BillingHost` as a return request
+4. `MPlayRoot` requests the audio permission (shows `PermissionRationaleScreen` while denied), asks for `POST_NOTIFICATIONS` once on Android 13+, calls `LibraryViewModel.onAppForeground()` on every resume, and renders `MainScreen` with `BillingHost` above it (checkout sheet, payment result, cancel dialog, and a payment check on every resume).
 
 ## Navigation
 
 No Navigation-Compose. [`ui/main/MainScreen.kt`](../app/src/main/java/com/autoomstudio/mp3studio/ui/main/MainScreen.kt) holds state in `rememberSaveable` and swaps screens with `AnimatedContent` + `fadeThrough()`.
 
 - Bottom bar (`Destination`): `Library`, `Playlists`, `Metronome`, `Profile` (its icon is the account photo, from `AccountViewModel`).
-- Profile sub-pages (`ProfilePage`): `Main` (the Profile screen; `MPlayTopBar` is hidden here), `EditProfile`, `Appearance`, `Library`, `Duplicates`, `Separation` (settings), `SeparationQueue`, `Playback`, `About`, `Licenses`, `Plans`, `Admin` (shown to admins; it keeps its own page stack in `AdminViewModel`). See [settings](features/settings-and-about.md). `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`.
+- Profile sub-pages (`ProfilePage`): `Main` (the Profile screen; `MPlayTopBar` is hidden here), `EditProfile`, `Appearance`, `Library`, `Duplicates`, `Separation` (settings), `SeparationQueue`, `Playback`, `About`, `Licenses`, `Plans`, `PaymentHistory` (from Plans), `Admin` (shown to admins; it keeps its own page stack in `AdminViewModel`). See [settings](features/settings-and-about.md). `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`.
 - The trial banner (last 3 days of the trial) sits above the screen content inside the scaffold.
 - Library back stack: route strings `album:<id>` / `artist:<name>`.
 - `ExpandablePlayer` is a draggable sheet from the mini player to Now Playing.
@@ -123,6 +127,7 @@ flowchart LR
 | `widget.MPlayWidgetReceiver` | Glance receiver, exported | | Home/lock screen widget. |
 | `separation.worker.CancelSeparationReceiver` | Receiver | | Cancel action on the separation notification. |
 | `ui.trim.TrimEditorActivity` | Activity | | Clip / ringtone editor. Finishes on sign-out. |
+| `MainActivity` App Link | Intent filter, `autoVerify` | | `VIEW` of `https://${payReturnHost}/pay/return`, the page PayU checkout returns to. Verified through `web/.well-known/assetlinks.json` on that host. |
 
 ### Removal from recents
 
@@ -154,7 +159,7 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | `RECORD_AUDIO` (+ optional `android.hardware.microphone` feature) | Sing-along |
 | `WAKE_LOCK` | Playback, WorkManager |
 | `WRITE_SETTINGS` | Setting ringtones |
-| `INTERNET`, `ACCESS_NETWORK_STATE` | Supabase sign-in and profile (cleartext blocked by `network_security_config.xml`) |
+| `INTERNET`, `ACCESS_NETWORK_STATE` | Supabase sign-in, profile, plans and payments (cleartext blocked by `network_security_config.xml`). PayU checkout opens in the browser, so the app never connects to PayU. |
 | `USE_BIOMETRIC`, `USE_FINGERPRINT` | Merged in by `androidx.credentials`; removed with `tools:node="remove"` |
 
 `RECEIVE_BOOT_COMPLETED` (WorkManager) is also merged in. The allow-list in `app/build.gradle.kts` (`ALLOWED_PERMISSIONS`) must be extended deliberately for any new permission.
@@ -177,3 +182,5 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-08 | - | Hardening (M6): `AuthRepository` takes an `AccountDeletionBackend`; `delete-account` Edge Function; recorded that old MPlay installs are not migrated. |
 | 2026-10-08 | - | `Destination.Settings` became `Destination.Profile` and `SettingsPage` became `ProfilePage` (new Profile screen and settings sub-pages). |
 | 2026-10-08 | - | `TaskRemoval` in `AppContainer`: removal from recents stops music, metronome, sing-along and separation; hooks in `onTaskRemoved` of `PlaybackService`, `MetronomeService`, `RecordingService` and the new `SeparationTaskWatcher` service; `MainActivity.onCreate` resumes separation. |
+| 2026-10-10 | - | `albumArtLoader` in `AppContainer`; `MPlayApp` is the Coil `SingletonImageLoader.Factory` (registers `AlbumArtFetcher`). |
+| 2026-10-10 | - | Payments: `billingRepository` in `AppContainer`, `androidx.browser`, the `/pay/return` App Link on `MainActivity` (`pay.returnHost`, `BuildConfig.PAY_RETURN_HOST`), `BillingHost` in `MPlayRoot`, `ProfilePage.PaymentHistory`, `AdminPage.Payments`; `web/` folder with the return page and `assetlinks.json` template. |

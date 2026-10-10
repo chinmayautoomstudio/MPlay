@@ -25,7 +25,7 @@ select is(public.claim_trial('bbbbbbbb-0000-0000-0000-000000000001', 'email-a', 
     'The first account gets the trial');
 select public.reserve_separation('bbbbbbbb-0000-0000-0000-000000000001', '[{"jobRef": "first-1"}]');
 insert into public.payment_events (user_id, provider, provider_event_id, event_type)
-values ('bbbbbbbb-0000-0000-0000-000000000001', 'razorpay', 'evt-abuse-1', 'payment.captured');
+values ('bbbbbbbb-0000-0000-0000-000000000001', 'payu', 'evt-abuse-1', 'payment_successful');
 
 select is(public.delete_account('bbbbbbbb-0000-0000-0000-000000000001') ->> 'result', 'deleted',
     'A user can delete their account');
@@ -57,13 +57,13 @@ select is(public.claim_trial('bbbbbbbb-0000-0000-0000-000000000003', 'email-c', 
 
 select is(public.delete_account('bbbbbbbb-0000-0000-0000-000000000005') ->> 'error', 'last_admin',
     'The last enabled Admin cannot delete their account');
-insert into public.subscriptions (user_id, status, provider, provider_ref, expires_at)
-values ('bbbbbbbb-0000-0000-0000-000000000006', 'active', 'razorpay', 'sub-abuse', now() + interval '20 days');
-select is(public.delete_account('bbbbbbbb-0000-0000-0000-000000000006') ->> 'error', 'active_subscription',
-    'A renewing paid subscription has to be cancelled first');
-update public.subscriptions set cancel_at_period_end = true where provider_ref = 'sub-abuse';
+insert into public.subscriptions (user_id, status, provider, provider_ref, expires_at, autopay_status)
+values ('bbbbbbbb-0000-0000-0000-000000000006', 'active', 'payu', 'sub-abuse', now() + interval '20 days', 'on');
+select is(public.delete_account('bbbbbbbb-0000-0000-0000-000000000006') ->> 'error', 'mandate_active',
+    'A live autopay mandate has to be cancelled with PayU first');
+update public.subscriptions set autopay_status = 'off', status = 'cancelled' where provider_ref = 'sub-abuse';
 select is(public.delete_account('bbbbbbbb-0000-0000-0000-000000000006') ->> 'result', 'deleted',
-    'A cancelled subscription does not block deletion');
+    'A cancelled mandate does not block deletion');
 select is(public.delete_account('bbbbbbbb-0000-0000-0000-000000000006') ->> 'error', 'not_found',
     'Deleting twice finds nothing');
 

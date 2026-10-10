@@ -15,11 +15,13 @@ import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSourceBitmapLoader
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder
+import androidx.media3.session.CacheBitmapLoader
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
@@ -126,8 +128,12 @@ class PlaybackService : MediaSessionService() {
                 .putExtra(MainActivity.EXTRA_OPEN_NOW_PLAYING, true),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+        val bitmapLoader = CacheBitmapLoader(
+            AlbumArtBitmapLoader(container.albumArtLoader, DataSourceBitmapLoader.Builder(this).build(), serviceScope),
+        )
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(sessionActivity)
+            .setBitmapLoader(bitmapLoader)
             .setCallback(SessionCallback())
             .setSessionExtras(PlaybackCommands.extras(SleepTimerStatus.Off, lofiEnabled))
             .build()

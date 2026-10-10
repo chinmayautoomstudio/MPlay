@@ -18,12 +18,16 @@ import com.autoomstudio.mp3studio.data.clip.RingtoneSetter
 import com.autoomstudio.mp3studio.data.clip.WaveformExtractor
 import com.autoomstudio.mp3studio.data.duplicates.DuplicateRepository
 import com.autoomstudio.mp3studio.data.duplicates.FileFingerprinter
+import com.autoomstudio.mp3studio.data.library.AlbumArtLoader
 import com.autoomstudio.mp3studio.data.library.AudioFolderScanner
 import com.autoomstudio.mp3studio.data.library.AudioFolderWatcher
 import com.autoomstudio.mp3studio.data.library.LibraryPreferences
 import com.autoomstudio.mp3studio.data.library.MediaStoreSongSource
 import com.autoomstudio.mp3studio.data.library.SongDeleter
 import com.autoomstudio.mp3studio.data.library.SongRepository
+import com.autoomstudio.mp3studio.data.billing.BillingRepository
+import com.autoomstudio.mp3studio.data.billing.DataStorePendingPaymentStore
+import com.autoomstudio.mp3studio.data.billing.SupabaseBillingBackend
 import com.autoomstudio.mp3studio.data.plan.DataStoreEntitlementsCache
 import com.autoomstudio.mp3studio.data.plan.DeviceId
 import com.autoomstudio.mp3studio.data.plan.EntitlementsRepository
@@ -79,6 +83,8 @@ class AppContainer(context: Context) {
             watcher = AudioFolderWatcher(scanner.folders()),
         )
     }
+
+    val albumArtLoader: AlbumArtLoader by lazy { AlbumArtLoader(appContext) }
 
     val playbackSessionStore: PlaybackSessionStore by lazy { PlaybackSessionStore(appContext) }
 
@@ -196,6 +202,14 @@ class AppContainer(context: Context) {
 
     val adminBackend: AdminBackend by lazy { SupabaseAdminBackend(supabase) }
 
+    val billingRepository: BillingRepository by lazy {
+        BillingRepository(
+            backend = SupabaseBillingBackend(supabase),
+            store = DataStorePendingPaymentStore(appContext),
+            refreshPlan = { entitlementsRepository.refresh(it) },
+        )
+    }
+
     fun signedInUserId(): String? = (authRepository.state.value as? AuthState.SignedIn)?.user?.id
 
     val googleSignIn: GoogleSignIn by lazy { GoogleSignIn(BuildConfig.GOOGLE_WEB_CLIENT_ID) }
@@ -232,7 +246,7 @@ class AppContainer(context: Context) {
     }
 
     fun createWidgetStatePublisher(): WidgetStatePublisher =
-        WidgetStatePublisher(appContext, widgetStateStore, applicationScope)
+        WidgetStatePublisher(appContext, widgetStateStore, albumArtLoader, applicationScope)
 
     fun createPlaybackController(scope: CoroutineScope): PlaybackController =
         PlaybackController(appContext, scope, songRepository, playbackSessionStore)

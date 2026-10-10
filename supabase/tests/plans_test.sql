@@ -48,7 +48,7 @@ select is(public.compute_entitlements('11111111-1111-1111-1111-111111111111') ->
 -- Subscriptions --------------------------------------------------------------------------------------------
 
 insert into public.subscriptions (user_id, status, provider, provider_ref, expires_at)
-values ('33333333-3333-3333-3333-333333333333', 'active', 'razorpay', 'sub_c1', now() + interval '20 days');
+values ('33333333-3333-3333-3333-333333333333', 'active', 'payu', 'sub_c1', now() + interval '20 days');
 select is(public.compute_entitlements('33333333-3333-3333-3333-333333333333') ->> 'plan', 'pro',
     'An active subscription is Pro');
 

@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.admin.AddAdminResult
+import com.autoomstudio.mp3studio.data.admin.AdminBillingResult
 import com.autoomstudio.mp3studio.data.admin.AdminError
 import com.autoomstudio.mp3studio.data.plan.epochMillis
 import java.time.LocalDate
@@ -48,6 +49,10 @@ internal fun AdminError.text(resources: Resources): String = resources.getString
         AdminError.InvalidEmail -> R.string.admin_error_invalid_email
         AdminError.InvalidDate -> R.string.admin_error_invalid_date
         AdminError.NotFound -> R.string.admin_error_not_found
+        AdminError.NotRefundable -> R.string.admin_error_not_refundable
+        AdminError.NotSubscribed -> R.string.admin_error_not_subscribed
+        AdminError.PayuRefused -> R.string.admin_error_payu_refused
+        AdminError.PaymentsUnavailable -> R.string.admin_error_payments_unavailable
         AdminError.Offline -> R.string.admin_error_offline
         AdminError.Other -> R.string.admin_error_other
     },
@@ -67,6 +72,14 @@ internal fun AdminMessage.text(resources: Resources): String = when (this) {
         AddAdminResult.Invited -> resources.getString(R.string.admin_msg_invited, email)
     }
     AdminMessage.InviteRevoked -> resources.getString(R.string.admin_msg_invite_revoked)
+    is AdminMessage.Billing -> resources.getString(
+        when (result) {
+            AdminBillingResult.Checked -> R.string.admin_msg_payment_checked
+            AdminBillingResult.RefundRequested -> R.string.admin_msg_refund_requested
+            AdminBillingResult.Cancelled -> R.string.admin_msg_subscription_cancelled
+            AdminBillingResult.CancelPending -> R.string.admin_msg_cancel_pending
+        },
+    )
 }
 
 internal fun formatDate(context: Context, iso: String?): String = iso?.let {

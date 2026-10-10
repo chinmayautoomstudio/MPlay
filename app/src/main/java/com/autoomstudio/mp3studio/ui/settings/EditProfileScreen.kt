@@ -231,7 +231,7 @@ private fun DeleteAccountDialog(
                         stringResource(
                             when (error) {
                                 DeletionError.LastAdmin -> R.string.account_delete_last_admin
-                                DeletionError.ActiveSubscription -> R.string.account_delete_subscription
+                                DeletionError.MandateCancelFailed -> R.string.account_delete_mandate
                                 DeletionError.Offline -> R.string.account_delete_offline
                                 DeletionError.Other -> R.string.account_delete_failed
                             },

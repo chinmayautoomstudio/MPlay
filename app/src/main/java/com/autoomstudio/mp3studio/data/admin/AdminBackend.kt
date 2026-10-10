@@ -30,6 +30,17 @@ interface AdminBackend {
     suspend fun revokePro(userId: String)
     suspend fun audit(before: Long?): List<AuditEntry>
     suspend fun activity(): List<AdminActivity>
+    suspend fun payments(query: String, filter: PaymentFilter, offset: Int): AdminPaymentPage
+    suspend fun billingHealth(): AdminBillingHealth
+
+    /** Checks a payment (or its refund) with PayU again and applies the answer. */
+    suspend fun reverifyPayment(txnId: String): AdminBillingResult
+
+    /** Asks PayU for a full refund; the payment changes only when PayU confirms it (payments PRD RF2). */
+    suspend fun refundPayment(txnId: String): AdminBillingResult
+
+    /** Cancels the user's PayU autopay; Pro stays until the paid period ends. */
+    suspend fun cancelSubscription(userId: String): AdminBillingResult
 
     companion object {
         const val PAGE_SIZE = 50
@@ -98,6 +109,32 @@ class SupabaseAdminBackend(private val client: SupabaseClient) : AdminBackend {
     override suspend fun activity(): List<AdminActivity> =
         call<ActivityDto>("activity") { put("limit", AdminBackend.PAGE_SIZE) }.events
 
+    override suspend fun payments(query: String, filter: PaymentFilter, offset: Int): AdminPaymentPage =
+        call("payments") {
+            put("query", query.take(100))
+            put("filter", filter.wire)
+            put("limit", AdminBackend.PAGE_SIZE)
+            put("offset", offset)
+        }
+
+    override suspend fun billingHealth(): AdminBillingHealth = call("billingHealth")
+
+    override suspend fun reverifyPayment(txnId: String): AdminBillingResult {
+        call<JsonObject>("reverifyPayment") { put("txnId", txnId) }
+        return AdminBillingResult.Checked
+    }
+
+    override suspend fun refundPayment(txnId: String): AdminBillingResult {
+        call<JsonObject>("refundPayment") { put("txnId", txnId) }
+        return AdminBillingResult.RefundRequested
+    }
+
+    override suspend fun cancelSubscription(userId: String): AdminBillingResult =
+        when (call<ResultDto>("cancelSubscription") { put("userId", userId) }.result) {
+            "cancelled" -> AdminBillingResult.Cancelled
+            else -> AdminBillingResult.CancelPending
+        }
+
     private suspend inline fun <reified T> call(action: String, fields: JsonObjectBuilder.() -> Unit = {}): T {
         val body = buildJsonObject {
             put("action", action)
@@ -138,8 +175,12 @@ internal fun errorOf(e: Throwable): AdminError = when (e) {
         when {
             e.statusCode == 403 -> AdminError.Forbidden
             e.statusCode == 404 -> AdminError.NotFound
+            e.statusCode == 502 && "payu_refused" in text -> AdminError.PayuRefused
+            e.statusCode == 503 && "payu_unavailable" in text -> AdminError.PaymentsUnavailable
             e.statusCode != 409 -> AdminError.Other
             "last_admin" in text -> AdminError.LastAdmin
+            "not_refundable" in text -> AdminError.NotRefundable
+            "not_subscribed" in text -> AdminError.NotSubscribed
             "invalid_email" in text -> AdminError.InvalidEmail
             "invalid_date" in text -> AdminError.InvalidDate
             "\"self\"" in text -> AdminError.Self

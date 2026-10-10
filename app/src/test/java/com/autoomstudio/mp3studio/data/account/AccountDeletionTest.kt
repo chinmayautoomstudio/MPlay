@@ -11,7 +11,8 @@ class AccountDeletionTest {
     @Test
     fun refusalsAreReadFromTheConflictBody() {
         assertEquals(DeletionError.LastAdmin, deletionErrorOf(409, """{"error":"last_admin"}"""))
-        assertEquals(DeletionError.ActiveSubscription, deletionErrorOf(409, """{"error":"active_subscription"}"""))
+        assertEquals(DeletionError.MandateCancelFailed, deletionErrorOf(409, """{"error":"mandate_cancel_failed"}"""))
+        assertEquals(DeletionError.Other, deletionErrorOf(409, """{"error":"active_subscription"}"""))
         assertEquals(DeletionError.Other, deletionErrorOf(409, """{"error":"something_new"}"""))
     }
 

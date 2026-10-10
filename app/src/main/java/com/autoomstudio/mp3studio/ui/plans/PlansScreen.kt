@@ -16,6 +16,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,14 +34,19 @@ import com.autoomstudio.mp3studio.data.plan.Plan
 import com.autoomstudio.mp3studio.data.plan.TrialClaim
 import com.autoomstudio.mp3studio.ui.library.DetailBackButton
 
-/** Settings > Plans (PRD PL6): the current plan with its dates, and what Free and Pro include. */
+/**
+ * Settings > Plans (PRD PL6): the current plan with its dates, the PayU billing status with its actions, and what
+ * Free and Pro include.
+ */
 @Composable
 fun PlansScreen(
     onBack: () -> Unit,
     onMessage: (String) -> Unit,
+    onOpenHistory: () -> Unit,
     modifier: Modifier = Modifier,
     backEnabled: Boolean = true,
     viewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
+    billingViewModel: BillingViewModel = viewModel(factory = BillingViewModel.Factory),
 ) {
     BackHandler(enabled = backEnabled, onBack = onBack)
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -61,6 +67,7 @@ fun PlansScreen(
         ) {
             Text(stringResource(R.string.plans_title), style = MaterialTheme.typography.headlineSmall)
             CurrentPlanCard(state = state, refreshing = refreshing, onRefresh = viewModel::refresh)
+            BillingSection(state = state, billing = billingViewModel, onOpenHistory = onOpenHistory)
             Text(stringResource(R.string.plans_compare), style = MaterialTheme.typography.titleMedium)
             ComparisonTable()
             Text(stringResource(R.string.plans_trial_note), style = MaterialTheme.typography.bodyMedium)
@@ -69,13 +76,95 @@ fun PlansScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (state.plan != Plan.Pro) {
-                Text(stringResource(R.string.plans_price), style = MaterialTheme.typography.titleMedium)
-                Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.plans_go_pro_soon))
-                }
+        }
+    }
+}
+
+/** What the PayU subscription is doing and what can be done about it (payments PRD PS1, PS2, CN1, 5.5). */
+@Composable
+private fun BillingSection(state: PlanUiState, billing: BillingViewModel, onOpenHistory: () -> Unit) {
+    val context = LocalContext.current
+    fun date(millis: Long?) = millis?.let { billingDate(context, it) } ?: "—"
+    val status = state.billing
+    if (state.checkedAt == null) return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when (val notice = status.notice) {
+            null -> Unit
+            BillingNotice.PaymentsUnavailable -> Notice(stringResource(R.string.plans_payments_unavailable))
+            is BillingNotice.PaymentPending -> Notice(stringResource(R.string.plans_payment_pending))
+            is BillingNotice.AutopayOn -> Notice(stringResource(R.string.plans_autopay_on, date(notice.nextBillingAt)))
+            is BillingNotice.AutopayNotSet -> Notice(stringResource(R.string.plans_autopay_not_set, date(notice.expiresAt)))
+            is BillingNotice.RenewSoon -> Notice(stringResource(R.string.plans_renew_reminder, date(notice.expiresAt)))
+            is BillingNotice.PastDue -> Notice(stringResource(R.string.plans_past_due, date(notice.graceEnd)), warning = true)
+            is BillingNotice.CancelPending -> Notice(stringResource(R.string.plans_cancel_pending))
+            is BillingNotice.Cancelled -> Notice(stringResource(R.string.plans_cancelled_until, date(notice.expiresAt)))
+            is BillingNotice.MandateEnding -> Notice(stringResource(R.string.plans_mandate_ends, date(notice.mandateEnd)), warning = true)
+            BillingNotice.Expired -> Notice(stringResource(R.string.plans_expired))
+        }
+        state.lastPayment?.let {
+            Text(
+                stringResource(R.string.plans_last_payment, rupees(it.amountPaise), date(it.at)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        val buysPro = status.actions.any { it == BillingAction.GoPro || it == BillingAction.GoProAgain || it == BillingAction.Renew }
+        if (buysPro || status.notice == BillingNotice.PaymentsUnavailable) {
+            Text(stringResource(R.string.plans_price), style = MaterialTheme.typography.titleMedium)
+        }
+        if (status.notice == BillingNotice.PaymentsUnavailable) {
+            Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.plans_go_pro))
             }
         }
+        status.actions.forEach { action ->
+            when (action) {
+                BillingAction.GoPro -> Button(
+                    onClick = { billing.openCheckout(CheckoutPurpose.Subscribe) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.plans_go_pro)) }
+                BillingAction.GoProAgain -> Button(
+                    onClick = { billing.openCheckout(CheckoutPurpose.Subscribe) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.plans_resubscribe)) }
+                BillingAction.FixPayment -> Button(
+                    onClick = { billing.openCheckout(CheckoutPurpose.FixPayment) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.plans_fix_payment)) }
+                BillingAction.SetUpAutopay -> Button(
+                    onClick = { billing.openCheckout(CheckoutPurpose.SetUpAutopay) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.plans_set_up_autopay)) }
+                BillingAction.Renew -> Button(
+                    onClick = { billing.openCheckout(CheckoutPurpose.Renew) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.plans_renew)) }
+                BillingAction.CheckPayment -> OutlinedButton(
+                    onClick = { billing.onReturned((status.notice as? BillingNotice.PaymentPending)?.txnId) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.plans_check_payment)) }
+                BillingAction.CancelAutopay -> OutlinedButton(
+                    onClick = billing::requestCancel,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(R.string.plans_cancel_autopay)) }
+            }
+        }
+        if (state.hasPayments) {
+            TextButton(onClick = onOpenHistory) { Text(stringResource(R.string.plans_payment_history)) }
+        }
+    }
+}
+
+@Composable
+private fun Notice(text: String, warning: Boolean = false) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (warning) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = if (warning) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(12.dp))
     }
 }
 

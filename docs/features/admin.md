@@ -1,10 +1,10 @@
 # Admin
 
-> Status: Unreleased | Added in: Unreleased | Last updated: 2026-10-08
+> Status: Unreleased | Added in: Unreleased | Last updated: 2026-10-10
 
 ## Summary
 
-Admins get an Admin card on the Profile screen, below Subscription. It opens the Admin dashboard, with screens to look up users, see each user's plan, trial, subscriptions, payments and AI Vocal Separator usage, change roles, disable accounts, grant or remove Pro with an end date, add other admins (by email, as an invite if they haven't signed in yet), read the audit log, and follow an Activity feed of new sign-ups, subscriptions and deleted accounts. Every change is checked and logged on the server; the app only decides whether to offer the screens.
+Admins get an Admin card on the Profile screen, below Subscription. It opens the Admin dashboard, with screens to look up users, see each user's plan, trial, subscriptions, payments and AI Vocal Separator usage, change roles, disable accounts, grant or remove Pro with an end date, add other admins (by email, as an invite if they haven't signed in yet), read the audit log, and follow an Activity feed of new sign-ups, subscriptions and deleted accounts. A Payments page lists PayU payments with billing health, and lets admins re-check a payment with PayU, refund it, or cancel a user's subscription ([payments](payments.md)). Every change is checked and logged on the server; the app only decides whether to offer the screens.
 
 ## Key files
 
@@ -15,15 +15,17 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 | `data/admin/AdminModels.kt` | DTOs for every admin response, `UserFilter`, `AddAdminResult`, `AdminError`, `AdminException`. |
 | `data/admin/AdminBackend.kt` | `AdminBackend` interface and `SupabaseAdminBackend`, which calls the `admin` Edge Function with an `action`; `errorOf()` maps HTTP status and refusal codes to `AdminError`. `PAGE_SIZE = 50`. |
 | `data/plan/Entitlements.kt`, `data/plan/EntitlementsBackend.kt` | `Entitlements.isAdmin`, from `role == "admin"` in the `entitlements` response. |
-| `ui/admin/AdminViewModel.kt` | Page back stack (`AdminPage`: Home, User, Admins, Usage, Audit, Activity), loading state per page, debounced user search, actions, one-shot `AdminMessage`s, `closed` when access is lost, `activity` and `unread` for the bell. |
+| `ui/admin/AdminViewModel.kt` | Page back stack (`AdminPage`: Home, User, Admins, Usage, Audit, Activity, Payments), loading state per page, debounced user search, payment search and filter (`PaymentListState`), billing health, actions, one-shot `AdminMessage`s (including `Billing(result)`), `closed` when access is lost, `activity` and `unread` for the bell. |
+| `ui/admin/AdminPaymentsScreen.kt` | Payments page: billing health card (last run of each job, overdue jobs, flagged and failed webhooks, unconfirmed mandate cancellations, payments to review), search by email, transaction ID or PayU reference, filter chips, `AdminPaymentItem` (Re-check with PayU, Refund, Open user), `RefundDialog`. |
 | `ui/admin/AdminScreen.kt` | Host (back handling, messages) and the dashboard: wordmark header with the Admin chip and bell, stats card, shortcut cards, Users card (pill search, filter chips, `AdminUserRowItem` with the "..." menu and its confirm dialog, paging). |
-| `ui/admin/AdminUserScreen.kt` | User detail and actions, confirm dialogs, `GrantProDialog` (1 month, 3 months, 1 year or a picked date up to 5 years ahead). |
+| `ui/admin/AdminUserScreen.kt` | User detail and actions, confirm dialogs, `GrantProDialog` (1 month, 3 months, 1 year or a picked date up to 5 years ahead); PayU subscription details, the user's payments and Cancel subscription. |
 | `ui/admin/AdminListScreens.kt` | Admins and invites (`AddAdminDialog`), weekly usage with top users, audit log, `AdminActivityScreen`. |
 | `ui/admin/AdminCommon.kt` | Error and message texts, date formatting, shared loading and error blocks, `AdminCard`, `IconTile`, `AdminColors`. |
 | `ui/settings/ProfileScreen.kt`, `ui/main/MainScreen.kt` | Admin card (shown when `PlanUiState.isAdmin`) and `ProfilePage.Admin`; the app top bar is hidden on the Admin screens. |
 | `data/settings/AppSettings.kt` | `adminActivitySeenAt` (key `admin_activity_seen_at`). |
 | `supabase/migrations/20261010000000_admin.sql` | `admin_invites`, invite handling in `handle_new_user()`, `admin_*` functions. |
 | `supabase/migrations/20261012000000_admin_activity.sql` | `admin_activity()` for the Activity feed. |
+| `supabase/migrations/20261015000000_billing_admin.sql` | `admin_list_payments()`, `admin_billing_health()`, `admin_billing_action()`, payments in `admin_user_detail()`. |
 | `supabase/functions/admin/index.ts`, `supabase/functions/_shared/admin.ts` | The `admin` Edge Function and its request parser. |
 
 ## How it works
@@ -39,11 +41,13 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 - **Granting Pro.** Writes a `subscriptions` row with `provider = 'admin'`, `provider_ref = 'admin:<user id>'`, `status = 'active'`, `payment_status = 'granted'` and the chosen end date (end of that day, local time). Changing the end date updates the same row. Removing Pro marks it `expired` now. The user's plan follows from the normal entitlement rules ([plans](plans.md)).
 - **Deleted accounts.** When a user deletes their account ([accounts](accounts.md#delete-account-prd-au9-pr4)), the audit log shows "A user deleted their account (Free plan)" by "the account owner". The entry has no email and doesn't open a user page, since the account no longer exists. The last enabled Admin can't delete their account.
 - **Search and paging.** The search box matches email or name (300 ms debounce) with a filter (All, Pro, Free trial, Free, Disabled, Admins); 50 users per page with "Load more". The audit log pages by entry id.
+- **Payments.** The Payments shortcut on the dashboard opens the payment list (filters All, Paid, Failed, Pending, Refunded, Disputed, Past due, Cancelled; 50 per page) under a billing health card. Each payment shows the user, amount, status, kind, method, PayU reference and any refund in progress. "Re-check with PayU" (`reverifyPayment`) re-runs the status check and applies the result. "Refund" (confirmed) asks PayU to refund what hasn't been refunded yet; it is offered only for a paid payment with a PayU reference and no refund in progress (`AdminPaymentRow.refundable`), and the result arrives later through the `sweep` job or a webhook. A user's page shows the same list for that user, their PayU subscription (autopay status, grace end, mandate end, cancellation pending) and "Cancel subscription", which stops renewals and revokes the mandate; Pro stays until the paid period ends. Cancelling your own subscription refreshes your plan.
+- **Billing refusals.** 409 `not_refundable` and `not_subscribed`, 502 `payu_refused` (PayU said no) and 503 `payu_unavailable` (PayU secrets not set or PayU unreachable).
 
 ## Data and persistence
 
 - On the phone: the existing `entitlements` cache ([plans](plans.md)) and the DataStore key `admin_activity_seen_at` (Long, epoch ms of the newest Activity event seen; [settings](settings-and-about.md)).
-- Server: `admin_invites`, `admin_audit_log` (actions `set_role`, `disable`, `enable`, `invite_admin`, `revoke_invite`, `invite_accepted`, `grant_pro`, `revoke_pro`, and `account_deleted` written by `delete_account()` when a user deletes their own account), `subscriptions` rows with provider `admin`. See [backend.md](../backend.md).
+- Server: `admin_invites`, `admin_audit_log` (actions `set_role`, `disable`, `enable`, `invite_admin`, `revoke_invite`, `invite_accepted`, `grant_pro`, `revoke_pro`, `reverify_payment`, `refund_requested`, `cancel_subscription`, and `account_deleted` written by `delete_account()` when a user deletes their own account), `subscriptions` rows with provider `admin`, and the billing tables (`payments`, `webhook_log`, `job_runs`). See [backend.md](../backend.md).
 
 ## Manifest, permissions and notifications
 
@@ -51,7 +55,8 @@ None. Uses the existing network access.
 
 ## Tests
 
-- `app/src/test/.../ui/admin/AdminViewModelTest.kt`: initial load, page back stack, debounced search, refusal message, own role change refreshes the plan, 403 closes the screens, Activity unread count cleared by opening the feed.
+- `app/src/test/.../ui/admin/AdminViewModelTest.kt`: initial load, page back stack, debounced search, refusal message, own role change refreshes the plan, 403 closes the screens, Activity unread count cleared by opening the feed, Payments page loads health and filtered payments, refund and cancel results and refusals, the refundable rule.
+- `supabase/tests/billing_flow_test.sql` (pgTAP): admin payment list, billing health and billing action refusals.
 - `app/src/test/.../data/plan/EntitlementsResponseTest.kt`: `role` maps to `isAdmin`.
 - `supabase/tests/admin_test.sql` (pgTAP): non-admin and disabled-admin refusals, last admin and self rules, promote and step down, invites and the sign-up trigger, Pro grant and removal, search, audit rows, `admin_activity` (refusal, sign-up, subscription and deleted events, newest first), no access for `authenticated`.
 - `supabase/functions/_shared/admin_test.ts` (Deno): request parsing and validation, including `activity` limits.
@@ -60,7 +65,8 @@ None. Uses the existing network access.
 ## Known limitations and TODOs
 
 - An invite only matches the exact email (case-insensitive); a different alias of the same Google account isn't matched.
-- Admin Pro grants don't show payment history; payment providers (M4) aren't built yet.
+- Refunds are always for the whole remaining amount; partial refunds are done in the PayU dashboard and picked up from the refund webhook.
+- Billing health only reports; there is no button to retry a flagged webhook from the app.
 - The Activity feed is computed live from `profiles`, `subscriptions` and the audit log: a subscription that later expires drops out of it, and unread is tracked per phone, not per admin.
 - The Admin card appears only after entitlements refresh (sign-in or app start), so a newly promoted admin may need to reopen the app.
 
@@ -71,3 +77,4 @@ None. Uses the existing network access.
 | 2026-10-08 | | Admin screens, invites, Pro grants and audit log (PRD v3.2 M5). |
 | 2026-10-08 | | M6: `account_deleted` audit entries; the store review account gets Pro from the Admin screens ([store review](../store-review.md)). |
 | 2026-10-08 | | Dashboard redesign (wordmark header, stats card, shortcut cards, Users card with "..." menu) and the Activity bell (`admin_activity()`, `activity` action, `admin_activity_seen_at`). |
+| 2026-10-10 | | PayU billing: Payments page with billing health, Re-check with PayU, Refund, Cancel subscription; PayU subscription details and payments on the user page; provider labels are now Admin and PayU only. |

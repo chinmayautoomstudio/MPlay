@@ -1,12 +1,28 @@
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FILTERS = ["all", "pro", "trial", "free", "disabled", "admin"];
+const PAYMENT_FILTERS = ["all", "success", "failed", "pending", "refunded", "disputed", "past_due", "cancelled"];
+const TXN = /^[A-Za-z0-9]{1,25}$/;
 export const PAGE_MAX = 100;
 
+/** A billing action that also calls PayU after `admin_billing_action` has checked and logged it. */
+export type PayuStep = "reverify" | "refund" | "cancel_subscription";
+
 /** The SQL function an admin request maps to and its arguments, without `p_actor`. */
-export type AdminCall = { fn: string; args: Record<string, unknown> };
+export type AdminCall = { fn: string; args: Record<string, unknown>; payu?: PayuStep };
 
 /** Error codes the SQL functions return as `{"error": ...}` for refusals the app explains. */
-export const REFUSALS = ["last_admin", "self", "invalid_email", "invalid_date"];
+export const REFUSALS = [
+  "last_admin",
+  "self",
+  "invalid_email",
+  "invalid_date",
+  "not_refundable",
+  "not_subscribed",
+];
+
+function txnId(value: unknown): string | null {
+  return typeof value === "string" && TXN.test(value) ? value : null;
+}
 
 function userId(value: unknown): string | null {
   return typeof value === "string" && UUID.test(value) ? value.toLowerCase() : null;
@@ -82,6 +98,37 @@ export function parseAdminRequest(body: unknown): AdminCall | null {
       const limit = count(b.limit, 50, PAGE_MAX);
       if (limit === null || limit === 0) return null;
       return { fn: "admin_activity", args: { p_limit: limit } };
+    }
+    case "payments": {
+      const query = b.query ?? "";
+      const filter = b.filter ?? "all";
+      const limit = count(b.limit, 50, PAGE_MAX);
+      const offset = count(b.offset, 0, 100_000);
+      if (typeof query !== "string" || query.length > 100) return null;
+      if (typeof filter !== "string" || !PAYMENT_FILTERS.includes(filter)) return null;
+      if (limit === null || limit === 0 || offset === null) return null;
+      return {
+        fn: "admin_list_payments",
+        args: { p_query: query.trim(), p_filter: filter, p_limit: limit, p_offset: offset },
+      };
+    }
+    case "billingHealth":
+      return { fn: "admin_billing_health", args: {} };
+    case "reverifyPayment":
+    case "refundPayment": {
+      const t = txnId(b.txnId);
+      const step: PayuStep = b.action === "refundPayment" ? "refund" : "reverify";
+      return t ? { fn: "admin_billing_action", args: { p_action: step, p_user: null, p_txn: t }, payu: step } : null;
+    }
+    case "cancelSubscription": {
+      const id = userId(b.userId);
+      return id
+        ? {
+          fn: "admin_billing_action",
+          args: { p_action: "cancel_subscription", p_user: id, p_txn: null },
+          payu: "cancel_subscription",
+        }
+        : null;
     }
     case "audit": {
       const limit = count(b.limit, 50, PAGE_MAX);

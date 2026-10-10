@@ -88,8 +88,8 @@ select is((select count(*)::int from public.admin_audit_log where created_at = n
 
 -- Activity feed --------------------------------------------------------------------------------------------
 
-select throws_ok($$ select public.admin_activity('aaaaaaaa-0000-0000-0000-000000000002', 50) $$, '42501', null,
-    'A normal user cannot read the activity feed');
+select throws_ok($$ select public.admin_activity('aaaaaaaa-0000-0000-0000-000000000003', 50) $$, '42501', null,
+    'A disabled Admin cannot read the activity feed');
 select is(public.admin_grant_pro('aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000002',
     now() + interval '1 month') ->> 'result', 'ok', 'Pro can be granted again');
 insert into public.admin_audit_log (actor_id, action, target_user_id, details)

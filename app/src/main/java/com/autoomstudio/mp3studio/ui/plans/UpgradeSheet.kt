@@ -30,8 +30,8 @@ import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.plan.Feature
 
 /**
- * Shown instead of a locked feature (PRD PL3, flow 6): what Pro adds and its price. Payments arrive later, so the
- * Go Pro button is disabled. "See plans" dismisses this and asks the main screen to open Settings > Plans.
+ * Shown instead of a locked feature (PRD PL3, flow 6): what Pro adds and its price. Go Pro dismisses this and opens
+ * the checkout sheet; "See plans" dismisses this and asks the main screen to open Settings > Plans.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +41,7 @@ fun UpgradeSheet(
     /** Set when the Free weekly separator limit was reached (PRD US7): the sheet leads with the reset date. */
     limitResetsAt: Long? = null,
     viewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
+    billingViewModel: BillingViewModel = viewModel(factory = BillingViewModel.Factory),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     ModalBottomSheet(
@@ -95,8 +96,23 @@ fun UpgradeSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(stringResource(R.string.plans_price), style = MaterialTheme.typography.titleMedium)
-            Button(onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.plans_go_pro_soon))
+            val canPay = state.checkedAt != null && state.billing.notice != BillingNotice.PaymentsUnavailable
+            Button(
+                onClick = {
+                    onDismiss()
+                    billingViewModel.openCheckout(CheckoutPurpose.Subscribe)
+                },
+                enabled = canPay,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.plans_go_pro))
+            }
+            if (!canPay && state.checkedAt != null) {
+                Text(
+                    stringResource(R.string.plans_payments_unavailable),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
             TextButton(
                 onClick = {

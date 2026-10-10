@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.CardGiftcard
 import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
@@ -113,6 +114,7 @@ fun AdminScreen(
         AdminPage.Usage -> AdminUsageScreen(viewModel, goBack, modifier)
         AdminPage.Audit -> AdminAuditScreen(viewModel, goBack, modifier)
         AdminPage.Activity -> AdminActivityScreen(viewModel, goBack, modifier)
+        AdminPage.Payments -> AdminPaymentsScreen(viewModel, goBack, modifier)
     }
 }
 
@@ -174,6 +176,21 @@ private fun AdminHome(viewModel: AdminViewModel, modifier: Modifier) {
                     stringResource(R.string.admin_open_audit_summary),
                     Modifier.weight(1f),
                 ) { viewModel.open(AdminPage.Audit) }
+            }
+        }
+        item {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .height(IntrinsicSize.Max),
+            ) {
+                ShortcutCard(
+                    rememberVectorPainter(Icons.Outlined.Payments),
+                    stringResource(R.string.admin_open_payments),
+                    stringResource(R.string.admin_open_payments_summary),
+                    Modifier.weight(1f),
+                ) { viewModel.open(AdminPage.Payments) }
             }
         }
         item {

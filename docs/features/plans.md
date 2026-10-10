@@ -1,10 +1,10 @@
 # Plans, trial and feature gates
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-08
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-10
 
 ## Summary
 
-Every account is on Free, Trial or Pro (PRD v3.2 section 6.3, M2). The server decides the plan; the app caches it and locks BPM detection and Sing Along on Free, showing an upgrade sheet instead. Free users can separate 10 songs a week (M3). New accounts get a one-time 30-day trial with everything in Pro, at most once per normalized email and per phone. Settings > Plans shows the plan, its dates and what each plan includes. Payments come in M4, so "Go Pro" is a disabled "Payments coming soon" button.
+Every account is on Free, Trial or Pro (PRD v3.2 section 6.3, M2). The server decides the plan; the app caches it and locks BPM detection and Sing Along on Free, showing an upgrade sheet instead. Free users can separate 10 songs a week (M3). New accounts get a one-time 30-day trial with everything in Pro, at most once per normalized email and per phone. Settings > Plans shows the plan, its dates, what each plan includes and, for paying users, the billing status. "Go Pro" (₹99 a month) opens the PayU checkout described in [payments](payments.md); it is disabled with "Payments aren't available yet." while the server has no PayU secrets.
 
 ## Key files
 
@@ -22,7 +22,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 | `data/tempo/TempoDetectionGate.kt` | `TempoSource` and the gate that lets cached tempos through and locks new detections. |
 | `ui/plans/PlansViewModel.kt` | `PlanUiState` for screens, `canUse()`, manual `refresh()`, the "See plans" request. |
 | `ui/plans/PlansScreen.kt` | Settings > Plans; `planLabel()` shared with the Account card. |
-| `ui/plans/UpgradeSheet.kt` | The locked-feature sheet. |
+| `ui/plans/UpgradeSheet.kt` | The locked-feature sheet; Go Pro opens the checkout. |
+| `ui/plans/BillingStatus.kt`, `BillingViewModel.kt`, `CheckoutSheet.kt`, `PaymentHistoryScreen.kt` | Billing status, checkout and payment history; see [payments](payments.md). |
 | `supabase/functions/entitlements/`, `claim-trial/`, `_shared/` | Edge Functions; see [backend](../backend.md#edge-functions). |
 | `supabase/migrations/20261008000000_plans.sql` | `compute_entitlements()` and `claim_trial()`. |
 
@@ -45,7 +46,7 @@ sequenceDiagram
 
 ### Server
 
-- `compute_entitlements`: Pro when a `pro` subscription is `active`, or `cancelled` with `expires_at` in the future (and any `expires_at` not passed); else Trial while `trials.ends_at` is in the future; else Free. It also returns the profile `role`, which the app maps to `Entitlements.isAdmin` to offer the [Admin](admin.md) screens.
+- `compute_entitlements`: Pro when a `pro` subscription counts as Pro (`is_pro_sub()`, shared with `plan_of()`): `active` before `expires_at` (plus one day when autopay is on, so the hourly renewal can debit), `cancelled` before `expires_at`, or `past_due` before `grace_end`; else Trial while `trials.ends_at` is in the future; else Free. It also returns the profile `role`, which the app maps to `Entitlements.isAdmin` to offer the [Admin](admin.md) screens, and the billing fields `billing`, `pendingPayment`, `lastPayment` and `hasPhone`. The `entitlements` function adds `billingMode` (from `PAYU_BILLING_MODE`) and `paymentsEnabled` (all PayU secrets set). See [payments](payments.md).
 - Admin Pro grants (M5): an Admin can grant Pro until a date (at most 5 years ahead) or remove it. That is a `subscriptions` row with `provider = 'admin'`, `payment_status = 'granted'` and `expires_at` as the end, so the rule above needs no special case; removing it marks the row `expired`. See [admin](admin.md).
 - `claim_trial`: serialised per user with an advisory lock. Returns `existing` if the user has a trial row, `denied` (`account`) for a disabled profile, `denied` (`email` or `device`) when `trial_claims` already holds that hash, otherwise inserts the claim and a 30-day `trials` row and returns `granted`.
 - The Edge Function takes the email from the verified token, normalizes it (lowercase, no `+alias`, Gmail dots removed, `googlemail.com` as `gmail.com`) and HMAC-SHA256s it and the device ID with `TRIAL_HASH_PEPPER`. Only hashes are stored.
@@ -67,7 +68,7 @@ sequenceDiagram
 
 ## Data and persistence
 
-- DataStore `entitlements`, key `entitlements_json`: the serialized `Entitlements` (user ID, plan, trial and subscription dates, trial claim, separator usage, `serverTime`, `checkedAt`). Cleared on sign-out (PRD AU6). A cache for a different user ID unlocks nothing.
+- DataStore `entitlements`, key `entitlements_json`: the serialized `Entitlements` (user ID, plan, trial and subscription dates, `subscriptionStatus`, trial claim, separator usage, billing fields, `serverTime`, `checkedAt`). A cache from before the billing fields (status stored as a string) fails to decode and is fetched again. Cleared on sign-out (PRD AU6). A cache for a different user ID unlocks nothing.
 - Server tables `trials`, `trial_claims`, `subscriptions`: see [backend](../backend.md#tables). No Room changes.
 
 ## Manifest, permissions and notifications
@@ -78,7 +79,7 @@ None. Uses the existing `INTERNET` permission.
 
 - `data/plan/EntitlementPolicyTest.kt`: access table for Free, Trial and Pro, no cache, ended trial, expired subscription with and without a trial, 7-day grace boundary, clock turned back, server time deciding end dates, days-left rounding, usage shown only on Free and rolled over after the reset.
 - `data/plan/EntitlementsRepositoryTest.kt`: refresh stores and maps the server answer, offline refresh keeps the cache, another account's cache unlocks nothing, clear, unknown plan values.
-- `data/plan/EntitlementsResponseTest.kt`: `role` maps to `isAdmin`.
+- `data/plan/EntitlementsResponseTest.kt`: `role` maps to `isAdmin`; billing state, pending and last payment, billing mode and `paymentsEnabled` are mapped, unknown statuses become `Unknown`.
 - `data/tempo/TempoDetectionGateTest.kt`: cached tempo on Free, locked new detection, detection with BPM Detector.
 - `supabase/tests/plans_test.sql` (pgTAP, 16 checks): plan computation, claim idempotence, email and device reuse denied, disabled account, both functions not executable by `authenticated`.
 - `supabase/functions/_shared/trial_test.ts` (Deno, 5 tests): email normalization, device ID validation, peppered hashing.
@@ -91,7 +92,7 @@ None. Uses the existing `INTERNET` permission.
 - The device check trusts the `ANDROID_ID` hash the app sends; it changes after a factory reset and differs per Android user.
 - Accounts created before M2 get their trial at their first refresh after the functions are deployed.
 - The plan shown on screens is recomputed when the cache changes, not as time passes; the next foreground refresh catches up.
-- Payments (M4) are not built yet. Admin Pro grants (M5) are.
+- Payments are built ([payments](payments.md)) but stay unavailable until the PayU secrets are set on the server.
 - A user granted Pro by an Admin sees it after their next refresh (app start, foreground or the Plans screen).
 
 ## Change history
@@ -102,3 +103,4 @@ None. Uses the existing `INTERNET` permission.
 | 2026-10-08 | - | Usage limit (M3): `SeparatorUsage` in the cache, `separatorUsage()`, usage on the Plans card, limit-reached upgrade sheet. |
 | 2026-10-08 | - | M6: offline grace checked end to end on the emulator. |
 | 2026-10-08 | - | Admin (M5): `Entitlements.isAdmin` from `role`, `PlanUiState.isAdmin`, admin Pro grants as `provider = 'admin'` subscriptions. |
+| 2026-10-10 | - | PayU payments: Go Pro enabled when payments are available, billing status section and Payment history on the Plans screen, `SubscriptionStatus` enum and billing fields in the cache, `is_pro_sub()` with grace for `past_due` ([payments](payments.md)). |

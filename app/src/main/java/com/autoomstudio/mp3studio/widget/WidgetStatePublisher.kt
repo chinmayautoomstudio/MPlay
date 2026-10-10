@@ -9,6 +9,7 @@ import androidx.core.graphics.scale
 import androidx.glance.appwidget.updateAll
 import androidx.media3.common.Player
 import com.autoomstudio.mp3studio.R
+import com.autoomstudio.mp3studio.data.library.AlbumArtLoader
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,7 @@ import kotlinx.coroutines.withContext
 class WidgetStatePublisher(
     private val context: Context,
     private val store: WidgetStateStore,
+    private val albumArt: AlbumArtLoader,
     private val scope: CoroutineScope,
 ) : Player.Listener {
 
@@ -83,17 +85,20 @@ class WidgetStatePublisher(
     /** Decodes album art at roughly [ARTWORK_PX] so the widget's RemoteViews stay well under binder limits. */
     private suspend fun loadArtwork(uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
         try {
-            val resolver = context.contentResolver
+            val bytes = albumArt.load(uri) ?: return@withContext null
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) } ?: return@withContext null
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@withContext null
             var sample = 1
             while (bounds.outWidth / (sample * 2) >= ARTWORK_PX && bounds.outHeight / (sample * 2) >= ARTWORK_PX) {
                 sample *= 2
             }
-            val decoded = resolver.openInputStream(uri)?.use {
-                BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
-            } ?: return@withContext null
+            val decoded = BitmapFactory.decodeByteArray(
+                bytes,
+                0,
+                bytes.size,
+                BitmapFactory.Options().apply { inSampleSize = sample },
+            ) ?: return@withContext null
             val side = minOf(decoded.width, decoded.height)
             val cropped = Bitmap.createBitmap(decoded, (decoded.width - side) / 2, (decoded.height - side) / 2, side, side)
             if (side <= ARTWORK_PX) cropped else cropped.scale(ARTWORK_PX, ARTWORK_PX)

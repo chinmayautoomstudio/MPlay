@@ -1,6 +1,6 @@
 # Playback
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-08
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-10
 
 ## Summary
 
@@ -20,6 +20,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `playback/SessionRestore.kt` | Pure `restoreQueue()` that rebuilds a saved queue against the current library. |
 | `playback/SleepTimer.kt` | `SleepTimerStatus` and pure timer math. |
 | `playback/SleepTimerRunner.kt` | `Player.Listener` in the service that ticks, fades and pauses. |
+| `playback/AlbumArtBitmapLoader.kt` | Media3 `BitmapLoader` for the session: album-art URIs through `AlbumArtLoader`, everything else to `DataSourceBitmapLoader`. |
 | `playback/SongMediaItems.kt` | `Song.toMediaItem()`, `originalUri`, `withPlaybackUri()` (used for stems). |
 | `ui/playback/PlaybackViewModel.kt` | Implements `PlayerActions`; owns a `PlaybackController`. |
 | `ui/playback/PlayerActions.kt` | Interface for transport, sleep timer, `setLofi`, `setStemMode`. |
@@ -38,6 +39,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 - Listeners: `SkipUnplayableListener` (a failing stem falls back to the original file; otherwise the broken item is removed), `SessionSaver`, `WidgetStatePublisher`, the `musicPlaying` mirror, `SleepTimerRunner`.
 - On create it restores shuffle/repeat, applies the saved lofi flag, loads `stemMode`, and watches `stemRepository.stemSets` to repoint stem URIs.
 - The session activity `PendingIntent` opens `MainActivity` with `EXTRA_OPEN_NOW_PLAYING`. Notifications use Media3's default provider.
+- The session's bitmap loader is `CacheBitmapLoader(AlbumArtBitmapLoader(...))`. Album-art URIs go through `AlbumArtLoader`, so songs in `Download/` (where MediaProvider refuses thumbnails) get their embedded cover in the notification. Other URIs go to `DataSourceBitmapLoader`. When a song has no art, the future fails and Media3 logs "Failed to load bitmap", which is expected. See [library](library.md#album-art).
 - `SessionCallback`:
   - `onConnectAsync` waits for `AuthRepository.awaitReady()` and rejects every controller (app, notification, system UI, Bluetooth) while signed out (PRD AU4). Signed in, it grants `PlaybackCommands.all` only to the app's own package.
   - `onCustomCommand` handles the commands below; anything else returns `ERROR_NOT_SUPPORTED`.
@@ -120,3 +122,4 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 | 2026-10-07 | - | Sign-in required: controllers rejected and resumption refused while signed out, service stops on sign-out, `SignedInMediaButtonReceiver`. See [accounts](accounts.md). |
 | 2026-10-08 | - | Swiping the app away from recents now always stops playback and the service (`onTaskRemoved`). |
 | 2026-10-08 | - | `onTaskRemoved` also reports the removal to `TaskRemoval`, which stops the other background features. |
+| 2026-10-10 | - | `AlbumArtBitmapLoader` on the session, so the notification shows the cover of songs in `Download/`. |

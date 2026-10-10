@@ -1,6 +1,6 @@
 # MP3 Studio: Product Requirements Document (v3.2)
 
-**Features:** App rename, Google login, Free and Pro plans, 30-day trial, usage limits, payments, in-app Admin **Product:** MP3 Studio (formerly MPlay), an Android music player and audio toolkit **Platform:** Android (native Kotlin, Jetpack Compose), Supabase backend **Version:** 3.2 **Status:** Draft
+**Features:** App rename, Google login, Free and Pro plans, 30-day trial, usage limits, PayU payments, in-app Admin **Product:** MP3 Studio (formerly MPlay), an Android music player and audio toolkit **Platform:** Android (native Kotlin, Jetpack Compose), Supabase backend **Version:** 3.2 **Status:** Draft
 
 ---
 
@@ -32,7 +32,7 @@ The app has grown from a music player into a set of powerful tools, including an
 - Activate Pro only after a verified payment, and return users to Free automatically when it ends.
 - Prevent trivial repeat trials through multiple accounts.
 - Let Admins manage users, roles, subscriptions and usage from inside the app.
-- Support both direct-APK and Google Play distribution over time without rewriting the plan logic.
+- Ship as a direct APK, with payments behind a provider interface so another provider (for example Play Billing) can be added later without rewriting the plan logic.
 
 **Non-Goals (v3.2)**
 
@@ -43,6 +43,7 @@ The app has grown from a music player into a set of powerful tools, including an
 - A separate web admin dashboard (Admin lives inside the app for now).
 - Plans beyond Free and Pro, yearly billing, coupons or referral rewards.
 - Social features, public profiles or sharing between users.
+- Google Play distribution and Google Play Billing (deferred to future scope).
 
 ## 4. Target Users
 
@@ -59,9 +60,9 @@ The app has grown from a music player into a set of powerful tools, including an
 | Permissions | INTERNET and network state are now required. Cleartext (non-HTTPS) traffic is disabled. The previous "no INTERNET permission" build check is replaced by a check that only the expected permissions are present |
 | Server is the source of truth | Plan, trial, subscription state and usage limits are decided and validated by the backend. The app only displays and caches them |
 | Entitlement cache | The app caches the user's entitlements so it works briefly offline (see section 6.3) |
-| Distribution | Both direct APK and Google Play are planned. Payments sit behind a provider interface: Razorpay (or UPI subscriptions) for the direct APK, Google Play Billing for the Play build. Two build flavors by distribution channel |
-| Payment verification | Payment results are confirmed on the server (Razorpay webhooks, Google Play purchase verification and real-time notifications). The app never trusts a client-side "payment successful" message |
-| Secrets | The Supabase service role key, payment secrets and webhook secrets exist only in server-side functions, never in the app |
+| Distribution | Direct APK only in v3.2, with a single build (no distribution flavors). Payments sit behind a provider interface with one implementation: a PayU recurring (subscription) payment link. **Update 2026-10-09:** Razorpay and Google Play Billing are dropped; Play distribution is deferred to future scope |
+| Payment verification | Payment results are confirmed on the server: PayU webhooks with the response hash verified, cross-checked with PayU's verify-payment API. The app never trusts a client-side "payment successful" message or the checkout return URL |
+| Secrets | The Supabase service role key, the PayU merchant key and salt, and webhook secrets exist only in server-side functions, never in the app |
 | App ID | The application ID stays the same so existing installs upgrade in place and keep their data. Only the display name changes. **Update 2026-10-08:** the ID was changed to `com.autoomstudio.mp3studio` with the rename; old MPlay installs are not migrated (accepted in M6) |
 | Time zone | Server times in UTC; dates shown to users in their local time; weekly reset boundary defined in India Standard Time |
 
@@ -90,7 +91,7 @@ Priority: **P0** = must ship, **P1** = should ship, **P2** = nice to have.
 | AU6 | Log out, which stops playback, clears the session and cached entitlements, and returns to the sign-in screen. It does not delete music, playlists, stems or recordings on the device | P0 |
 | AU7 | Persistent sign-in: users stay signed in across restarts until they log out. Once signed in, the app opens and plays music offline | P0 |
 | AU8 | Clear, friendly error messages (sign-in cancelled, no Google account on the device, Google Play services missing or outdated, no network, account disabled) | P0 |
-| AU9 | Account deletion from inside the app, which removes the user's server-side data | P0 (required for the Play build) |
+| AU9 | Account deletion from inside the app, which removes the user's server-side data | P0 |
 | AU10 | Show profile name, email and photo from the Google account; allow editing the display name | P1 |
 | AU11 | A disabled account is signed out at the next online check, returned to the sign-in screen and cannot sign in again | P0 |
 
@@ -157,16 +158,17 @@ Example: **AI Vocal Separator, 7/10 songs used this week. 3 songs remaining.**
 | ID | Requirement | Priority |
 | --- | --- | --- |
 | PY1 | Pro costs ₹99 per month | P0 |
-| PY2 | Payments go through a provider interface with two implementations: Razorpay (or UPI subscriptions) for the direct APK, and Google Play Billing for the Play build | P0 |
-| PY3 | Pro access is activated only after the server confirms a successful payment | P0 |
-| PY4 | Record these events: payment initiated, successful, failed; subscription activated, renewed, cancelled, expired | P0 |
-| PY5 | When a subscription expires or a renewal fails (after any grace period set by the provider), the user returns to the Free plan automatically | P0 |
+| PY2 | Payments go through a provider interface with a single implementation: PayU recurring payment links. A server function creates a per-user PayU subscription payment link for ₹99 per month, and the app opens it outside the app (browser or Custom Tab). The user sets up a UPI Autopay or card mandate once, and PayU auto-debits ₹99 every month | P0 |
+| PY3 | Pro access is activated only after the server confirms a successful payment through a PayU webhook (hash verified) and PayU's verify-payment API. The checkout return URL is never trusted | P0 |
+| PY4 | Record these events: payment initiated, successful, failed; mandate registered, revoked; subscription activated, renewed, cancelled, expired | P0 |
+| PY5 | When a monthly auto-debit fails (after PayU's retry window), the mandate is revoked or the subscription expires, the user returns to the Free plan automatically | P0 |
 | PY6 | Store subscription start date, expiry date, next billing date, last payment date, payment status and cancellation status for each user | P0 |
-| PY7 | Cancelling stops renewal and keeps Pro until the paid period ends | P0 |
-| PY8 | Users can cancel or manage the subscription from inside the app (a link to the Play subscription page on the Play build) | P1 |
-| PY9 | "Restore purchase" for users who reinstall or switch phones | P1 |
-| PY10 | Payment webhooks and notifications are idempotent: repeats never double-activate or double-count | P0 |
+| PY7 | Cancelling stops renewal by cancelling the PayU mandate and keeps Pro until the paid period ends | P0 |
+| PY8 | Users can cancel the subscription from inside the app, through a server function that cancels the PayU mandate | P1 |
+| PY9 | "Refresh subscription status" for users who reinstall or switch phones. Pro is tied to the Google account on the server, so signing in and refreshing entitlements restores it | P1 |
+| PY10 | PayU webhooks are idempotent: repeats never double-activate or double-count | P0 |
 | PY11 | Show the payment and billing status in the Plans screen | P1 |
+| PY12 | Store the PayU mandate (subscription) ID and transaction IDs for each payment. No card numbers or UPI details are stored | P0 |
 
 ### 6.7 Admin (inside the app)
 
@@ -206,7 +208,7 @@ Example: **AI Vocal Separator, 7/10 songs used this week. 3 songs remaining.**
 | PR2 | Provide a privacy policy and terms of service, linked from the sign-in screen and the About screen | P0 |
 | PR3 | Collect only the data needed: name, email and photo from the Google account, role, plan, trial, subscription, payment status and usage counts. No audio, no contacts, no location | P0 |
 | PR4 | Account deletion removes server-side data except records the law requires to keep (such as payment records) | P0 |
-| PR5 | Provide a Google test account for store reviewers (required because sign-in is needed to open the app) | P1 |
+| PR5 | Provide a Google test account for reviewers and testers (required because sign-in is needed to open the app) | P1 |
 
 I am not a lawyer; confirm privacy and payment rules (including India's data protection law and recurring-payment rules) with a qualified adviser before release.
 
@@ -234,14 +236,14 @@ New screens from this update: the sign-in screen is shown to signed-out users; t
 | Table | Purpose |
 | --- | --- |
 | profiles | User ID, name, email, photo, role, disabled flag, created date |
-| subscriptions | Plan, status, provider, provider reference, start date, expiry date, next billing date, last payment date, payment status, cancel-at-period-end |
+| subscriptions | Plan, status, provider (`payu`, or `admin` for admin grants), provider reference (PayU mandate ID), start date, expiry date, next billing date, last payment date, payment status, cancel-at-period-end |
 | trials | Trial status, start date, end date, whether it was used |
 | trial_claims | Normalized email hash and device hash with unique rules to block repeat trials |
-| payment_events | Every payment and subscription event with type, provider, time and reference (no card data stored) |
+| payment_events | Every payment and subscription event with type, provider, time and reference (PayU transaction or mandate ID; no card or UPI data stored) |
 | ai_usage | One row per separation: user, song reference, reserved time, completed time, status, week |
 | admin_audit_log | Admin actions: who, what, target user, when |
 
-**Server functions:** claim trial, get entitlements, reserve separation, complete or release separation, create payment or verify purchase, payment webhook and Play notification handlers, admin set role, admin disable or enable account, admin user and usage queries.
+**Server functions:** claim trial, get entitlements, reserve separation, complete or release separation, create PayU subscription payment link, PayU webhook handler (hash check and verify-payment API), cancel subscription (cancel PayU mandate), admin set role, admin disable or enable account, admin user and usage queries.
 
 ## 8. Non-Functional Requirements
 
@@ -249,11 +251,11 @@ New screens from this update: the sign-in screen is shown to signed-out users; t
 - **Reliability:** The first sign-in needs a network connection. After that, the app opens and plays music offline. Network failures show clear messages and never corrupt local data. Payment handling is idempotent.
 - **Performance:** Entitlement checks use the cache and add no visible delay; Google sign-in completes within a few seconds on a normal connection.
 - **Privacy:** No audio leaves the device; data collection is limited to what is listed in PR3.
-- **Compatibility:** Android 8.0 and above. Google Play services and a Google account are required, because Google is the only sign-in method; devices without Play services cannot use the app.
+- **Compatibility:** Android 8.0 and above. Google Play services and a Google account are required for sign-in only, because Google is the only sign-in method; devices without Play services cannot use the app. The app is distributed as a direct APK, not through Google Play.
 - **Accessibility:** Sign-in, plans and admin screens support font scaling, content descriptions and large touch targets.
 - **Currency:** Prices shown in rupees (₹99 per month).
 
-**Residual risk:** AI separation, BPM detection and Sing Along run on the phone. A determined user who modifies the app could bypass local checks. Server-validated quotas, signed entitlements and (on Play) device integrity checks reduce this but cannot remove it entirely.
+**Residual risk:** AI separation, BPM detection and Sing Along run on the phone. A determined user who modifies the app could bypass local checks. Server-validated quotas and signed entitlements reduce this but cannot remove it entirely.
 
 ## 9. User Flows
 
@@ -263,17 +265,19 @@ New screens from this update: the sign-in screen is shown to signed-out users; t
 4. **Separate a song (Free):** Separate vocals → server checks quota → time notice → job runs → counts as one use when finished → "7/10 used this week".
 5. **Limit reached:** Separate vocals → "Weekly limit reached, resets Monday" → upgrade option.
 6. **Locked feature:** Tap Sing Along or Detect BPM on Free → upgrade sheet showing Pro benefits and ₹99 per month.
-7. **Upgrade:** Plans → Go Pro → payment → server confirms → Pro activated.
-8. **Expiry or failed renewal:** Subscription ends → server updates → app returns to Free automatically.
-9. **Admin:** Admin → Users → search or filter → open a user → change role or disable account → action recorded in the audit log.
-10. **Delete account:** Settings → Delete account → confirm → data removed → signed out to the sign-in screen.
+7. **Upgrade:** Plans → Go Pro → server creates a PayU subscription payment link → link opens outside the app → user approves the UPI Autopay or card mandate and pays ₹99 → returns to the app, which shows "Confirming payment" → PayU webhook verified on the server → Pro activated.
+8. **Monthly renewal:** PayU sends a pre-debit notice → auto-debits ₹99 → webhook verified → expiry date extended.
+9. **Cancel:** Plans → Cancel subscription → server cancels the PayU mandate → Pro stays until the paid period ends → returns to Free.
+10. **Expiry or failed renewal:** Auto-debit fails after PayU's retries, or the mandate is revoked → server updates → app returns to Free automatically.
+11. **Admin:** Admin → Users → search or filter → open a user → change role or disable account → action recorded in the audit log.
+12. **Delete account:** Settings → Delete account → confirm → data removed → signed out to the sign-in screen.
 
 ## 10. Screens
 
 - Sign-in (single "Continue with Google" button, privacy policy and terms links)
 - Profile and account (edit name, log out, delete account)
 - Plans and subscription (plan comparison, status, trial days, billing dates, usage)
-- Upgrade and payment
+- Upgrade, PayU checkout handoff and "Confirming payment" state
 - Usage indicator for AI Vocal Separator and limit-reached message
 - Locked feature prompts
 - Admin: user list, user detail, overview, usage, payment events, audit log
@@ -286,7 +290,7 @@ New screens from this update: the sign-in screen is shown to signed-out users; t
 - Row Level Security tests prove a normal user cannot read other users' data or change their own role, plan, trial or usage.
 - Quota tests prove that 20 parallel separation requests at 9 of 10 used grant exactly one.
 - Trial abuse tests prove a second account from the same email alias or device does not get a trial.
-- Payment tests prove that duplicate webhooks never double-activate Pro, and that expiry and failed payments return the user to Free.
+- Payment tests prove that duplicate PayU webhooks never double-activate Pro, that webhooks with an invalid hash are rejected, and that expiry, failed auto-debits and revoked mandates return the user to Free.
 - Offline tests prove Pro and Trial features work within the grace window and lock after it.
 - Admin tests prove non-admins cannot reach any admin function, and every admin action is logged.
 
@@ -294,10 +298,11 @@ New screens from this update: the sign-in screen is shown to signed-out users; t
 
 | Risk | Mitigation |
 | --- | --- |
-| Google Play generally requires Play Billing for digital subscriptions | Use Play Billing in the Play flavor and Razorpay only in the direct flavor; confirm current policy before release |
-| Recurring payment rules for UPI and cards in India | Use the provider's subscription product and confirm rules with the provider |
+| Google Play does not allow selling digital subscriptions through an external payment link such as PayU | No Play distribution in v3.2; a future Play release would need Play Billing (see future scope); confirm current policy before any Play release |
+| RBI e-mandate rules for recurring UPI and card payments (pre-debit notification, per-transaction limits, mandate cancellation) | Use PayU's recurring subscription product, which handles mandate registration and pre-debit notices; confirm the rules with PayU |
+| User abandons or delays payment after leaving the app for the PayU link | "Confirming payment" state, refresh entitlements when the app returns to the foreground, activation driven only by the verified webhook |
 | Users get repeat trials with new accounts | Server-side checks on normalized email and device; accept that a determined user with several Google accounts can still evade |
-| Client-side checks bypassed in a modified app | Server quotas, signed short-lived entitlements, device integrity checks on Play |
+| Client-side checks bypassed in a modified app | Server quotas, signed short-lived entitlements |
 | Mandatory login frustrates users, and existing users face a new login wall even for playback | One-tap Google sign-in, clear explanation on the sign-in screen, keep all local data intact, offline use after sign-in |
 | Users without Google Play services or a Google account cannot use the app at all | Accept for v3.2; show a clear message on such devices; revisit other sign-in methods in future scope |
 | Users locked out when offline or when the server is down | Persistent session so signed-in users keep playing offline; offline grace window for cached Pro and Trial access; clear messages |
@@ -305,7 +310,7 @@ New screens from this update: the sign-in screen is shown to signed-out users; t
 | Admin tools expose sensitive data | Role checks on the server, audit log, least-privilege access, protected first admin |
 | Supabase or Google sign-in outage | New sign-ins fail with a clear message; existing sessions and cached entitlements keep working; retries; idempotent handlers |
 | Privacy and legal obligations of collecting accounts and payments | Privacy policy and terms, account deletion, minimal data, adviser review |
-| Google sign-in misconfiguration (signing keys differ per distribution) | Register the signing certificates of every build and store signing key in the Google and Supabase setup |
+| Google sign-in misconfiguration (signing keys differ per distribution) | Register the signing certificates of every build (debug and release) in the Google and Supabase setup |
 | Webhook delays make payment look unconfirmed | Show "Confirming payment" state and refresh entitlements when confirmed |
 
 ## 13. Milestones
@@ -315,18 +320,18 @@ New screens from this update: the sign-in screen is shown to signed-out users; t
 | M1: Foundation | Rename to MP3 Studio, Supabase project, data model, RLS, mandatory Google sign-in, persistent sessions, sign-in gate for the app, widget and media controls, privacy note update |
 | M2: Plans and gating | Profiles and roles, entitlements, feature gates and upgrade prompts, trial with abuse checks, plans screen |
 | M3: Usage limit | Reserve and complete separation functions, weekly limit, usage display, limit-reached messages, admin usage records |
-| M4: Payments (direct APK) | Provider interface, Razorpay subscription, webhooks, activation, expiry and downgrade, cancel and restore |
+| M4: Payments (PayU) | Provider interface, PayU recurring subscription payment link, webhooks with hash verification and the verify-payment API, activation, expiry and downgrade, mandate cancel, refresh subscription status |
 | M5: Admin | In-app admin screens, server admin functions, audit log |
 | M6: Hardening | RLS and quota tests, offline grace, abuse tests, migration of existing installs, account deletion, store review credentials |
-| M7: Play Billing | Play flavor, purchase verification and notifications, Play policy checks (when the Play release is scheduled) |
+| Deferred | Google Play distribution with Play Billing (see future scope) |
 
 ## 14. Future Scope
 
-Yearly plan, coupons and referral rewards, a web admin dashboard, trial-ending push reminders, family or device-limit rules, more Pro features, promotional pricing, and additional sign-in methods for devices without Google.
+Google Play distribution with Play Billing (and Play device integrity checks), yearly plan, coupons and referral rewards, a web admin dashboard, trial-ending push reminders, family or device-limit rules, more Pro features, promotional pricing, and additional sign-in methods for devices without Google.
 
 ## 15. Decisions
 
-- **Distribution and payments:** Both direct APK and Google Play are planned. Razorpay (or UPI subscriptions) is built first for the direct APK; Play Billing follows when the Play release is scheduled. The plan logic is shared.
+- **Distribution and payments:** Direct APK only in v3.2. Pro is paid through a PayU recurring subscription payment link (UPI Autopay or card mandate, ₹99 per month auto-debit). Razorpay and Google Play Billing are dropped, and Play distribution is deferred. Payments stay behind a provider interface so the plan logic does not change if another provider is added. *Update 2026-10-09: replaces the earlier Razorpay (direct APK) plus Play Billing (Play build) decision.*
 - **Login:** Mandatory and cannot be skipped; nothing in the app works while signed out, including playback, the widget and media controls. Google is the only sign-in method. After sign-in, the app works offline using the saved session and cached entitlements.
 - **Admin:** Admin screens live inside the app. A web dashboard is deferred.
 - **Pricing:** Pro is ₹99 per month.

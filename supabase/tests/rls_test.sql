@@ -3,7 +3,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(17);
+select plan(21);
 
 -- Two users; the trigger creates their profiles from the Google metadata.
 insert into auth.users (id, email, raw_user_meta_data)
@@ -11,6 +11,10 @@ values
     ('11111111-1111-1111-1111-111111111111', 'alice@example.com',
      '{"full_name": "Alice", "avatar_url": "https://example.com/a.png"}'),
     ('22222222-2222-2222-2222-222222222222', 'bob@example.com', '{"name": "Bob"}');
+
+insert into public.payments (txn_id, user_id, kind, amount_paise)
+values ('RLSALICE1', '11111111-1111-1111-1111-111111111111', 'first', 9900),
+       ('RLSBOB1', '22222222-2222-2222-2222-222222222222', 'first', 9900);
 
 select is(
     (select display_name from public.profiles where id = '11111111-1111-1111-1111-111111111111'),
@@ -67,7 +71,7 @@ select is(public.is_admin(), false, 'A normal user is not an Admin');
 
 select throws_ok(
     $$ insert into public.subscriptions (user_id, status, provider, provider_ref)
-       values ('11111111-1111-1111-1111-111111111111', 'active', 'razorpay', 'sub_x') $$,
+       values ('11111111-1111-1111-1111-111111111111', 'active', 'payu', 'sub_x') $$,
     '42501',
     null,
     'A user cannot write subscriptions'
@@ -108,6 +112,33 @@ select throws_ok(
     '42501',
     null,
     'A user cannot read the admin audit log'
+);
+
+select results_eq(
+    'select txn_id from public.payments',
+    $$ values ('RLSALICE1'::text) $$,
+    'A user sees only their own payments'
+);
+
+select throws_ok(
+    $$ update public.payments set status = 'success' where txn_id = 'RLSALICE1' $$,
+    '42501',
+    null,
+    'A user cannot change a payment'
+);
+
+select throws_ok(
+    'select * from public.webhook_log',
+    '42501',
+    null,
+    'A user cannot read the webhook log'
+);
+
+select throws_ok(
+    $$ update public.profiles set phone = '9876543210' where id = '11111111-1111-1111-1111-111111111111' $$,
+    '42501',
+    null,
+    'A user cannot set their mobile number directly'
 );
 
 -- Signed-out (anon) requests get nothing.

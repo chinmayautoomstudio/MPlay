@@ -6,6 +6,28 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+### Added
+- Pro payments through PayU Payment Links at ₹99 a month (payments PRD). Go Pro (Plans screen and upgrade sheet) opens a checkout sheet that asks once for an Indian mobile number, then opens PayU in a Custom Tab. On return (App Link `https://<pay.returnHost>/pay/return`, or simply coming back to the app) the app waits for the server, which confirms the payment with PayU before granting Pro. Autopay (UPI AutoPay, eNACH, card) renews each month; the server flag `PAYU_BILLING_MODE=manual` switches to one-off links with manual renewal. New `data/billing/` (`BillingRepository`, `SupabaseBillingBackend`, DataStore `billing`), `ui/plans/` `BillingViewModel`, `BillingHost`, `CheckoutSheet`, `PaymentResultScreen`, `PaymentReturnLink`; `androidx.browser` 1.9.0; `pay.returnHost` in `local.properties`. ([payments](features/payments.md), [architecture](architecture.md))
+- Billing status on the Plans screen: autopay on, autopay not set, renew soon, past due with a grace period, cancellation pending, cancelled, autopay ending and expired, with Fix payment, Set up autopay, Renew, Check payment and Cancel autopay. Settings > Plans > Payment history with receipts. ([payments](features/payments.md), [plans](features/plans.md))
+- Admin Payments page: billing health (jobs, webhooks, unconfirmed cancellations), payment search and filters, Re-check with PayU and Refund; a user's page shows their PayU subscription and payments and can cancel the subscription. ([admin](features/admin.md))
+- Edge Functions `start-checkout`, `payment-status`, `payu-webhook`, `payu-return`, `subscription` and `billing-jobs`; billing actions in `admin`; `entitlements` returns `billingMode` and `paymentsEnabled`. PayU credentials are Edge Function secrets only. ([backend](backend.md#billing-payu))
+- `web/pay/return/index.html` (App Link landing page with an "Open MP3 Studio" fallback) and a `web/.well-known/assetlinks.json` template. ([payments](features/payments.md))
+- Tests: `BillingRepositoryTest`, `BillingViewModelTest`, `BillingStatusRulesTest`, billing cases in `EntitlementsResponseTest` and `AdminViewModelTest`; Deno `payu_test.ts`, `checkout_test.ts`, `webhook_test.ts`; pgTAP `payments_test.sql`, `billing_flow_test.sql`; `run_live.ps1 -Pending` tests unapplied migrations in rolled-back transactions. ([payments](features/payments.md), [backend](backend.md))
+
+### Changed
+- Delete account cancels a PayU autopay mandate first instead of refusing accounts with a paid subscription; if PayU doesn't confirm, the dialog says the autopay couldn't be cancelled (`DeletionError.MandateCancelFailed`, error `mandate_cancel_failed`). ([accounts](features/accounts.md))
+- `Entitlements.subscriptionStatus` is now a `SubscriptionStatus` enum and the cache carries billing state, pending and last payment, phone presence, billing mode and `paymentsEnabled`; older caches are refetched. Pro now also covers `past_due` during its grace period and one day after the period end while autopay renews. ([plans](features/plans.md))
+
+### Removed
+- Razorpay and Google Play as subscription providers (never used): admin provider labels `admin_provider_razorpay` and `admin_provider_play`, the `active_subscription` deletion refusal (`account_delete_subscription`), and the "Payments coming soon" button (`plans_go_pro_soon`). ([admin](features/admin.md), [accounts](features/accounts.md))
+
+### Database
+- No Room changes. Supabase migrations `20261013000000_payu_billing`, `20261013100000_payu_verification`, `20261014000000_billing_jobs` and `20261015000000_billing_admin`: tables `payments`, `webhook_log`, `job_runs`; PayU autopay columns on `subscriptions` (`provider` now `payu` or `admin`); `profiles.phone`; `payment_events.txn_id`; checkout, verification, renewal, expiry, cancellation, refund, dispute and admin billing functions; five pg_cron jobs. Applied live on 2026-10-10; billing is deployed in PayU test mode with manual renewal (`PAYU_BILLING_MODE=manual`). ([backend](backend.md#migrations))
+
+### Fixed
+- Trial claims work again on the server: a save from the Coolify UI had dropped `TRIAL_HASH_PEPPER` from `.env`, so new claims returned `unavailable`. A new pepper was generated; all secrets must also be kept in the Coolify UI. ([backend](backend.md#edge-functions))
+- Songs in `Download/` now show their cover art in the app, the media notification and the widget. Android's MediaProvider refuses album-art thumbnails for Downloads ("No thumbnails in Downloads directories"), so the new `data/library/AlbumArtLoader` falls back to the embedded picture of a song from that album. It is used by a Coil fetcher (`ui/components/AlbumArtFetcher`, registered through `MPlayApp` as `SingletonImageLoader.Factory`), the session's `playback/AlbumArtBitmapLoader` and `WidgetStatePublisher`. ([library](features/library.md), [playback](features/playback.md), [widget](features/widget.md), [architecture](architecture.md))
+
 ## [3.2.3] - 2026-10-09
 
 ### Changed

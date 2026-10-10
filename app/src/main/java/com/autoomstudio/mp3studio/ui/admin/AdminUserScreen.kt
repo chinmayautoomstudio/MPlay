@@ -45,9 +45,12 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
-private enum class Confirm { MakeAdmin, RemoveAdmin, Disable, RemovePro }
+private enum class Confirm { MakeAdmin, RemoveAdmin, Disable, RemovePro, CancelSubscription }
 
-/** One user's details and the Admin actions on them (PRD AD3, AD5-AD8, AD10). */
+/**
+ * One user's details and the Admin actions on them (PRD AD3, AD5-AD8, AD10), with their PayU payments, refunds and
+ * subscription cancellation (payments PRD AD1, AD3, AD4, RF2).
+ */
 @Composable
 internal fun AdminUserScreen(viewModel: AdminViewModel, userId: String, onBack: () -> Unit, modifier: Modifier) {
     val detail by viewModel.detail.collectAsStateWithLifecycle()
@@ -71,6 +74,7 @@ private fun UserDetail(user: AdminUserDetail, isMe: Boolean, busy: Boolean, view
     val label = profile.email ?: profile.name.orEmpty()
     var confirm by rememberSaveable { mutableStateOf<Confirm?>(null) }
     var granting by rememberSaveable { mutableStateOf(false) }
+    var refunding by rememberSaveable { mutableStateOf<String?>(null) }
 
     Column(
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -103,6 +107,14 @@ private fun UserDetail(user: AdminUserDetail, isMe: Boolean, busy: Boolean, view
                 ),
             )
             sub.paymentStatus?.let { Text(stringResource(R.string.admin_detail_payment, it)) }
+            if (sub.provider == "payu") {
+                sub.autopayStatus?.let { Text(stringResource(R.string.admin_detail_autopay, it)) }
+                sub.graceEnd?.let { Text(stringResource(R.string.admin_detail_grace, formatDate(context, it))) }
+                sub.mandateEnd?.let { Text(stringResource(R.string.admin_detail_mandate_end, formatDate(context, it))) }
+                if (sub.cancelPending) {
+                    Text(stringResource(R.string.admin_detail_cancel_pending), color = MaterialTheme.colorScheme.error)
+                }
+            }
         }
         Text(stringResource(R.string.admin_detail_usage, user.usage.used, user.usage.reserved))
         if (profile.disabled) {
@@ -143,6 +155,11 @@ private fun UserDetail(user: AdminUserDetail, isMe: Boolean, busy: Boolean, view
                 Text(stringResource(R.string.admin_remove_pro))
             }
         }
+        if (user.payuSubscription != null) {
+            OutlinedButton(onClick = { confirm = Confirm.CancelSubscription }, enabled = !busy) {
+                Text(stringResource(R.string.admin_cancel_subscription))
+            }
+        }
     }
     user.adminGrant?.let {
         Text(
@@ -169,6 +186,20 @@ private fun UserDetail(user: AdminUserDetail, isMe: Boolean, busy: Boolean, view
     }
     user.jobs.forEach { JobRow(it) }
 
+    if (user.payments.isNotEmpty()) {
+        SectionTitle(stringResource(R.string.admin_section_payment_list))
+        user.payments.forEach { payment ->
+            AdminPaymentItem(
+                payment = payment,
+                busy = busy,
+                showEmail = false,
+                onReverify = { viewModel.reverifyPayment(payment.txnId) },
+                onRefund = { refunding = payment.txnId },
+                onOpenUser = null,
+            )
+        }
+    }
+
     SectionTitle(stringResource(R.string.admin_section_payments))
     if (user.events.isEmpty()) {
         Text(stringResource(R.string.admin_no_payments), modifier = Modifier.padding(horizontal = 16.dp))
@@ -176,6 +207,7 @@ private fun UserDetail(user: AdminUserDetail, isMe: Boolean, busy: Boolean, view
     user.events.forEach { event ->
         Text(
             "${formatDateTime(context, event.createdAt)} · ${providerName(event.provider)} · ${event.type}" +
+                (event.txnId?.let { " · $it" } ?: "") +
                 (event.amountPaise?.let { " · %.2f %s".format(it / 100.0, event.currency.orEmpty()) } ?: ""),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
@@ -189,6 +221,8 @@ private fun UserDetail(user: AdminUserDetail, isMe: Boolean, busy: Boolean, view
             Confirm.RemoveAdmin -> R.string.admin_remove_admin_title to R.string.admin_remove_admin_message
             Confirm.Disable -> R.string.admin_disable_title to R.string.admin_disable_message
             Confirm.RemovePro -> R.string.admin_remove_pro_title to R.string.admin_remove_pro_message
+            Confirm.CancelSubscription ->
+                R.string.admin_cancel_subscription_title to R.string.admin_cancel_subscription_message
         }
         AlertDialog(
             onDismissRequest = { confirm = null },
@@ -202,12 +236,23 @@ private fun UserDetail(user: AdminUserDetail, isMe: Boolean, busy: Boolean, view
                         Confirm.RemoveAdmin -> viewModel.setRole(profile.id, label, admin = false)
                         Confirm.Disable -> viewModel.setDisabled(profile.id, true)
                         Confirm.RemovePro -> viewModel.revokePro(profile.id)
+                        Confirm.CancelSubscription -> viewModel.cancelSubscription(profile.id)
                     }
                 }) { Text(stringResource(android.R.string.ok)) }
             },
             dismissButton = {
                 TextButton(onClick = { confirm = null }) { Text(stringResource(android.R.string.cancel)) }
             },
+        )
+    }
+    user.payments.firstOrNull { it.txnId == refunding }?.let { payment ->
+        RefundDialog(
+            payment = payment,
+            onConfirm = {
+                refunding = null
+                viewModel.refundPayment(payment.txnId)
+            },
+            onDismiss = { refunding = null },
         )
     }
     if (granting) {
@@ -245,8 +290,7 @@ private fun JobRow(job: AdminJob) {
 @Composable
 internal fun providerName(provider: String): String = when (provider) {
     "admin" -> stringResource(R.string.admin_provider_admin)
-    "razorpay" -> stringResource(R.string.admin_provider_razorpay)
-    "play" -> stringResource(R.string.admin_provider_play)
+    "payu" -> stringResource(R.string.admin_provider_payu)
     else -> provider
 }
 

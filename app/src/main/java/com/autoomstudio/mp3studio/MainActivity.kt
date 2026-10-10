@@ -40,6 +40,8 @@ import com.autoomstudio.mp3studio.ui.separation.SeparationViewModel
 import com.autoomstudio.mp3studio.ui.main.MainScreen
 import com.autoomstudio.mp3studio.ui.permission.PermissionRationaleScreen
 import com.autoomstudio.mp3studio.ui.permission.rememberAudioPermissionState
+import com.autoomstudio.mp3studio.ui.plans.BillingHost
+import com.autoomstudio.mp3studio.ui.plans.PaymentReturnLink
 import com.autoomstudio.mp3studio.ui.playback.PlaybackViewModel
 import com.autoomstudio.mp3studio.ui.playlist.PlaylistsViewModel
 import com.autoomstudio.mp3studio.ui.settings.SettingsViewModel
@@ -55,6 +57,9 @@ class MainActivity : ComponentActivity() {
 
     /** Set when launched from the metronome notification; consumed once by the UI. */
     private var openMetronomeRequest by mutableStateOf(false)
+
+    /** Set when the PayU return page opened the app: the transaction ID from the link, or "". Consumed once. */
+    private var paymentReturnRequest by mutableStateOf<String?>(null)
 
     private val settingsViewModel: SettingsViewModel by viewModels { SettingsViewModel.Factory }
 
@@ -96,6 +101,8 @@ class MainActivity : ComponentActivity() {
                                 onOpenSeparationHandled = { openSeparationRequest = false },
                                 openMetronomeRequest = openMetronomeRequest,
                                 onOpenMetronomeHandled = { openMetronomeRequest = false },
+                                paymentReturnRequest = paymentReturnRequest,
+                                onPaymentReturnHandled = { paymentReturnRequest = null },
                                 themeSettings = theme,
                                 settingsViewModel = settingsViewModel,
                             )
@@ -122,6 +129,7 @@ class MainActivity : ComponentActivity() {
         }
         if (intent?.action == SeparationLinks.ACTION_OPEN_QUEUE) openSeparationRequest = true
         if (intent?.getBooleanExtra(EXTRA_OPEN_METRONOME, false) == true) openMetronomeRequest = true
+        PaymentReturnLink.parse(intent?.data)?.let { paymentReturnRequest = it }
     }
 
     companion object {
@@ -138,6 +146,8 @@ private fun MPlayRoot(
     onOpenSeparationHandled: () -> Unit,
     openMetronomeRequest: Boolean,
     onOpenMetronomeHandled: () -> Unit,
+    paymentReturnRequest: String?,
+    onPaymentReturnHandled: () -> Unit,
     themeSettings: ThemeSettings,
     settingsViewModel: SettingsViewModel,
     viewModel: LibraryViewModel = viewModel(factory = LibraryViewModel.Factory),
@@ -236,6 +246,7 @@ private fun MPlayRoot(
             onOpenMetronomeHandled = onOpenMetronomeHandled,
         )
     }
+    BillingHost(returnRequest = paymentReturnRequest, onReturnHandled = onPaymentReturnHandled)
 }
 
 /**

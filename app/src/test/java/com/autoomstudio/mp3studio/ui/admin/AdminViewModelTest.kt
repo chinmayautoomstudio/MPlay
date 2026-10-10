@@ -3,10 +3,15 @@ package com.autoomstudio.mp3studio.ui.admin
 import com.autoomstudio.mp3studio.data.admin.AddAdminResult
 import com.autoomstudio.mp3studio.data.admin.AdminActivity
 import com.autoomstudio.mp3studio.data.admin.AdminBackend
+import com.autoomstudio.mp3studio.data.admin.AdminBillingHealth
+import com.autoomstudio.mp3studio.data.admin.AdminBillingResult
 import com.autoomstudio.mp3studio.data.admin.AdminError
 import com.autoomstudio.mp3studio.data.admin.AdminException
 import com.autoomstudio.mp3studio.data.admin.AdminList
 import com.autoomstudio.mp3studio.data.admin.AdminOverview
+import com.autoomstudio.mp3studio.data.admin.AdminPaymentPage
+import com.autoomstudio.mp3studio.data.admin.AdminPaymentRow
+import com.autoomstudio.mp3studio.data.admin.PaymentFilter
 import com.autoomstudio.mp3studio.data.admin.AdminProfile
 import com.autoomstudio.mp3studio.data.admin.AdminUsage
 import com.autoomstudio.mp3studio.data.admin.AdminUserDetail
@@ -88,6 +93,28 @@ class AdminViewModelTest {
             AdminActivity("subscribed", "2026-10-08T09:00:00+00:00", userId = "u1", provider = "admin", plan = "pro"),
             AdminActivity("deleted", "2026-10-07T09:00:00+00:00", plan = "free"),
         ).also { check() }
+
+        val paymentQueries = mutableListOf<Pair<String, PaymentFilter>>()
+        val refunds = mutableListOf<String>()
+        var cancelResult = AdminBillingResult.Cancelled
+
+        override suspend fun payments(query: String, filter: PaymentFilter, offset: Int): AdminPaymentPage {
+            check()
+            paymentQueries += query to filter
+            return AdminPaymentPage(
+                1,
+                listOf(AdminPaymentRow("MP1", "u1", "a@b.c", "first", "success", 9900, payuRef = "403", createdAt = "2026-10-08T00:00:00+00:00")),
+            )
+        }
+
+        override suspend fun billingHealth() = AdminBillingHealth(flaggedWebhooks = 1).also { check() }
+        override suspend fun reverifyPayment(txnId: String) = AdminBillingResult.Checked.also { check() }
+        override suspend fun refundPayment(txnId: String): AdminBillingResult {
+            check()
+            refunds += txnId
+            return AdminBillingResult.RefundRequested
+        }
+        override suspend fun cancelSubscription(userId: String) = cancelResult.also { check() }
     }
 
     private val backend = FakeBackend()
@@ -161,6 +188,43 @@ class AdminViewModelTest {
         assertEquals(listOf("me" to false), backend.roleChanges)
         assertEquals(listOf("me"), refreshed)
         assertEquals(AdminMessage.RoleChanged("me@x.y", admin = false), vm.messages.first())
+    }
+
+    @Test
+    fun thePaymentsPageLoadsHealthAndFilteredPayments() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.open(AdminPage.Payments)
+        assertEquals(1, vm.health.value.data?.flaggedWebhooks)
+        assertFalse(vm.health.value.data!!.healthy)
+        assertEquals(listOf("MP1"), vm.payments.value.payments.map { it.txnId })
+        assertTrue(vm.payments.value.payments.single().refundable)
+        vm.setPaymentFilter(PaymentFilter.Refunded)
+        assertEquals("" to PaymentFilter.Refunded, backend.paymentQueries.last())
+    }
+
+    @Test
+    fun billingActionsReportWhatPayUDid() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.refundPayment("MP1")
+        assertEquals(listOf("MP1"), backend.refunds)
+        assertEquals(AdminMessage.Billing(AdminBillingResult.RefundRequested), vm.messages.first())
+        backend.cancelResult = AdminBillingResult.CancelPending
+        vm.cancelSubscription("me")
+        assertEquals(AdminMessage.Billing(AdminBillingResult.CancelPending), vm.messages.first())
+        assertEquals("Cancelling your own subscription refreshes your plan", listOf("me"), refreshed)
+        backend.failWith = AdminError.NotRefundable
+        vm.refundPayment("MP1")
+        assertEquals(AdminMessage.Failed(AdminError.NotRefundable), vm.messages.first())
+    }
+
+    @Test
+    fun refundsNeedAPaidPaymentWithAPayUReference() {
+        val paid = AdminPaymentRow("MP1", kind = "first", status = "success", amountPaise = 9900, payuRef = "1", createdAt = "x")
+        assertTrue(paid.refundable)
+        assertFalse(paid.copy(payuRef = null).refundable)
+        assertFalse(paid.copy(refundPending = true).refundable)
+        assertFalse(paid.copy(status = "failed").refundable)
+        assertTrue(paid.copy(status = "partially_refunded").refundable)
     }
 
     @Test

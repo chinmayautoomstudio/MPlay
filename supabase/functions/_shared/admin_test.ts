@@ -41,6 +41,28 @@ Deno.test("Write actions validate their fields", () => {
   assertEquals(parseAdminRequest({ action: "grantPro", userId: id, until: "soon" }), null);
 });
 
+Deno.test("Billing actions", () => {
+  assertEquals(parseAdminRequest({ action: "payments", query: " MP1 ", filter: "refunded" }), {
+    fn: "admin_list_payments",
+    args: { p_query: "MP1", p_filter: "refunded", p_limit: 50, p_offset: 0 },
+  });
+  assertEquals(parseAdminRequest({ action: "billingHealth" }), { fn: "admin_billing_health", args: {} });
+  assertEquals(parseAdminRequest({ action: "refundPayment", txnId: "MPABC" }), {
+    fn: "admin_billing_action",
+    args: { p_action: "refund", p_user: null, p_txn: "MPABC" },
+    payu: "refund",
+  });
+  assertEquals(parseAdminRequest({ action: "reverifyPayment", txnId: "MPABC" })!.payu, "reverify");
+  assertEquals(parseAdminRequest({ action: "cancelSubscription", userId: id })!.args, {
+    p_action: "cancel_subscription",
+    p_user: id,
+    p_txn: null,
+  });
+  assertEquals(parseAdminRequest({ action: "payments", filter: "stolen" }), null);
+  assertEquals(parseAdminRequest({ action: "refundPayment", txnId: "MP-1; x" }), null);
+  assertEquals(parseAdminRequest({ action: "cancelSubscription", userId: "1" }), null);
+});
+
 Deno.test("Malformed requests are rejected", () => {
   assertEquals(parseAdminRequest(null), null);
   assertEquals(parseAdminRequest({ action: "dropTables" }), null);

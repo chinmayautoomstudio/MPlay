@@ -39,6 +39,12 @@ data class EntitlementsResponse(
     val subscription: SubscriptionDto? = null,
     val trialClaim: ClaimDto? = null,
     val usage: UsageDto? = null,
+    val billing: BillingDto? = null,
+    val pendingPayment: PendingPaymentDto? = null,
+    val lastPayment: LastPaymentDto? = null,
+    val hasPhone: Boolean = false,
+    val billingMode: String? = null,
+    val paymentsEnabled: Boolean = false,
     val serverTime: String,
 ) {
     @Serializable
@@ -53,6 +59,40 @@ data class EntitlementsResponse(
     )
 
     @Serializable
+    data class BillingDto(
+        val status: String,
+        val autopayStatus: String? = null,
+        val expiresAt: String? = null,
+        val nextBillingAt: String? = null,
+        val graceEnd: String? = null,
+        val mandateEnd: String? = null,
+        val cancelAtPeriodEnd: Boolean = false,
+        val cancelPending: Boolean = false,
+    ) {
+        fun toState() = BillingState(
+            status = SubscriptionStatus.of(status) ?: SubscriptionStatus.Unknown,
+            autopayStatus = AutopayStatus.of(autopayStatus),
+            expiresAt = expiresAt?.let(::epochMillis),
+            nextBillingAt = nextBillingAt?.let(::epochMillis),
+            graceEnd = graceEnd?.let(::epochMillis),
+            mandateEnd = mandateEnd?.let(::epochMillis),
+            cancelAtPeriodEnd = cancelAtPeriodEnd,
+            cancelPending = cancelPending,
+        )
+    }
+
+    @Serializable
+    data class PendingPaymentDto(
+        val txnId: String,
+        val status: String,
+        val linkExpiresAt: String? = null,
+        val resolveUntil: String? = null,
+    )
+
+    @Serializable
+    data class LastPaymentDto(val txnId: String, val status: String, val amountPaise: Int, val at: String)
+
+    @Serializable
     data class ClaimDto(val result: String, val reason: String? = null)
 
     fun toEntitlements(userId: String, checkedAt: Long) = Entitlements(
@@ -64,7 +104,7 @@ data class EntitlementsResponse(
         },
         trialStartedAt = trial?.startedAt?.let(::epochMillis),
         trialEndsAt = trial?.endsAt?.let(::epochMillis),
-        subscriptionStatus = subscription?.status,
+        subscriptionStatus = SubscriptionStatus.of(subscription?.status),
         subscriptionExpiresAt = subscription?.expiresAt?.let(::epochMillis),
         subscriptionNextBillingAt = subscription?.nextBillingAt?.let(::epochMillis),
         cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?: false,
@@ -77,6 +117,14 @@ data class EntitlementsResponse(
         },
         usage = usage?.toUsage(),
         isAdmin = role == "admin",
+        billing = billing?.toState(),
+        pendingPayment = pendingPayment?.let {
+            PendingPayment(it.txnId, it.status, it.linkExpiresAt?.let(::epochMillis), it.resolveUntil?.let(::epochMillis))
+        },
+        lastPayment = lastPayment?.let { LastPayment(it.txnId, it.status, it.amountPaise, epochMillis(it.at)) },
+        hasPhone = hasPhone,
+        billingMode = BillingMode.of(billingMode),
+        paymentsEnabled = paymentsEnabled,
         serverTime = epochMillis(serverTime),
         checkedAt = checkedAt,
     )

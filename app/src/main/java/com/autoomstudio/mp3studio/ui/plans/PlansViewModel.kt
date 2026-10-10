@@ -9,6 +9,7 @@ import com.autoomstudio.mp3studio.MPlayApp
 import com.autoomstudio.mp3studio.data.plan.EntitlementPolicy
 import com.autoomstudio.mp3studio.data.plan.Entitlements
 import com.autoomstudio.mp3studio.data.plan.Feature
+import com.autoomstudio.mp3studio.data.plan.LastPayment
 import com.autoomstudio.mp3studio.data.plan.Plan
 import com.autoomstudio.mp3studio.data.plan.SeparatorUsage
 import com.autoomstudio.mp3studio.data.plan.TrialClaim
@@ -43,6 +44,10 @@ data class PlanUiState(
     val usage: SeparatorUsage? = null,
     /** Shows the Admin entry in Settings; the server checks every admin call. */
     val isAdmin: Boolean = false,
+    val billing: BillingStatus = BillingStatus(null, emptyList()),
+    val lastPayment: LastPayment? = null,
+    /** Whether the user ever had a PayU subscription or payment, so payment history is worth offering. */
+    val hasPayments: Boolean = false,
 ) {
     fun unlocks(feature: Feature): Boolean = when (feature) {
         Feature.BpmDetector, Feature.SingAlong, Feature.UnlimitedSeparator -> plan != Plan.Free
@@ -52,20 +57,37 @@ data class PlanUiState(
         get() = trialDaysLeft != null && trialDaysLeft <= EntitlementPolicy.TRIAL_REMINDER_DAYS
 
     companion object {
-        fun of(entitlements: Entitlements?, now: Long) = PlanUiState(
-            plan = EntitlementPolicy.effectivePlan(entitlements, now),
-            cachedPlan = entitlements?.plan,
-            stale = entitlements != null && EntitlementPolicy.isStale(entitlements, now),
-            trialDaysLeft = EntitlementPolicy.trialDaysLeft(entitlements, now),
-            trialEndsAt = entitlements?.trialEndsAt,
-            trialClaim = entitlements?.trialClaim,
-            subscriptionExpiresAt = entitlements?.subscriptionExpiresAt,
-            subscriptionNextBillingAt = entitlements?.subscriptionNextBillingAt,
-            cancelAtPeriodEnd = entitlements?.cancelAtPeriodEnd ?: false,
-            checkedAt = entitlements?.checkedAt,
-            usage = EntitlementPolicy.separatorUsage(entitlements, now),
-            isAdmin = entitlements?.isAdmin == true,
-        )
+        fun of(entitlements: Entitlements?, now: Long): PlanUiState {
+            val plan = EntitlementPolicy.effectivePlan(entitlements, now)
+            return PlanUiState(
+                plan = plan,
+                cachedPlan = entitlements?.plan,
+                stale = entitlements != null && EntitlementPolicy.isStale(entitlements, now),
+                trialDaysLeft = EntitlementPolicy.trialDaysLeft(entitlements, now),
+                trialEndsAt = entitlements?.trialEndsAt,
+                trialClaim = entitlements?.trialClaim,
+                subscriptionExpiresAt = entitlements?.subscriptionExpiresAt,
+                subscriptionNextBillingAt = entitlements?.subscriptionNextBillingAt,
+                cancelAtPeriodEnd = entitlements?.cancelAtPeriodEnd ?: false,
+                checkedAt = entitlements?.checkedAt,
+                usage = EntitlementPolicy.separatorUsage(entitlements, now),
+                isAdmin = entitlements?.isAdmin == true,
+                billing = if (entitlements == null) {
+                    BillingStatus(null, emptyList())
+                } else {
+                    BillingStatusRules.of(
+                        plan = plan,
+                        billing = entitlements.billing,
+                        pending = entitlements.pendingPayment,
+                        mode = entitlements.billingMode,
+                        paymentsEnabled = entitlements.paymentsEnabled,
+                        now = now,
+                    )
+                },
+                lastPayment = entitlements?.lastPayment,
+                hasPayments = entitlements?.billing != null || entitlements?.lastPayment != null,
+            )
+        }
     }
 }
 

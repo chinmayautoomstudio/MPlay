@@ -94,6 +94,7 @@ import com.autoomstudio.mp3studio.ui.library.SongInfoHost
 import com.autoomstudio.mp3studio.ui.library.rememberSongSelection
 import com.autoomstudio.mp3studio.data.plan.Feature
 import com.autoomstudio.mp3studio.ui.plans.PlansScreen
+import com.autoomstudio.mp3studio.ui.plans.PaymentHistoryScreen
 import com.autoomstudio.mp3studio.ui.plans.PlansViewModel
 import com.autoomstudio.mp3studio.ui.plans.UpgradeSheet
 import com.autoomstudio.mp3studio.ui.playback.ExpandablePlayer
@@ -635,6 +636,12 @@ fun MainScreen(
                                     ProfilePage.Plans -> PlansScreen(
                                         onBack = backToMain,
                                         onMessage = showMessage,
+                                        onOpenHistory = { profilePage = ProfilePage.PaymentHistory },
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                    )
+                                    ProfilePage.PaymentHistory -> PaymentHistoryScreen(
+                                        onBack = { profilePage = ProfilePage.Plans },
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
                                     )
@@ -792,6 +799,7 @@ private enum class ProfilePage {
     About,
     Licenses,
     Plans,
+    PaymentHistory,
     Admin,
 }
 

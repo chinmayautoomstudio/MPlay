@@ -9,10 +9,14 @@ import com.autoomstudio.mp3studio.MPlayApp
 import com.autoomstudio.mp3studio.data.admin.AddAdminResult
 import com.autoomstudio.mp3studio.data.admin.AdminActivity
 import com.autoomstudio.mp3studio.data.admin.AdminBackend
+import com.autoomstudio.mp3studio.data.admin.AdminBillingHealth
+import com.autoomstudio.mp3studio.data.admin.AdminBillingResult
 import com.autoomstudio.mp3studio.data.admin.AdminError
 import com.autoomstudio.mp3studio.data.admin.AdminException
 import com.autoomstudio.mp3studio.data.admin.AdminList
 import com.autoomstudio.mp3studio.data.admin.AdminOverview
+import com.autoomstudio.mp3studio.data.admin.AdminPaymentRow
+import com.autoomstudio.mp3studio.data.admin.PaymentFilter
 import com.autoomstudio.mp3studio.data.admin.AdminUsage
 import com.autoomstudio.mp3studio.data.admin.AdminUserDetail
 import com.autoomstudio.mp3studio.data.admin.AdminUserRow
@@ -41,6 +45,18 @@ sealed interface AdminPage {
     data object Usage : AdminPage
     data object Audit : AdminPage
     data object Activity : AdminPage
+    data object Payments : AdminPage
+}
+
+data class PaymentListState(
+    val query: String = "",
+    val filter: PaymentFilter = PaymentFilter.All,
+    val payments: List<AdminPaymentRow> = emptyList(),
+    val total: Int = 0,
+    val loading: Boolean = false,
+    val error: AdminError? = null,
+) {
+    val hasMore: Boolean get() = payments.size < total
 }
 
 /** One page's data as fetched from the server. */
@@ -72,6 +88,7 @@ sealed interface AdminMessage {
     data object ProRemoved : AdminMessage
     data class AdminAdded(val email: String, val result: AddAdminResult) : AdminMessage
     data object InviteRevoked : AdminMessage
+    data class Billing(val result: AdminBillingResult) : AdminMessage
 }
 
 /**
@@ -112,6 +129,12 @@ class AdminViewModel(
 
     private val _activity = MutableStateFlow(Loadable<List<AdminActivity>>())
     val activity: StateFlow<Loadable<List<AdminActivity>>> = _activity.asStateFlow()
+
+    private val _payments = MutableStateFlow(PaymentListState())
+    val payments: StateFlow<PaymentListState> = _payments.asStateFlow()
+
+    private val _health = MutableStateFlow(Loadable<AdminBillingHealth>())
+    val health: StateFlow<Loadable<AdminBillingHealth>> = _health.asStateFlow()
 
     /** Activity events newer than the last one the admin saw; shown as the bell's badge. */
     val unread: StateFlow<Int> = combine(_activity, activitySeenAt) { activity, seenAt ->
@@ -164,7 +187,62 @@ class AdminViewModel(
             AdminPage.Usage -> load(_usage) { backend.usage() }
             AdminPage.Audit -> loadAudit(more = false)
             AdminPage.Activity -> loadActivity(markSeen = true)
+            AdminPage.Payments -> {
+                load(_health) { backend.billingHealth() }
+                searchPayments(immediately = true)
+            }
         }
+    }
+
+    fun setPaymentQuery(query: String) {
+        _payments.update { it.copy(query = query) }
+        searchPayments(immediately = false)
+    }
+
+    fun setPaymentFilter(filter: PaymentFilter) {
+        _payments.update { it.copy(filter = filter) }
+        searchPayments(immediately = true)
+    }
+
+    private fun searchPayments(immediately: Boolean) {
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            if (!immediately) delay(searchDelayMillis)
+            val state = _payments.value
+            _payments.update { it.copy(loading = true, error = null) }
+            try {
+                val page = backend.payments(state.query.trim(), state.filter, offset = 0)
+                _payments.update { it.copy(payments = page.payments, total = page.total, loading = false) }
+            } catch (e: AdminException) {
+                _payments.update { it.copy(loading = false, error = e.error) }
+                onForbidden(e.error)
+            }
+        }
+    }
+
+    fun loadMorePayments() {
+        val state = _payments.value
+        if (state.loading || !state.hasMore) return
+        searchJob = viewModelScope.launch {
+            _payments.update { it.copy(loading = true, error = null) }
+            try {
+                val page = backend.payments(state.query.trim(), state.filter, offset = state.payments.size)
+                _payments.update { it.copy(payments = it.payments + page.payments, total = page.total, loading = false) }
+            } catch (e: AdminException) {
+                _payments.update { it.copy(loading = false, error = e.error) }
+                onForbidden(e.error)
+            }
+        }
+    }
+
+    fun reverifyPayment(txnId: String) = actFor { AdminMessage.Billing(backend.reverifyPayment(txnId)) }
+
+    fun refundPayment(txnId: String) = actFor { AdminMessage.Billing(backend.refundPayment(txnId)) }
+
+    fun cancelSubscription(userId: String) = actFor {
+        val result = backend.cancelSubscription(userId)
+        if (userId == currentUserId()) refreshOwnPlan(userId)
+        AdminMessage.Billing(result)
     }
 
     private fun loadHome() {
@@ -290,13 +368,17 @@ class AdminViewModel(
 
     fun revokeInvite(email: String) = act(AdminMessage.InviteRevoked) { backend.revokeInvite(email) }
 
-    private fun act(success: AdminMessage, block: suspend () -> Unit) {
+    private fun act(success: AdminMessage, block: suspend () -> Unit) = actFor {
+        block()
+        success
+    }
+
+    private fun actFor(block: suspend () -> AdminMessage) {
         if (_busy.value) return
         _busy.value = true
         viewModelScope.launch {
             try {
-                block()
-                _messages.send(success)
+                _messages.send(block())
             } catch (e: AdminException) {
                 if (e.error != AdminError.Forbidden) _messages.send(AdminMessage.Failed(e.error))
                 onForbidden(e.error)

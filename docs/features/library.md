@@ -1,6 +1,6 @@
 # Library
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-07
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-10
 
 ## Summary
 
@@ -13,6 +13,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | File | Role |
 |---|---|
 | `data/library/MediaStoreSongSource.kt` | MediaStore audio query that builds `Song`s. |
+| `data/library/AlbumArtLoader.kt` | Album-art bytes, with an embedded-picture fallback for songs in `Download/`. |
+| `ui/components/AlbumArtFetcher.kt` | Coil fetcher that sends album-art URIs through `AlbumArtLoader`. |
 | `data/library/SongRepository.kt` | Reactive `songs()` flow; reloads on MediaStore changes, manual refresh and automatic scans. |
 | `data/library/AudioFolderScanner.kt` | Runs `MediaScannerConnection` over public audio folders. |
 | `data/library/AudioFolderWatcher.kt` | `FileObserver`-based change flow for those folders. |
@@ -39,8 +41,16 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 - Collection: `getContentUri(VOLUME_EXTERNAL)` on Android 10+, else `EXTERNAL_CONTENT_URI`. `BITRATE` only on Android 11+.
 - Filter: `IS_MUSIC != 0 OR NULL`, and duration at least 30 s (`MIN_DURATION_MS`) or NULL. Files in `Music/MP3 Studio Clips/`, `Music/MP3 Studio Recordings/` and the pre-rename `Music/MPlay Clips/` and `Music/MPlay Recordings/` skip the length check (`SavedFolders.likePatterns`, tested in `data/library/SavedFoldersTest.kt`).
 - Sorted by title (case-insensitive). Track number is `TRACK % 1000`.
-- Album art: `content://media/external/audio/albumart/<albumId>`.
+- Album art: `content://media/external/audio/albumart/<albumId>` (`AlbumArtLoader.ALBUM_ART_URI`). See [Album art](#album-art).
 - Missing title falls back to the file name; missing artist/album become "Unknown Artist"/"Unknown Album". Bitrate is estimated from size and duration when MediaStore has none.
+
+### Album art
+
+MediaProvider refuses album-art thumbnails for files in `Download/` (`FileNotFoundException: No thumbnails in Downloads directories`). `AlbumArtLoader.load(uri)` (shared through `AppContainer.albumArtLoader`) tries the album-art URI first. If that fails, it picks a song with the same `ALBUM_ID` and reads its embedded picture with `MediaMetadataRetriever`. Album IDs with no art at all are remembered in memory, so they aren't looked up again. The loader is used by:
+
+- Coil, through `ui/components/AlbumArtFetcher`, which `MPlayApp` registers as the singleton `ImageLoader`. `ArtworkImage` is unchanged.
+- The media session's bitmap loader (see [playback](playback.md)).
+- The widget (see [widget](widget.md)).
 
 ### Refresh
 
@@ -78,6 +88,7 @@ Long-press starts selection; taps toggle. Bulk actions: add to playlist, play ne
 
 - `data/library/LibraryQueriesTest.kt`: filtering, every sort order, grouping, Various Artists, Unknown Artist last.
 - `data/library/SongMapperTest.kt`: bitrate and fallbacks.
+- `data/library/AlbumArtLoaderTest.kt`: `albumIdOf` parsing of album-art URIs.
 - `ui/library/SongSelectionTest.kt`: selection state.
 - `ui/common/DurationFormatTest.kt`: duration formatting.
 
@@ -87,6 +98,7 @@ Long-press starts selection; taps toggle. Bulk actions: add to playlist, play ne
 - The folder watcher is not recursive; the 60 s scan is the fallback.
 - On Android 11+ there is no per-file check after the delete dialog.
 - Artists are grouped by exact string, so "A feat. B" is its own artist.
+- Songs in `Download/` with no embedded cover still show the placeholder. The album-art fallback uses the first song of the album, so an album split between folders may show another track's cover.
 
 ## Change history
 
@@ -98,3 +110,4 @@ Long-press starts selection; taps toggle. Bulk actions: add to playlist, play ne
 | 2026-10-03 | `da53339` | Song deletion and selection UI. |
 | 2026-10-06 | `e13b2f7` | `Music/MPlay Recordings/` exempt from the 30 s minimum; Metronome tab added to `MainScreen`; `SingAlongOverlay` hosted. |
 | 2026-10-07 | - | `data/library/SavedFolders.kt` builds the minimum-length exemption for the new MP3 Studio folders and the legacy MPlay ones. |
+| 2026-10-10 | - | `AlbumArtLoader` and `AlbumArtFetcher`: embedded-picture fallback for songs in `Download/`. |

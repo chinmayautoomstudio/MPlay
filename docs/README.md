@@ -8,7 +8,7 @@ MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.au
 | minSdk / targetSdk / compileSdk | 26 / 37 / 37 |
 | Modules | `:app`, `:separation` (DSP + ONNX pipeline) |
 | Database | Room `mplay.db`, schema version 7 |
-| Network | Supabase Auth, PostgREST and Edge Functions only (`INTERNET`, `ACCESS_NETWORK_STATE`, no cleartext). The build fails if any permission outside `ALLOWED_PERMISSIONS` is merged into the manifest. |
+| Network | Supabase Auth, PostgREST and Edge Functions only (`INTERNET`, `ACCESS_NETWORK_STATE`, no cleartext); PayU checkout opens in the browser. The build fails if any permission outside `ALLOWED_PERMISSIONS` is merged into the manifest. |
 | Backend | Self-hosted Supabase, see [backend.md](backend.md) |
 
 ## How these docs are organised
@@ -38,7 +38,8 @@ MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.au
 | Sing-along recording | [features/sing-along.md](features/sing-along.md) | Unreleased |
 | Accounts and Google sign-in | [features/accounts.md](features/accounts.md) | Unreleased |
 | Plans, trial and feature gates | [features/plans.md](features/plans.md) | Unreleased |
-| Admin (users, roles, invites, Pro grants, audit log) | [features/admin.md](features/admin.md) | Unreleased |
+| Admin (users, roles, invites, Pro grants, audit log, payments) | [features/admin.md](features/admin.md) | Unreleased |
+| Payments (PayU Pro subscription, autopay, history, refunds) | [features/payments.md](features/payments.md) | Unreleased |
 
 ## Product requirement documents
 
@@ -49,6 +50,7 @@ The PRDs describe intent; these docs describe what the code actually does.
 - [MPlay PRD v3_ AI Vocal Separation.md](../MPlay%20PRD%20v3_%20AI%20Vocal%20Separation.md)
 - [MPlay PRD v3.1.md](../MPlay%20PRD%20v3.1.md)
 - [MP3 Studio PRD v3.2.md](../MP3%20Studio%20PRD%20v3.2.md) (rename, accounts, plans)
+- [MP3-Studio-PRD-Payments-PayU-Payment-Link.md](../MP3-Studio-PRD-Payments-PayU-Payment-Link.md) (PayU Pro payments)
 
 ## Keeping the docs current
 
