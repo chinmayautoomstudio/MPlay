@@ -3,8 +3,11 @@ package com.autoomstudio.mp3studio.ui.plans
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -88,7 +91,12 @@ fun CheckoutSheet(
                 style = MaterialTheme.typography.titleLarge,
             )
             if (!state.intervalLocked) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.selectableGroup()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier
+                        .height(IntrinsicSize.Min)
+                        .selectableGroup(),
+                ) {
                     IntervalOption(
                         title = stringResource(R.string.checkout_interval_monthly),
                         price = stringResource(R.string.checkout_interval_monthly_price),
@@ -96,7 +104,9 @@ fun CheckoutSheet(
                         selected = !yearly,
                         enabled = !state.busy,
                         onClick = { onIntervalChange(BillingInterval.Month) },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
                     )
                     IntervalOption(
                         title = stringResource(R.string.checkout_interval_yearly),
@@ -105,7 +115,9 @@ fun CheckoutSheet(
                         selected = yearly,
                         enabled = !state.busy,
                         onClick = { onIntervalChange(BillingInterval.Year) },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
                     )
                 }
             }

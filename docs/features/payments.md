@@ -147,7 +147,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 
 | Date | Commit | Change |
 |---|---|---|
-| 2026-10-10 | - | Yearly Pro at ₹999: Monthly/Yearly picker, yearly autopay mandate, switching between intervals at the end of the paid period (migration `20261017000000_yearly_plan.sql`, not yet applied). |
+| 2026-10-10 | - | Yearly Pro at ₹999: Monthly/Yearly picker, yearly autopay mandate, switching between intervals at the end of the paid period (migration `20261017000000_yearly_plan.sql`, not yet applied). The Monthly and Yearly cards are the same height. |
 | 2026-10-10 | - | After checkout, `payu-return` serves the return page and opens the app through an intent link, instead of redirecting to autoomstudio.com, which showed the company website. |
 | 2026-10-10 | - | Admin revoke subscription: ends PayU Pro now and cancels any mandate, without a refund. |
 | 2026-10-10 | - | Payment-link payments are verified under PayU's own txnid (from the webhook or the link's transactions); a webhook hash mismatch no longer drops the event. First test payment confirmed. |
