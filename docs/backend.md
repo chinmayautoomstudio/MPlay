@@ -87,10 +87,10 @@ Deno functions in `supabase/functions/`, called by the app with the user's acces
 | `payment-status` | `POST {"txnId"?: "..."}` (without one: all the caller's open payments are checked and the latest payment is answered) | Checks with PayU, then `payment_summary()`: `{txnId, status, kind, failureReason, resolveUntil, amountPaise, completedAt, plan}`. `404 not_found`. |
 | `subscription` | `POST {"action": "cancel"}` | `{"result": "cancelled", "expiresAt"}` or `{"result": "cancel_pending"}`. `409 not_subscribed`. |
 | `payu-webhook` | PayU's server notification (form or JSON, max 64 KB), no JWT | `{"result": "received"}`; `500` only when the event couldn't be saved (PayU retries). |
-| `payu-return` | PayU's success and failure URLs (`GET` or `POST`), no JWT | `303` to `PAYU_RETURN_PAGE?result=success\|failure&txn=...`. Reads nothing else, changes nothing. |
+| `payu-return` | PayU's success and failure URLs (`GET` or `POST`), no JWT | `200` HTML return page (`_shared/return_page.ts`, strict CSP, `no-store`) with an intent link to the app's `https://<host of PAYU_RETURN_PAGE>/pay/return?result=...&txn=...`. Reads only `txn` (or `udf1`, then `txnid`, from a POST); changes nothing. |
 | `billing-jobs` | `POST {"action": "webhooks" \| "sweep" \| "renewals" \| "expiry" \| "notices"}` with header `x-billing-job-secret`, no JWT | `{action, processed, failed, skipped}`; `401` with a wrong secret, `500 job_failed`. |
 
-`payu-webhook`, `payu-return` and `billing-jobs` have `verify_jwt = false` in `config.toml`: PayU and pg_cron can't send a user token. They are safe to expose because the webhook only triggers a status check with PayU, the return page only redirects, and the jobs need the shared secret.
+`payu-webhook`, `payu-return` and `billing-jobs` have `verify_jwt = false` in `config.toml`: PayU and pg_cron can't send a user token. They are safe to expose because the webhook only triggers a status check with PayU, the return page only links back to the app, and the jobs need the shared secret.
 
 `_shared/trial.ts` normalizes the email from the token (lowercase, `+alias` removed, Gmail dots removed, `googlemail.com` as `gmail.com`) and HMAC-SHA256s it and the device ID with `TRIAL_HASH_PEPPER`. Without the pepper the claim returns `unavailable` and the user stays on Free; `entitlements` still answers.
 
@@ -138,7 +138,7 @@ Edge Function secrets (functions service environment, like `TRIAL_HASH_PEPPER`):
 | `PAYU_CLIENT_ID`, `PAYU_CLIENT_SECRET`, `PAYU_MERCHANT_ID` | Payment Links API (OAuth client credentials, merchant ID header). |
 | `PAYU_KEY`, `PAYU_SALT` | Merchant key and salt for signed `postservice.php` commands (status, debit, pre-debit, mandate cancel, refund) and the reverse hash. |
 | `PAYU_SUCCESS_URL`, `PAYU_FAILURE_URL` | `.../functions/v1/payu-return?result=success` and `?result=failure`. |
-| `PAYU_RETURN_PAGE` | The App Link page, `https://<pay.returnHost>/pay/return`. |
+| `PAYU_RETURN_PAGE` | The app's return link, `https://<pay.returnHost>/pay/return`; `payu-return` builds its intent link from the host. |
 | `PAYU_BILLING_MODE` | `manual` for one-off links and manual renewal; anything else is autopay. |
 | `BILLING_JOBS_SECRET` | The secret `billing-jobs` expects in `x-billing-job-secret`; the same value as the Vault secret `billing_jobs_secret`. |
 
@@ -153,14 +153,14 @@ Deployed on 2026-10-10 in PayU **test** mode with `PAYU_BILLING_MODE=manual`:
 
 Smoke-checked:
 - `entitlements` and `start-checkout` return 401 without a token;
-- `payu-return` returns 303 to the return page;
+- `payu-return` returned the return page (a 303 at the time; it serves the page itself since the later fix);
 - `payu-webhook` returns 400 for a bad body;
 - `billing-jobs` returns 401 for a wrong secret and 200 for `sweep` and `expiry`;
 - the first pg_cron runs (`webhooks`, `sweep`) got HTTP 200 through pg_net and wrote `job_runs`;
 - no secret values appeared in the container logs;
 - the PayU test OAuth token was accepted.
 
-Remaining for production, in order: switch the five PayU values to the live ones with `PAYU_ENV=live`; publish `web/pay/return/index.html` and `web/.well-known/assetlinks.json` (with the real signing fingerprints) on `pay.returnHost`; set PayU's webhook URL to `.../functions/v1/payu-webhook`; run a sandbox payment end to end. PayU endpoint paths and field names follow its documentation as of 2026-10 and must be checked against the sandbox first.
+Remaining for production, in order: switch the five PayU values to the live ones with `PAYU_ENV=live`; optionally publish `web/.well-known/assetlinks.json` (with the real signing fingerprints) on `pay.returnHost` so plain `/pay/return` links open the app too; set PayU's webhook URL to `.../functions/v1/payu-webhook`; run a sandbox payment end to end. PayU endpoint paths and field names follow its documentation as of 2026-10 and must be checked against the sandbox first.
 
 ## Usage reports (admin)
 
@@ -232,3 +232,4 @@ Sign in once with the Google account, then run `supabase/seed/first_admin.sql` (
 | 2026-10-10 | - | Billing deployed live in PayU test mode (manual billing): migrations applied, Vault secrets, cron jobs, functions; `BILLING_JOBS_SECRET` and a regenerated `TRIAL_HASH_PEPPER` in `.env`; smoke checks passed. |
 | 2026-10-10 | - | Payment-link verification fix deployed (`_shared`, `payu-webhook`; backups `*.bak-20261010073023`): lookups by PayU's own txnid, webhook hash mismatch only flagged. The first test payment's webhook was re-queued and granted Pro. |
 | 2026-10-10 | - | Admin revoke subscription: migration `20261016000000_admin_revoke_subscription` (pgTAP checks passed live with it pending, then applied), `revokeSubscription` in the `admin` function (deployed; backups `*.bak-20261010100130`), new `billing_flow_test.sql` and `admin_test.ts` cases. |
+| 2026-10-10 | - | `payu-return` serves the return page (`_shared/return_page.ts`, `return_page_test.ts`) with an intent link to the app instead of a 303 to autoomstudio.com; POSTs prefer `udf1`. Deployed (backups `*.bak-20261010101029`) and checked live. |

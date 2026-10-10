@@ -29,7 +29,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 | `supabase/functions/start-checkout/`, `payment-status/`, `payu-webhook/`, `payu-return/`, `subscription/`, `billing-jobs/` | Billing Edge Functions; see [backend](../backend.md#billing-payu). |
 | `supabase/functions/_shared/payu.ts`, `billing.ts`, `checkout.ts`, `webhook.ts`, `jobs.ts`, `notifier.ts` | PayU client (OAuth Payment Links API and SHA-512-signed `postservice.php` commands), shared flows, request parsing, webhook classification and redaction, job auth, billing notices. |
 | `supabase/migrations/20261013000000_payu_billing.sql` to `20261015000000_billing_admin.sql` | Schema, verification, scheduled jobs and admin billing. |
-| `web/pay/return/index.html`, `web/.well-known/assetlinks.json` | The App Link page with an "Open MP3 Studio" fallback, and the Digital Asset Links template. |
+| `supabase/functions/_shared/return_page.ts` | The return page `payu-return` serves after checkout, with an intent link back to the app. |
+| `web/pay/return/index.html`, `web/.well-known/assetlinks.json` | Unpublished App Link page and Digital Asset Links template, for when `pay.returnHost` serves them. |
 
 ## How it works
 
@@ -45,7 +46,7 @@ sequenceDiagram
     Fn-->>App: url, txnId, mode
     App->>PayU: Custom Tab
     PayU->>Ret: success or failure URL
-    Ret-->>App: 303 to https://host/pay/return?txn=... (App Link)
+    Ret-->>App: return page, intent link to https://host/pay/return?txn=...
     App->>St: txnId
     St->>PayU: verify_payment status check
     St-->>App: status, plan
@@ -60,7 +61,7 @@ sequenceDiagram
 
 ### Confirmation
 
-- PayU's success and failure URLs point at `payu-return`, which only redirects (303) to `PAYU_RETURN_PAGE` with `result` and `txn`. The page is the App Link `https://<pay.returnHost>/pay/return`; `MainActivity.handleIntent` passes the transaction to `BillingViewModel.onReturned`.
+- PayU's success and failure URLs point at `payu-return`, which serves the return page itself (`returnPageHtml`): "Payment received" or "Payment not completed" and a "Return to MP3 Studio" button. On Android the page opens `intent://<host of PAYU_RETURN_PAGE>/pay/return?result=...&txn=...#Intent;scheme=https;package=com.autoomstudio.mp3studio;end` straight away, and the button repeats it. Because the intent names the package, it reaches the `/pay/return` intent filter without App Link verification. `MainActivity.handleIntent` passes the transaction to `BillingViewModel.onReturned`. For a PayU POST the transaction comes from `udf1` (ours) before `txnid`.
 - `BillingRepository.confirm` polls `payment-status` every 3 s (`POLL_INTERVAL_MS`) up to 10 times (`VISIBLE_ATTEMPTS`) while the result screen shows "Confirming". `payment-status` asks PayU (`verify_payment`) and applies the answer through `apply_payment_result()`; the app only displays what comes back. A payment PayU still reports as pending is checked until `resolveUntil` before it is failed.
 - If the App Link didn't fire (browser closed, link verification missing), `onForeground` checks the stored transaction on every resume. A quiet check only surfaces Success; a return the user was waiting for shows every result.
 - PayU runs each payment-link payment under a txnid it picks (for example `938632`) and puts our txnid in `udf1`. `PayuClient.checkPayment` therefore asks `verify_payment` for our txnid first (renewals use it), then for the PayU txnid a webhook named, accepted only when the answer's `udf1` is ours, and then for each transaction on the link (`GET /payment-links/{invoice}/txns`, OAuth scope `read_payment_links`). The answer is reported under our txnid, so `apply_payment_result()` matches it.
@@ -109,7 +110,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 ## Manifest, permissions and notifications
 
 - `MainActivity` has an `android:autoVerify="true"` intent filter for `https://${payReturnHost}/pay/return`. The host comes from `pay.returnHost` in `local.properties` (default `autoomstudio.com`) and is also `BuildConfig.PAY_RETURN_HOST`.
-- The App Link verifies only after `web/.well-known/assetlinks.json` is published on that host with the release and debug signing SHA-256 fingerprints (the file in the repo has placeholders). Without it, the resume check still confirms payments.
+- The App Link verifies only after `web/.well-known/assetlinks.json` is published on that host with the release and debug signing SHA-256 fingerprints (the file in the repo has placeholders). The return page's intent link doesn't need it, and the resume check still confirms payments.
 - No new permissions; the PayU page runs in the browser, not in the app.
 - Billing emails (renewal failed, grace ending, expired, autopay ending) are only logged for now (`LogNotifier`); no email provider is chosen.
 
@@ -128,7 +129,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 
 - PayU endpoint paths, command names and field names follow PayU's documentation as of 2026-10 and must be checked against the sandbox before going live (`payu.ts` header).
 - Deployed on 2026-10-10 with PayU **test** credentials and `PAYU_BILLING_MODE=manual`; real payments need the live credentials and `PAYU_ENV=live`. Whenever any PayU secret is missing, `paymentsEnabled` is false and the Plans screen shows "Payments aren't available yet." with Go Pro disabled.
-- The App Link needs `assetlinks.json` with the real fingerprints on `pay.returnHost`.
+- `pay.returnHost` (autoomstudio.com) doesn't serve `/pay/return` or `assetlinks.json`, so a plain `https://autoomstudio.com/pay/return` link opens the company website, not the app. Only the intent link from the return page opens the app. Some browsers may block the automatic open, in which case the user taps the button.
 - Billing emails are only logged; GST invoices, partial refunds from the app, a web checkout and plan changes are out of scope (PRD phase 6).
 - Receipts are in-app only (transaction ID, amount, date, method); there is no PDF.
 
@@ -136,6 +137,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-10 | - | After checkout, `payu-return` serves the return page and opens the app through an intent link, instead of redirecting to autoomstudio.com, which showed the company website. |
 | 2026-10-10 | - | Admin revoke subscription: ends PayU Pro now and cancels any mandate, without a refund. |
 | 2026-10-10 | - | Payment-link payments are verified under PayU's own txnid (from the webhook or the link's transactions); a webhook hash mismatch no longer drops the event. First test payment confirmed. |
 | 2026-10-10 | - | Deployed to the live server in PayU test mode with manual renewal. |

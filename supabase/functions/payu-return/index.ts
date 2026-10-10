@@ -1,22 +1,31 @@
-// PayU's success and failure URLs (payments PRD section 4). PayU may POST the result form to them, which a static
-// page can't take, so this answers with a 303 redirect to the App Link page (PAYU_RETURN_PAGE) carrying only our
-// transaction ID and which URL was hit. It reads nothing else and changes nothing (SC7): the app then asks
-// payment-status, which checks with PayU.
+// PayU's success and failure URLs (payments PRD section 4). PayU may POST the result form to them, so this answers
+// with the return page itself (_shared/return_page.ts), which opens MP3 Studio through an intent link to the app's
+// return link (PAYU_RETURN_PAGE). It reads only our transaction ID and which URL was hit, and changes nothing (SC7):
+// the app then asks payment-status, which checks with PayU.
 import { validTxnId } from "../_shared/checkout.ts";
+import { RETURN_PAGE_CSP, returnPageHtml } from "../_shared/return_page.ts";
 
 Deno.serve(async (req) => {
   if (req.method !== "GET" && req.method !== "POST") return new Response("Method not allowed", { status: 405 });
-  const page = Deno.env.get("PAYU_RETURN_PAGE");
-  if (!page) return new Response("Not configured", { status: 503 });
+  const appLink = Deno.env.get("PAYU_RETURN_PAGE");
+  if (!appLink) return new Response("Not configured", { status: 503 });
 
   const url = new URL(req.url);
   let txn = validTxnId(url.searchParams.get("txn"));
   if (!txn && req.method === "POST") {
+    // Payment-link postbacks carry PayU's own txnid; ours is in udf1.
     const form = new URLSearchParams(await req.text().catch(() => ""));
-    txn = validTxnId(form.get("txnid")) ?? validTxnId(form.get("udf1"));
+    txn = validTxnId(form.get("udf1")) ?? validTxnId(form.get("txnid"));
   }
-  const target = new URL(page);
-  target.searchParams.set("result", url.searchParams.get("result") === "success" ? "success" : "failure");
-  if (txn) target.searchParams.set("txn", txn);
-  return new Response(null, { status: 303, headers: { Location: target.toString(), "Cache-Control": "no-store" } });
+  const html = returnPageHtml({ success: url.searchParams.get("result") === "success", txnId: txn, appLink });
+  return new Response(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Content-Security-Policy": RETURN_PAGE_CSP,
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff",
+    },
+  });
 });
