@@ -1,7 +1,8 @@
 // PayU server notifications (payments PRD SV2, SV7, SC5). Public by necessity and harmless: the event is saved to
 // webhook_log first (an error makes PayU retry), then handled by re-checking with PayU's APIs. A payment callback's
-// reverse hash is checked as a first filter; a forged event at worst causes a status check. Always answers quickly;
-// failed processing is retried by the billing-jobs `webhooks` action.
+// reverse hash is checked and a mismatch is flagged in the log, but the event is still handled: payment-link
+// postbacks don't always match the documented formula, and a forged event at worst causes a status check. Always
+// answers quickly; failed processing is retried by the billing-jobs `webhooks` action.
 import { payuFromEnv, processWebhook, rpc } from "../_shared/billing.ts";
 import { reverseHash, sameHash } from "../_shared/payu.ts";
 import { adminClient, json } from "../_shared/server.ts";
@@ -33,13 +34,8 @@ Deno.serve(async (req) => {
     console.error("webhook not saved", e instanceof Error ? e.message : e);
     return json({ error: "server_error" }, 500);
   }
-  if (logged.duplicate || suspicious || !env) {
-    if (suspicious) {
-      await rpc(admin, "finish_webhook", { p_id: logged.id, p_status: "ignored", p_error: "hash_mismatch" })
-        .catch(() => null);
-    }
-    return json({ result: "received" });
-  }
+  if (logged.duplicate || !env) return json({ result: "received" });
+  if (suspicious) console.warn(`webhook ${logged.id} hash mismatch; checking with PayU anyway`);
 
   try {
     const outcome = await processWebhook(admin, env.payu, body);

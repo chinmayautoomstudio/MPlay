@@ -7,6 +7,8 @@ export type WebhookKind = "payment" | "refund" | "dispute" | "mandate" | "unknow
 export type WebhookEvent = {
   kind: WebhookKind;
   txnId: string | null;
+  /** PayU's own txnid when it differs from ours (payment-link payments carry ours in udf1). */
+  payuTxnId: string | null;
   payuRef: string | null;
   mandateRef: string | null;
   status: string | null;
@@ -49,10 +51,17 @@ function str(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : typeof value === "number" ? String(value) : null;
 }
 
+/** Our transaction IDs: "MP" for checkouts, "RN" for renewals, then 20 hex digits. */
+const OUR_TXN = /^(MP|RN)[0-9A-F]{20}$/;
+
 /** Which kind of event this is and what it refers to. */
 export function classifyWebhook(body: Record<string, unknown>): WebhookEvent {
   const lower = Object.fromEntries(Object.entries(body).map(([k, v]) => [k.toLowerCase(), v]));
-  const txnId = str(lower.txnid) ?? str(lower.invoicenumber) ?? str(lower.merchanttransactionid) ?? str(lower.udf1);
+  const udf1 = str(lower.udf1);
+  const ours = udf1 && OUR_TXN.test(udf1) ? udf1 : null;
+  const rawTxn = str(lower.txnid);
+  const txnId = ours ?? rawTxn ?? str(lower.invoicenumber) ?? str(lower.merchanttransactionid) ?? udf1;
+  const payuTxnId = ours && rawTxn && rawTxn !== ours ? rawTxn : null;
   const payuRef = str(lower.mihpayid) ?? str(lower.payuid) ?? str(lower.payu_id);
   const mandateRef = str(lower.authpayuid) ?? str(lower.mandateid) ?? str(lower.umrn);
   const status = str(lower.status)?.toLowerCase() ?? null;
@@ -78,6 +87,7 @@ export function classifyWebhook(body: Record<string, unknown>): WebhookEvent {
   return {
     kind,
     txnId,
+    payuTxnId,
     payuRef,
     mandateRef,
     status,

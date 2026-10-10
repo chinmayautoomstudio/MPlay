@@ -63,7 +63,8 @@ sequenceDiagram
 - PayU's success and failure URLs point at `payu-return`, which only redirects (303) to `PAYU_RETURN_PAGE` with `result` and `txn`. The page is the App Link `https://<pay.returnHost>/pay/return`; `MainActivity.handleIntent` passes the transaction to `BillingViewModel.onReturned`.
 - `BillingRepository.confirm` polls `payment-status` every 3 s (`POLL_INTERVAL_MS`) up to 10 times (`VISIBLE_ATTEMPTS`) while the result screen shows "Confirming". `payment-status` asks PayU (`verify_payment`) and applies the answer through `apply_payment_result()`; the app only displays what comes back. A payment PayU still reports as pending is checked until `resolveUntil` before it is failed.
 - If the App Link didn't fire (browser closed, link verification missing), `onForeground` checks the stored transaction on every resume. A quiet check only surfaces Success; a return the user was waiting for shows every result.
-- `payu-webhook` saves every PayU notification to `webhook_log` first (secrets and card fields redacted), checks the reverse hash as a filter, and then re-checks the payment with PayU. Failed processing is retried by the `webhooks` job and flagged after 5 tries.
+- PayU runs each payment-link payment under a txnid it picks (for example `938632`) and puts our txnid in `udf1`. `PayuClient.checkPayment` therefore asks `verify_payment` for our txnid first (renewals use it), then for the PayU txnid a webhook named, accepted only when the answer's `udf1` is ours, and then for each transaction on the link (`GET /payment-links/{invoice}/txns`, OAuth scope `read_payment_links`). The answer is reported under our txnid, so `apply_payment_result()` matches it.
+- `payu-webhook` saves every PayU notification to `webhook_log` first (secrets and card fields redacted) and then re-checks the payment with PayU. `classifyWebhook` takes our txnid from `udf1` when it looks like ours (`MP` or `RN` plus 20 hex digits). The reverse hash is still computed; a mismatch is logged as `_hashMismatch` but the event is processed anyway, because PayU's status answer decides and payment-link postbacks have failed the documented formula. Failed processing is retried by the `webhooks` job and flagged after 5 tries.
 
 ### Plans screen
 
@@ -117,7 +118,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 - `ui/plans/BillingStatusRulesTest.kt`: the notice and buttons for each state, admin grants, the manual renewal window, and return-link parsing (host, scheme, path, transaction format).
 - `data/plan/EntitlementsResponseTest.kt`: billing fields and enums from the `entitlements` JSON.
 - `ui/admin/AdminViewModelTest.kt`: admin payments page, refund and cancel messages, refundable rule.
-- Deno, `supabase/functions/_shared/`: `payu_test.ts` (hashes, IST dates, link payload, parsers, config, the client against a fake fetch: token reuse, signed commands, the salt never sent), `checkout_test.ts` (phone, checkout and status requests, job auth), `webhook_test.ts` (classification, redaction, form and JSON bodies), `admin_test.ts` (billing actions).
+- Deno, `supabase/functions/_shared/`: `payu_test.ts` (hashes, IST dates, link payload, parsers, config, the client against a fake fetch: token reuse, signed commands, the salt never sent; payment-link lookups by `udf1`, the link's transactions and `checkPayment`), `checkout_test.ts` (phone, checkout and status requests, job auth), `webhook_test.ts` (classification including payment-link postbacks, redaction, form and JSON bodies), `admin_test.ts` (billing actions).
 - pgTAP: `supabase/tests/payments_test.sql` and `billing_flow_test.sql` (checkout rules, payment results, renewals, expiry, grace, cancellation, refunds, disputes, admin billing), run live with the new migrations rolled back (`run_live.ps1 -Pending`).
 - Gaps: no end-to-end test against PayU's sandbox yet; no UI tests for the sheet, result screen or history.
 
@@ -133,5 +134,6 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-10 | - | Payment-link payments are verified under PayU's own txnid (from the webhook or the link's transactions); a webhook hash mismatch no longer drops the event. First test payment confirmed. |
 | 2026-10-10 | - | Deployed to the live server in PayU test mode with manual renewal. |
 | 2026-10-10 | - | PayU Payment Links: checkout with autopay or manual mode, server verification, Plans billing status, cancel autopay, renewals and expiry jobs, refunds and disputes, payment history and receipts, admin payments. |

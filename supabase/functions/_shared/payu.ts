@@ -244,6 +244,32 @@ export function parseVerifyResponse(txnId: string, body: unknown): VerifiedPayme
   };
 }
 
+/**
+ * verify_payment's answer for PayU's own txnid of a payment-link payment, reported under our txnId. PayU runs each
+ * link payment under a txnid it picks and carries ours in udf1; when udf1 is present it must be ours, and with
+ * requireUdf1 it must be present.
+ */
+export function parseLinkVerify(txnId: string, payuTxnId: string, body: unknown, requireUdf1: boolean): VerifiedPayment {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const t = ((b.transaction_details ?? {}) as Record<string, Record<string, unknown>>)[payuTxnId];
+  const udf1 = t?.udf1 == null ? "" : String(t.udf1);
+  if (udf1 !== txnId && (requireUdf1 || udf1 !== "")) return { status: "not_found", txnId };
+  return { ...parseVerifyResponse(payuTxnId, body), txnId };
+}
+
+/** PayU's txnids for the payments made on one payment link, successful ones first. Empty when PayU has none. */
+export function parseLinkTransactions(body: unknown): string[] {
+  const result = ((body ?? {}) as Record<string, unknown>).result as Record<string, unknown> | null | undefined;
+  const rows = Array.isArray(result?.data) ? result!.data as Record<string, unknown>[] : [];
+  const success = (r: Record<string, unknown>) => String(r.status ?? "").toLowerCase() === "success" ? 1 : 0;
+  const ids = [...rows].sort((a, b) => success(b) - success(a))
+    .map((r) => r.merchantReferenceId == null ? "" : String(r.merchantReferenceId))
+    .filter((id) => id !== "");
+  return [...new Set(ids)];
+}
+
+const STATUS_RANK: Record<VerifiedStatus, number> = { not_found: 0, failure: 1, pending: 2, success: 3 };
+
 /** "active", "inactive" or "unknown" from a mandate status answer. */
 export function parseMandateStatus(body: unknown): "active" | "inactive" | "unknown" {
   const text = JSON.stringify(body ?? {}).toLowerCase();
@@ -281,7 +307,7 @@ type Fetch = typeof fetch;
 
 /** Server-to-server PayU calls. Never logs secrets, hashes or full bodies (SC6). */
 export class PayuClient {
-  private token: { value: string; until: number } | null = null;
+  private readonly tokens = new Map<string, { value: string; until: number }>();
 
   constructor(private readonly config: PayuConfig, private readonly http: Fetch = fetch) {}
 
@@ -289,8 +315,9 @@ export class PayuClient {
     return HOSTS[this.config.env];
   }
 
-  private async accessToken(): Promise<string> {
-    if (this.token && this.token.until > Date.now() + 60_000) return this.token.value;
+  private async accessToken(scope = "create_payment_links"): Promise<string> {
+    const cached = this.tokens.get(scope);
+    if (cached && cached.until > Date.now() + 60_000) return cached.value;
     const response = await this.http(`${this.hosts.accounts}/oauth/token`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -298,13 +325,13 @@ export class PayuClient {
         client_id: this.config.clientId,
         client_secret: this.config.clientSecret,
         grant_type: "client_credentials",
-        scope: "create_payment_links",
+        scope,
       }),
     });
     const body = await response.json().catch(() => null) as { access_token?: string; expires_in?: number } | null;
     if (!response.ok || !body?.access_token) throw new Error(`PayU token request failed (${response.status})`);
-    this.token = { value: body.access_token, until: Date.now() + (body.expires_in ?? 600) * 1000 };
-    return this.token.value;
+    this.tokens.set(scope, { value: body.access_token, until: Date.now() + (body.expires_in ?? 600) * 1000 });
+    return body.access_token;
   }
 
   async createLink(req: LinkRequest): Promise<{ url: string; ref: string | null }> {
@@ -344,6 +371,48 @@ export class PayuClient {
 
   async verifyPayment(txnId: string): Promise<VerifiedPayment> {
     return parseVerifyResponse(txnId, await this.command("verify_payment", txnId));
+  }
+
+  /** PayU's txnids for the payments made on the link whose invoice number is txnId (last 45 days). */
+  async linkTransactions(txnId: string): Promise<string[]> {
+    const day = 86_400_000;
+    const query = new URLSearchParams({
+      pageSize: "20",
+      dateFrom: istDate(new Date(Date.now() - 45 * day)),
+      dateTo: istDate(new Date(Date.now() + day)),
+    });
+    const response = await this.http(
+      `${this.hosts.links}/payment-links/${encodeURIComponent(txnId)}/txns?${query}`,
+      {
+        headers: {
+          Authorization: `Bearer ${await this.accessToken("read_payment_links")}`,
+          merchantId: this.config.merchantId,
+        },
+      },
+    );
+    const body = await response.json().catch(() => null);
+    if (response.status === 404) return [];
+    if (!response.ok) throw new Error(`PayU link transactions failed (${response.status})`);
+    return parseLinkTransactions(body);
+  }
+
+  /**
+   * Status of our transaction txnId. Renewals run under our txnid; a payment-link payment runs under PayU's own, so
+   * when PayU doesn't know ours this tries the txnid a webhook named (payuTxnId), then the link's transactions.
+   */
+  async checkPayment(txnId: string, payuTxnId?: string | null): Promise<VerifiedPayment> {
+    let best = await this.verifyPayment(txnId);
+    if (best.status !== "not_found") return best;
+    if (payuTxnId && payuTxnId !== txnId) {
+      best = parseLinkVerify(txnId, payuTxnId, await this.command("verify_payment", payuTxnId), true);
+      if (best.status === "success") return best;
+    }
+    for (const id of (await this.linkTransactions(txnId)).slice(0, 5)) {
+      const verified = parseLinkVerify(txnId, id, await this.command("verify_payment", id), false);
+      if (verified.status === "success") return verified;
+      if (STATUS_RANK[verified.status] > STATUS_RANK[best.status]) best = verified;
+    }
+    return best;
   }
 
   async mandateStatus(mandateRef: string): Promise<"active" | "inactive" | "unknown"> {

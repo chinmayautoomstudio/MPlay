@@ -28,14 +28,18 @@ function message(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-/** Verifies one transaction with PayU and applies the answer (SV1, SV4). Returns apply_payment_result's answer. */
+/**
+ * Verifies one transaction with PayU and applies the answer (SV1, SV4). payuTxnId is PayU's own txnid when a webhook
+ * named one. Returns apply_payment_result's answer.
+ */
 export async function resolvePayment(
   admin: SupabaseClient,
   payu: PayuClient,
   txnId: string,
   si: boolean,
+  payuTxnId: string | null = null,
 ): Promise<Record<string, unknown>> {
-  let verified: VerifiedPayment = await payu.verifyPayment(txnId);
+  let verified: VerifiedPayment = await payu.checkPayment(txnId, payuTxnId);
   // The first payment of an autopay link registers the mandate; confirm it when the status answer doesn't say.
   if (si && verified.status === "success" && !verified.mandateRef && verified.payuRef) {
     const state = await payu.mandateStatus(verified.payuRef).catch(() => "unknown" as const);
@@ -222,7 +226,7 @@ export async function processWebhook(
       if (!txnId) return "ignored";
       const { data } = await admin.from("payments").select("si").eq("txn_id", txnId).maybeSingle();
       if (!data) return "ignored";
-      await resolvePayment(admin, payu, txnId, data.si);
+      await resolvePayment(admin, payu, txnId, data.si, event.payuTxnId);
       return "processed";
     }
     case "refund": {
@@ -235,7 +239,7 @@ export async function processWebhook(
     case "dispute": {
       // PayU's dispute notifications are checked against the payment: it must exist and have been paid.
       if (!txnId || !event.disputeState) return "ignored";
-      const verified = await payu.verifyPayment(txnId);
+      const verified = await payu.checkPayment(txnId, event.payuTxnId);
       if (verified.status !== "success") return "ignored";
       const result = await rpc<{ subscriptionId?: string }>(admin, "apply_dispute", {
         p_txn: txnId,

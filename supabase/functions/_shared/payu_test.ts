@@ -6,6 +6,8 @@ import {
   istDate,
   istDateTime,
   parseLinkResponse,
+  parseLinkTransactions,
+  parseLinkVerify,
   parseMandateStatus,
   parseRefundStatus,
   parseVerifyResponse,
@@ -178,4 +180,68 @@ Deno.test("The client gets one token, creates the link and signs commands", asyn
   assertEquals(form.get("command"), "verify_payment");
   assertEquals(form.get("hash"), await commandHash("KEY", "verify_payment", "MPABC123", "SALT"));
   assert(!calls.at(-1)!.body.includes("SALT"), "The salt is never sent");
+});
+
+const OURS = "MPE6362B8BB4EC4C13A64E";
+const linkPaid = {
+  status: 1,
+  transaction_details: {
+    "938632": { txnid: "938632", mihpayid: "6133", status: "success", unmappedstatus: "captured", amt: "99.00", mode: "UPI", udf1: OURS },
+  },
+};
+
+Deno.test("A payment-link payment is reported under our txnid only when udf1 is ours", () => {
+  const paid = parseLinkVerify(OURS, "938632", linkPaid, true);
+  assertEquals(paid.status, "success");
+  assertEquals(paid.txnId, OURS);
+  assertEquals(paid.payuRef, "6133");
+  assertEquals(paid.amountPaise, 9900);
+  assertEquals(parseLinkVerify("MPAAAAAAAAAAAAAAAAAAAA", "938632", linkPaid, true).status, "not_found");
+  const noUdf = { transaction_details: { "938632": { ...linkPaid.transaction_details["938632"], udf1: "" } } };
+  assertEquals(parseLinkVerify(OURS, "938632", noUdf, true).status, "not_found", "A webhook hint needs udf1");
+  assertEquals(parseLinkVerify(OURS, "938632", noUdf, false).status, "success", "The link's own list is enough");
+});
+
+Deno.test("A link's transactions list successful payments first", () => {
+  const body = {
+    status: 0,
+    result: {
+      data: [
+        { merchantReferenceId: "1", status: "failure" },
+        { merchantReferenceId: "2", status: "success" },
+        { merchantReferenceId: "", status: "pending" },
+      ],
+    },
+  };
+  assertEquals(parseLinkTransactions(body), ["2", "1"]);
+  assertEquals(parseLinkTransactions({ status: -1, message: "paymentLink not found", result: null }), []);
+});
+
+Deno.test("checkPayment finds a link payment through the link's transactions", async () => {
+  const scopes: string[] = [];
+  const verified: string[] = [];
+  const fakeFetch = (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith("/oauth/token")) {
+      scopes.push(new URLSearchParams(String(init?.body)).get("scope")!);
+      return Promise.resolve(Response.json({ access_token: "tok", expires_in: 3600 }));
+    }
+    if (url.includes(`/payment-links/${OURS}/txns?`)) {
+      return Promise.resolve(Response.json({ status: 0, result: { data: [{ merchantReferenceId: "938632", status: "success" }] } }));
+    }
+    const var1 = new URLSearchParams(String(init?.body)).get("var1")!;
+    verified.push(var1);
+    if (var1 === "938632") return Promise.resolve(Response.json(linkPaid));
+    return Promise.resolve(Response.json({ status: 0, transaction_details: { [var1]: { mihpayid: "Not Found" } } }));
+  };
+  const client = new PayuClient(config, fakeFetch as typeof fetch);
+  const result = await client.checkPayment(OURS);
+  assertEquals(result.status, "success");
+  assertEquals(result.txnId, OURS);
+  assertEquals(verified, [OURS, "938632"]);
+  assertEquals(scopes, ["read_payment_links"]);
+
+  verified.length = 0;
+  assertEquals((await client.checkPayment(OURS, "938632")).status, "success");
+  assertEquals(verified, [OURS, "938632"], "A webhook's txnid is tried before the link list");
 });

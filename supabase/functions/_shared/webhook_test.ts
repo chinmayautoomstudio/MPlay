@@ -33,10 +33,25 @@ Deno.test("Webhooks are classified by what they refer to", () => {
   assertEquals(classifyWebhook({ hello: "world" }), {
     kind: "unknown",
     txnId: null,
+    payuTxnId: null,
     payuRef: null,
     mandateRef: null,
     status: null,
     disputeState: null,
     eventKey: null,
   });
+});
+
+Deno.test("A payment-link postback is matched by our txnid in udf1", () => {
+  const event = classifyWebhook({
+    txnid: "938632",
+    udf1: "MPE6362B8BB4EC4C13A64E",
+    mihpayid: "613345778913415662",
+    status: "success",
+  });
+  assertEquals(event.kind, "payment");
+  assertEquals(event.txnId, "MPE6362B8BB4EC4C13A64E");
+  assertEquals(event.payuTxnId, "938632");
+  assertEquals(event.eventKey, "payment:MPE6362B8BB4EC4C13A64E:success::");
+  assertEquals(classifyWebhook({ txnid: "938632", udf1: "something", status: "success" }).txnId, "938632");
 });
