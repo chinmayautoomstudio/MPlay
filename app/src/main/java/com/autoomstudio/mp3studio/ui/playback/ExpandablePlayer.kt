@@ -35,6 +35,7 @@ import com.autoomstudio.mp3studio.playback.NowPlayingState
 import com.autoomstudio.mp3studio.ui.components.ArtworkImage
 import com.autoomstudio.mp3studio.ui.library.SongActions
 import com.autoomstudio.mp3studio.ui.separation.SeparatorUi
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.Flow
 
@@ -98,6 +99,7 @@ fun ExpandablePlayer(
         val showMini by remember { derivedStateOf { progress() < 0.3f } }
         val prominentArt by remember { derivedStateOf { progress() > 0.5f } }
         val backEnabled = sheetState.targetValue == PlayerSheetValue.Expanded
+        val swipe = rememberSwipeSkipState()
 
         var fullArtRect by remember { mutableStateOf(Rect.Zero) }
         val positions = remember { ArtworkPositions() }
@@ -169,6 +171,7 @@ fun ExpandablePlayer(
                     actions = actions,
                     onExpand = onExpand,
                     showArtwork = false,
+                    swipe = swipe,
                     modifier = Modifier
                         .layout { measurable, constraints ->
                             val width = (fullWidth - 2 * marginH).roundToInt()
@@ -205,8 +208,24 @@ fun ExpandablePlayer(
                             placeable.place(rect.left.roundToInt(), rect.top.roundToInt())
                         }
                     }
+                    .then(
+                        if (prominentArt) {
+                            Modifier.swipeToSkip(
+                                state = swipe,
+                                canNext = state.hasNext,
+                                canPrevious = state.hasPrevious,
+                                onNext = actions::next,
+                                onPrevious = actions::previousTrack,
+                            )
+                        } else {
+                            Modifier
+                        },
+                    )
                     .graphicsLayer {
                         val p = progress()
+                        val offset = swipe.offset.value
+                        translationX = offset
+                        if (size.width > 0f) alpha = 1f - (abs(offset) / size.width * 0.5f).coerceIn(0f, 0.5f)
                         val scale = lerp(1f, artScale.value, p)
                         scaleX = scale
                         scaleY = scale

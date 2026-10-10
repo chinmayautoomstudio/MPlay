@@ -191,6 +191,8 @@ class PlaybackController(
 
     fun previous() = withController { it.seekToPrevious() }
 
+    fun previousTrack() = withController { it.seekToPreviousMediaItem() }
+
     fun seekTo(positionMs: Long) = withController { it.seekTo(positionMs.coerceAtLeast(0L)) }
 
     /** False while a newly loaded item is still preparing; Media3 drops seeks until then. */

@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
@@ -48,6 +49,7 @@ import com.autoomstudio.mp3studio.ui.common.formatDuration
 import com.autoomstudio.mp3studio.ui.components.ArtworkImage
 import com.autoomstudio.mp3studio.ui.components.pressBounce
 import com.autoomstudio.mp3studio.ui.metronome.MetronomeMiniIndicator
+import kotlin.math.abs
 import kotlinx.coroutines.flow.Flow
 
 private val ProgressLineHeight = 4.dp
@@ -71,6 +73,7 @@ fun MiniPlayerContent(
     onExpand: () -> Unit,
     modifier: Modifier = Modifier,
     showArtwork: Boolean = true,
+    swipe: SwipeSkipState = rememberSwipeSkipState(),
 ) {
     val positionMs by position.collectAsStateWithLifecycle(initialValue = 0L)
     val openLabel = stringResource(R.string.action_open_player, state.title)
@@ -87,6 +90,13 @@ fun MiniPlayerContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(RowHeight)
+                    .swipeToSkip(
+                        state = swipe,
+                        canNext = state.hasNext,
+                        canPrevious = state.hasPrevious,
+                        onNext = actions::next,
+                        onPrevious = actions::previousTrack,
+                    )
                     .clickable(onClickLabel = openLabel, onClick = onExpand)
                     .padding(
                         start = MiniArtworkStart,
@@ -100,14 +110,25 @@ fun MiniPlayerContent(
                     ArtworkImage(
                         uri = state.artworkUri,
                         contentDescription = null,
-                        modifier = Modifier.size(MiniArtworkSize),
+                        modifier = Modifier
+                            .size(MiniArtworkSize)
+                            .graphicsLayer { translationX = swipe.offset.value },
                         cornerRadius = 8.dp,
                     )
                 } else {
                     Spacer(Modifier.size(MiniArtworkSize))
                 }
                 Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .graphicsLayer {
+                            translationX = swipe.offset.value
+                            if (size.width > 0f) {
+                                alpha = 1f - (abs(swipe.offset.value) / size.width).coerceIn(0f, 0.7f)
+                            }
+                        },
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         MetronomeMiniIndicator(Modifier.padding(end = 6.dp))
                         Text(

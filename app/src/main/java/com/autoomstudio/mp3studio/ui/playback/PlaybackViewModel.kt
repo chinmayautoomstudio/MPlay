@@ -50,6 +50,7 @@ class PlaybackViewModel(container: AppContainer) : ViewModel(), PlayerActions {
     override fun playPause() = controller.playPause()
     override fun next() = controller.next()
     override fun previous() = controller.previous()
+    override fun previousTrack() = controller.previousTrack()
     override fun seekTo(positionMs: Long) = controller.seekTo(positionMs)
     override fun toggleShuffle() = controller.toggleShuffle()
     override fun cycleRepeat() = controller.cycleRepeat()

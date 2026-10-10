@@ -10,6 +10,9 @@ interface PlayerActions {
     fun playPause()
     fun next()
     fun previous()
+
+    /** The previous song, even when the current one has played for a while (unlike [previous], which restarts it). */
+    fun previousTrack()
     fun seekTo(positionMs: Long)
     fun toggleShuffle()
     fun cycleRepeat()

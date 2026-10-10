@@ -29,6 +29,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `ui/playback/MiniPlayer.kt` | Title/artist, play/pause, next, scrub strip, metronome indicator. |
 | `ui/playback/NowPlayingScreen.kt` | Artwork, seek bar, transport, `StemModeSelector`, chip row (lofi, metronome, separator, sing-along), sheets. |
 | `ui/playback/PlayPauseIcon.kt` | Lottie play/pause morph with icon fallback. |
+| `ui/playback/SwipeToSkip.kt` | `swipeToSkip` modifier, `SwipeSkipState` and `swipeDecision()`: swipe the album art or mini player to change song. |
 | `ui/playback/SleepTimerSheet.kt` | Presets, end of song, 1-180 min slider, remaining-time chip. |
 
 ## How it works
@@ -67,6 +68,14 @@ State flows back through session extras: `sleep_end_elapsed`, `sleep_end_of_song
 - `positionMs()` polls every 500 ms.
 - On connect with an empty queue, `restoreSession()` loads the saved queue paused.
 - Added in `e13b2f7` for sing-along: `play()`, `pause()`, `currentPositionMs()`, `isSeekable()`.
+- `previousTrack()` uses `seekToPreviousMediaItem()`, so it always changes song; `previous()` (the Previous button) uses `seekToPrevious()`, which restarts the current song after 3 s.
+
+### Swipe to skip
+
+- Swipe the Now Playing album art (the shared artwork in `ExpandablePlayer`, while expanded) or the mini player row left for the next song and right for the previous one (`PlayerActions.next()` / `previousTrack()`).
+- `swipeToSkip` uses `detectHorizontalDragGestures`, so vertical drags still expand or collapse the player, taps still open it, and the mini player's scrub strip keeps its own drags. One `SwipeSkipState` in `ExpandablePlayer` moves the artwork and the mini player's title and artist together.
+- A swipe counts past 30% of the element's width or with a fling faster than 1000 dp/s (`swipeDecision()`); the content slides out, the song changes with a haptic tick, and the content slides back in from the other side. Otherwise it springs back. With no next or previous song (`hasNext` / `hasPrevious`) the drag only moves a little against resistance.
+- TalkBack gets "Next song" and "Previous song" custom actions on both.
 
 ### Sleep timer
 
@@ -96,7 +105,8 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 - `playback/NowPlayingStateTest.kt`: repeat cycle.
 - `playback/SessionRestoreTest.kt`: missing songs, index shift, fallback, clamping.
 - `playback/SleepTimerTest.kt`: start, clamp, extend, expiry, fade curve, speed-adjusted end of song.
-- No tests for the service, controller, runner or UI.
+- `ui/playback/SwipeToSkipTest.kt`: swipe threshold, fling, blocked directions.
+- No tests for the service, controller, runner or the rest of the UI.
 
 ## Known limitations and TODOs
 
@@ -123,3 +133,4 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 | 2026-10-08 | - | Swiping the app away from recents now always stops playback and the service (`onTaskRemoved`). |
 | 2026-10-08 | - | `onTaskRemoved` also reports the removal to `TaskRemoval`, which stops the other background features. |
 | 2026-10-10 | - | `AlbumArtBitmapLoader` on the session, so the notification shows the cover of songs in `Download/`. |
+| 2026-10-10 | - | Swipe the album art or mini player left/right for the next/previous song (`SwipeToSkip.kt`, `PlayerActions.previousTrack()`). |
