@@ -1,6 +1,6 @@
 # Settings, About, theme and shared components
 
-> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-10
+> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-12
 
 ## Summary
 
@@ -102,3 +102,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-10 | - | DataStore `billing` (`pending_payment_user`, `pending_payment_txn`) for PayU payments ([payments](payments.md)). |
 | 2026-10-09 | - | About shows the new MP3 Studio logo (`ic_mp3studio_logo`) in both themes; `ic_mplay_logo`/`ic_mplay_logo_dark` removed (3.2.3). |
 | 2026-10-10 | - | Keys `admin_notifications_enabled` and `admin_activity_notified_at` for Admin phone notifications ([admin](admin.md)). |
+| 2026-10-12 | - | About logo regenerated from `logos/mp3-studio-logo-v2.png` (`ic_mp3studio_logo`); launcher background restored to `#030013`. |
