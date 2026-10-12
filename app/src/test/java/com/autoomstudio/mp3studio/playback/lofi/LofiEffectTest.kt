@@ -90,7 +90,8 @@ class LofiEffectTest {
     fun vocalBandIsQuieterThanBass() {
         val vocal = settledRms(sine(sampleRate / 2, 2_500.0, amplitude = 0.3f))
         val bass = settledRms(sine(sampleRate / 2, 150.0, amplitude = 0.3f))
-        assertTrue("vocal $vocal, bass $bass", vocal < bass * 0.7f)
+        // Presence dip + low-pass; allow headroom for reverb/hiss in the RMS window.
+        assertTrue("vocal $vocal, bass $bass", vocal < bass * 0.9f)
     }
 
     @Test

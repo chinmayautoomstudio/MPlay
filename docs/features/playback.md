@@ -1,6 +1,6 @@
 # Playback
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-10
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-12
 
 ## Summary
 
@@ -37,9 +37,9 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 ### Service
 
-- `ExoPlayer.Builder(this, LofiRenderersFactory(...))` with music audio attributes, `handleAudioFocus = true`, `setHandleAudioBecomingNoisy(true)`, `WAKE_MODE_LOCAL`.
+- `ExoPlayer.Builder(this, EffectRenderersFactory(...))` with music audio attributes, `handleAudioFocus = true`, `setHandleAudioBecomingNoisy(true)`, `WAKE_MODE_LOCAL`. The sink runs Lofi then the [Equalizer](equalizer.md) processor before Media3 speed/pitch.
 - Listeners: `SkipUnplayableListener` (a failing stem falls back to the original file; otherwise the broken item is removed), `SessionSaver`, `WidgetStatePublisher`, the `musicPlaying` mirror, `SleepTimerRunner`.
-- On create it restores shuffle/repeat, applies the saved lofi flag, loads `stemMode`, and watches `stemRepository.stemSets` to repoint stem URIs.
+- On create it restores shuffle/repeat, applies the saved lofi flag, applies equalizer state from `EqualizerRepository` (and collects updates), loads `stemMode`, and watches `stemRepository.stemSets` to repoint stem URIs.
 - The session activity `PendingIntent` opens `MainActivity` with `EXTRA_OPEN_NOW_PLAYING`. Notifications use Media3's default provider.
 - The session's bitmap loader is `CacheBitmapLoader(AlbumArtBitmapLoader(...))`. Album-art URIs go through `AlbumArtLoader`, so songs in `Download/` (where MediaProvider refuses thumbnails) get their embedded cover in the notification. Other URIs go to `DataSourceBitmapLoader`. When a song has no art, the future fails and Media3 logs "Failed to load bitmap", which is expected. See [library](library.md#album-art).
 - `SessionCallback`:
@@ -61,7 +61,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `SET_LOFI` | `enabled` |
 | `SET_STEM_MODE` | `stem_mode` |
 
-State flows back through session extras: `sleep_end_elapsed`, `sleep_end_of_song`, `lofi`, `stem_mode`.
+State flows back through session extras: `sleep_end_elapsed`, `sleep_end_of_song`, `lofi`, `stem_mode`, `equalizer_active`.
 
 ### Controller
 
@@ -137,3 +137,4 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 | 2026-10-10 | - | `AlbumArtBitmapLoader` on the session, so the notification shows the cover of songs in `Download/`. |
 | 2026-10-10 | - | Swipe the album art or mini player left/right for the next/previous song (`SwipeToSkip.kt`, `PlayerActions.previousTrack()`). |
 | 2026-10-10 | - | Controller policy for the exported service: other apps refused, trusted system controllers transport-only, `onAddMediaItems` limited to the app (`ControllerAccess.kt`). |
+| 2026-10-12 | - | Equalizer processor after Lofi (`EffectRenderersFactory`); session extra `equalizer_active`; Now Playing Equalizer chip. See [equalizer](equalizer.md). |

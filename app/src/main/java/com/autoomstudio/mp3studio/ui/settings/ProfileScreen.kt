@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -79,6 +80,7 @@ fun ProfileScreen(
     onOpenLibrary: () -> Unit,
     onOpenSeparation: () -> Unit,
     onOpenPlayback: () -> Unit,
+    onOpenEqualizer: () -> Unit,
     onOpenAbout: () -> Unit,
     modifier: Modifier = Modifier,
     accountViewModel: AccountViewModel = viewModel(factory = AccountViewModel.Factory),
@@ -166,6 +168,12 @@ fun ProfileScreen(
             title = stringResource(R.string.profile_playback),
             subtitle = stringResource(R.string.profile_playback_summary),
             onClick = onOpenPlayback,
+        )
+        CategoryRow(
+            icon = Icons.Rounded.Tune,
+            title = stringResource(R.string.profile_equalizer),
+            subtitle = stringResource(R.string.profile_equalizer_summary),
+            onClick = onOpenEqualizer,
         )
         CategoryRow(
             icon = Icons.Rounded.Info,

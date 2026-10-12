@@ -129,6 +129,7 @@ import com.autoomstudio.mp3studio.ui.settings.AppearanceSettingsScreen
 import com.autoomstudio.mp3studio.ui.settings.EditProfileScreen
 import com.autoomstudio.mp3studio.ui.settings.LibrarySettingsScreen
 import com.autoomstudio.mp3studio.ui.settings.LicensesScreen
+import com.autoomstudio.mp3studio.ui.equalizer.EqualizerScreen
 import com.autoomstudio.mp3studio.ui.settings.PlaybackSettingsScreen
 import com.autoomstudio.mp3studio.ui.settings.ProfileScreen
 import com.autoomstudio.mp3studio.ui.settings.ProfileTabIcon
@@ -573,6 +574,7 @@ fun MainScreen(
                                         onOpenLibrary = { profilePage = ProfilePage.Library },
                                         onOpenSeparation = { profilePage = ProfilePage.Separation },
                                         onOpenPlayback = { profilePage = ProfilePage.Playback },
+                                        onOpenEqualizer = { profilePage = ProfilePage.Equalizer },
                                         onOpenAbout = { profilePage = ProfilePage.About },
                                         modifier = contentModifier,
                                         accountViewModel = accountViewModel,
@@ -627,6 +629,12 @@ fun MainScreen(
                                         usage = plan.usage,
                                     )
                                     ProfilePage.Playback -> PlaybackSettingsScreen(
+                                        onBack = backToMain,
+                                        onOpenEqualizer = { profilePage = ProfilePage.Equalizer },
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                    )
+                                    ProfilePage.Equalizer -> EqualizerScreen(
                                         onBack = backToMain,
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
@@ -705,6 +713,11 @@ fun MainScreen(
                 songActions = songActions,
                 suggestedSleepMinutes = suggestedSleepMinutes,
                 separator = separator,
+                onOpenEqualizer = {
+                    onShowNowPlayingChange(false)
+                    openProfile()
+                    profilePage = ProfilePage.Equalizer
+                },
             )
         }
         if (!contentBackEnabled) {
@@ -808,6 +821,7 @@ private enum class ProfilePage {
     Separation,
     SeparationQueue,
     Playback,
+    Equalizer,
     About,
     Licenses,
     Plans,

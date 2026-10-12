@@ -19,8 +19,9 @@ Feature area to doc mapping:
 
 | Code | Doc |
 |---|---|
-| `playback/` (not `lofi/`), `ui/playback/` | `features/playback.md` |
+| `playback/` (not `lofi/` or `equalizer/` or `dsp/`), `ui/playback/` | `features/playback.md` |
 | `playback/lofi/` | `features/lofi-mode.md` |
+| `playback/equalizer/`, `playback/dsp/`, `data/equalizer/`, `ui/equalizer/` | `features/equalizer.md` |
 | `data/library/`, `data/model/`, `ui/library/`, `ui/permission/` | `features/library.md` |
 | `data/playlist/` (not the database class), `ui/playlist/` | `features/playlists.md` |
 | `data/clip/`, `ui/trim/` | `features/clips-and-ringtones.md` |

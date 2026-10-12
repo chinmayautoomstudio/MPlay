@@ -28,4 +28,6 @@ data class NowPlayingState(
     val lofiEnabled: Boolean = false,
     /** Session-wide; songs without stems play the original whatever this says. */
     val stemMode: StemMode = StemMode.Original,
+    /** True when the equalizer is on and not a flat Normal with extras off. */
+    val equalizerActive: Boolean = false,
 )

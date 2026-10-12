@@ -32,6 +32,7 @@ MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.au
 | Home screen widget | [features/widget.md](features/widget.md) | 1.0 |
 | Duplicate detection | [features/duplicates.md](features/duplicates.md) | 2.0 |
 | Lofi mode | [features/lofi-mode.md](features/lofi-mode.md) | 2.0 |
+| Equalizer | [features/equalizer.md](features/equalizer.md) | Unreleased |
 | AI vocal separation (stems) | [features/vocal-separation.md](features/vocal-separation.md) | 3.0 |
 | Settings, About, theme and shared components | [features/settings-and-about.md](features/settings-and-about.md) | 1.0, About in 3.1 |
 | Metronome and BPM detection | [features/metronome.md](features/metronome.md) | Unreleased |
@@ -51,6 +52,7 @@ The PRDs describe intent; these docs describe what the code actually does.
 - [MPlay PRD v3.1.md](../MPlay%20PRD%20v3.1.md)
 - [MP3 Studio PRD v3.2.md](../MP3%20Studio%20PRD%20v3.2.md) (rename, accounts, plans)
 - [MP3-Studio-PRD-Payments-PayU-Payment-Link.md](../MP3-Studio-PRD-Payments-PayU-Payment-Link.md) (PayU Pro payments)
+- [MP3-Studio-PRD-v3.3-Equalizer.md](../MP3-Studio-PRD-v3.3-Equalizer.md) (equalizer)
 
 ## Keeping the docs current
 

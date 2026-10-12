@@ -171,10 +171,17 @@ fun SeparationSettingsScreen(
 @Composable
 fun PlaybackSettingsScreen(
     onBack: () -> Unit,
+    onOpenEqualizer: () -> Unit = {},
     modifier: Modifier = Modifier,
     backEnabled: Boolean = true,
 ) {
     SubPage(stringResource(R.string.profile_playback), onBack, backEnabled, modifier) {
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.profile_equalizer)) },
+            supportingContent = { Text(stringResource(R.string.profile_equalizer_summary)) },
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+            modifier = Modifier.clickable(onClick = onOpenEqualizer),
+        )
         BatteryOptimizationItem()
     }
 }

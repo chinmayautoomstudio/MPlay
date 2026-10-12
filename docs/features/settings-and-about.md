@@ -24,7 +24,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 ## How it works
 
-- `MainScreen` keeps `ProfilePage` (`Main`, `EditProfile`, `Appearance`, `Library`, `Duplicates`, `Separation`, `SeparationQueue`, `Playback`, `About`, `Licenses`, `Plans`, `Admin`). Sub-pages go back to `Main`, except Duplicates (back to Library), the separation queue (back to Separation) and Licenses (back to About). `MPlayTopBar` is hidden on `Main`, because the Profile screen draws its own back button and "Profile" title. That back button returns to the tab that was open before Profile.
+- `MainScreen` keeps `ProfilePage` (`Main`, `EditProfile`, `Appearance`, `Library`, `Duplicates`, `Separation`, `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `Admin`). Sub-pages go back to `Main`, except Duplicates (back to Library), the separation queue (back to Separation) and Licenses (back to About). `MPlayTopBar` is hidden on `Main`, because the Profile screen draws its own back button and "Profile" title. That back button returns to the tab that was open before Profile.
 - The subscription card shows "MP3 Studio" plus the plan name (Free, Trial or Pro). Below that it shows the days left in the trial, or the days until the Pro subscription expires or renews; Free users see an upgrade hint. Tapping it opens Plans. The Profile cards use theme colours, so they follow light and dark mode. The layout is compact so the whole screen fits above the mini player and bottom bar on a typical phone: the back button and title share one row, the avatar is 56dp, category rows are about 60dp tall, and Edit is a small pencil-only icon button (content description "Edit").
 - `MPlayAppTheme` decides dark/light from the setting (or system), or dark when `forceDark` is set (`MainActivity` sets it while signed out, so the sign-in screen is always dark), runs edge-to-edge with matching bar icons, and uses dynamic colour on API 31+ when enabled, otherwise `NeonDarkColors` / `NeonLightColors`.
 - `MainActivity` keeps the splash screen until the theme has loaded.
@@ -63,7 +63,7 @@ All keys in DataStore `app_settings`:
 | `admin_notifications_enabled` | Boolean | `true` | [Admin](admin.md) phone notifications switch |
 | `admin_activity_notified_at` | Long | 0 (epoch ms; cleared on sign-out) | [Admin](admin.md) newest event posted as a notification |
 
-Other DataStores: `playback_session`, `library_prefs`, `widget_state`, and `auth_session` (key `session`: the Supabase session, encrypted with Tink, excluded from backup; see [accounts](accounts.md)). The Tink keyset lives in SharedPreferences `auth_keyset_prefs`. DataStore `entitlements` (key `entitlements_json`: the last plan answer from the server, cleared on sign-out; see [plans](plans.md)). DataStore `billing` (keys `pending_payment_user` and `pending_payment_txn`: the PayU payment the app is waiting for, cleared when it settles and on sign-out; see [payments](payments.md)).
+Other DataStores: `playback_session`, `library_prefs`, `widget_state`, and `auth_session` (key `session`: the Supabase session, encrypted with Tink, excluded from backup; see [accounts](accounts.md)). The Tink keyset lives in SharedPreferences `auth_keyset_prefs`. DataStore `entitlements` (key `entitlements_json`: the last plan answer from the server, cleared on sign-out; see [plans](plans.md)). DataStore `billing` (keys `pending_payment_user` and `pending_payment_txn`: the PayU payment the app is waiting for, cleared when it settles and on sign-out; see [payments](payments.md)). DataStore `equalizer_settings` (equalizer on/off, bands, presets and switches; see [equalizer](equalizer.md)).
 
 ## Manifest, permissions and notifications
 
@@ -102,4 +102,5 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-10 | - | DataStore `billing` (`pending_payment_user`, `pending_payment_txn`) for PayU payments ([payments](payments.md)). |
 | 2026-10-09 | - | About shows the new MP3 Studio logo (`ic_mp3studio_logo`) in both themes; `ic_mplay_logo`/`ic_mplay_logo_dark` removed (3.2.3). |
 | 2026-10-10 | - | Keys `admin_notifications_enabled` and `admin_activity_notified_at` for Admin phone notifications ([admin](admin.md)). |
+| 2026-10-12 | - | `ProfilePage.Equalizer` and Profile/Playback equalizer rows; DataStore `equalizer_settings` ([equalizer](equalizer.md)). |
 | 2026-10-12 | - | About logo regenerated from `logos/mp3-studio-logo-v2.png` (`ic_mp3studio_logo`); launcher background restored to `#030013`. |

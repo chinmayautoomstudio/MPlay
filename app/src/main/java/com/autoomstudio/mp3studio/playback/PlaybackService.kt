@@ -33,9 +33,11 @@ import com.autoomstudio.mp3studio.data.account.AuthRepository
 import com.autoomstudio.mp3studio.data.account.AuthState
 import com.autoomstudio.mp3studio.data.library.SongRepository
 import com.autoomstudio.mp3studio.data.model.Song
+import com.autoomstudio.mp3studio.data.equalizer.EqualizerRepository
 import com.autoomstudio.mp3studio.data.settings.AppSettings
 import com.autoomstudio.mp3studio.data.stems.StemMode
 import com.autoomstudio.mp3studio.data.stems.StemRepository
+import com.autoomstudio.mp3studio.playback.equalizer.EqualizerAudioProcessor
 import com.autoomstudio.mp3studio.playback.lofi.LofiAudioProcessor
 import com.autoomstudio.mp3studio.widget.WidgetStatePublisher
 import com.google.common.util.concurrent.Futures
@@ -66,13 +68,16 @@ class PlaybackService : MediaSessionService() {
     private lateinit var sleepTimer: SleepTimerRunner
 
     private val lofiProcessor = LofiAudioProcessor()
+    private val equalizerProcessor = EqualizerAudioProcessor()
     private var lofiEnabled = false
+    private var equalizerActive = false
 
     private lateinit var stemRepository: StemRepository
     private var stemMode = StemMode.Original
 
     private lateinit var musicPlaying: MutableStateFlow<Boolean>
     private lateinit var authRepository: AuthRepository
+    private lateinit var equalizerRepository: EqualizerRepository
 
     @OptIn(UnstableApi::class)
     override fun onCreate() {
@@ -82,12 +87,19 @@ class PlaybackService : MediaSessionService() {
         saveScope = container.applicationScope
         appSettings = container.appSettings
         authRepository = container.authRepository
+        equalizerRepository = container.equalizerRepository
 
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
-        val player = ExoPlayer.Builder(this, LofiRenderersFactory(this, lofiProcessor))
+        // Apply saved EQ before the first buffer so cold starts never play unequalized audio.
+        equalizerProcessor.setFromState(equalizerRepository.state.value)
+        equalizerActive = equalizerRepository.state.value.isActive
+        val player = ExoPlayer.Builder(
+            this,
+            EffectRenderersFactory(this, lofiProcessor, equalizerProcessor),
+        )
             .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
@@ -114,6 +126,13 @@ class PlaybackService : MediaSessionService() {
         }
         serviceScope.launch { applyLofi(player, appSettings.lofiEnabled.first(), persist = false) }
         serviceScope.launch {
+            equalizerRepository.state.collect { state ->
+                equalizerProcessor.setFromState(state)
+                equalizerActive = state.isActive
+                publishExtras()
+            }
+        }
+        serviceScope.launch {
             stemMode = appSettings.stemMode.first()
             publishExtras()
             // Also covers stems finishing or being deleted while their song is queued.
@@ -135,7 +154,9 @@ class PlaybackService : MediaSessionService() {
             .setSessionActivity(sessionActivity)
             .setBitmapLoader(bitmapLoader)
             .setCallback(SessionCallback())
-            .setSessionExtras(PlaybackCommands.extras(SleepTimerStatus.Off, lofiEnabled))
+            .setSessionExtras(
+                PlaybackCommands.extras(SleepTimerStatus.Off, lofiEnabled, equalizerActive = equalizerActive),
+            )
             .build()
 
         serviceScope.launch {
@@ -155,7 +176,9 @@ class PlaybackService : MediaSessionService() {
     }
 
     private fun publishExtras() {
-        mediaSession?.setSessionExtras(PlaybackCommands.extras(sleepTimer.status, lofiEnabled, stemMode))
+        mediaSession?.setSessionExtras(
+            PlaybackCommands.extras(sleepTimer.status, lofiEnabled, stemMode, equalizerActive),
+        )
     }
 
     private fun applyStemMode(player: ExoPlayer, mode: StemMode) {
@@ -435,11 +458,15 @@ class PlaybackService : MediaSessionService() {
         }
     }
 
-    /** Builds the default audio sink with [lofi] ahead of Media3's own speed and pitch processing. */
+    /**
+     * Builds the default audio sink with Lofi then Equalizer ahead of Media3's own speed and
+     * pitch processing.
+     */
     @OptIn(UnstableApi::class)
-    private class LofiRenderersFactory(
+    private class EffectRenderersFactory(
         context: Context,
         private val lofi: LofiAudioProcessor,
+        private val equalizer: EqualizerAudioProcessor,
     ) : DefaultRenderersFactory(context) {
         override fun buildAudioSink(
             context: Context,
@@ -448,7 +475,7 @@ class PlaybackService : MediaSessionService() {
         ): AudioSink = DefaultAudioSink.Builder(context)
             .setEnableFloatOutput(enableFloatOutput)
             .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
-            .setAudioProcessors(arrayOf(lofi))
+            .setAudioProcessors(arrayOf(lofi, equalizer))
             .build()
     }
 

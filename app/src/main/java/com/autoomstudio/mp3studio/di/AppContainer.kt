@@ -36,6 +36,7 @@ import com.autoomstudio.mp3studio.data.plan.SupabaseEntitlementsBackend
 import com.autoomstudio.mp3studio.data.playlist.MPlayDatabase
 import com.autoomstudio.mp3studio.data.playlist.PlaylistRepository
 import com.autoomstudio.mp3studio.playback.PlaybackController
+import com.autoomstudio.mp3studio.data.equalizer.EqualizerRepository
 import com.autoomstudio.mp3studio.data.settings.AppSettings
 import com.autoomstudio.mp3studio.data.stems.StemRepository
 import com.autoomstudio.mp3studio.data.tempo.SongTempoAnalyzer
@@ -161,6 +162,10 @@ class AppContainer(context: Context) {
     val widgetStateStore: WidgetStateStore by lazy { WidgetStateStore(appContext) }
 
     val appSettings: AppSettings by lazy { AppSettings(appContext) }
+
+    val equalizerRepository: EqualizerRepository by lazy {
+        EqualizerRepository(appContext, applicationScope)
+    }
 
     private val sessionStore: SecureSessionStore by lazy { SecureSessionStore(appContext) }
 

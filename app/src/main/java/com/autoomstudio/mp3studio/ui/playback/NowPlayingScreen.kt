@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
@@ -127,6 +128,7 @@ fun NowPlayingContent(
     songActions: SongActions? = null,
     suggestedSleepMinutes: Int = SleepTimer.DEFAULT_MINUTES,
     separator: SeparatorUi? = null,
+    onOpenEqualizer: () -> Unit = {},
     plansViewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
 ) {
     BackHandler(enabled = backEnabled, onBack = onCollapse)
@@ -289,6 +291,11 @@ fun NowPlayingContent(
                             onToggle = actions::setLofi,
                             modifier = chipModifier,
                         )
+                        EqualizerChip(
+                            active = state.equalizerActive,
+                            onClick = onOpenEqualizer,
+                            modifier = chipModifier,
+                        )
                         MetronomeChip(onClick = { showMetronomeSheet = true }, modifier = chipModifier)
                         if (separator != null && !separated) {
                             SeparatorChip(ui = separator, title = state.title, modifier = chipModifier)
@@ -433,6 +440,23 @@ private fun LofiChip(enabled: Boolean, isPlaying: Boolean, onToggle: (Boolean) -
                 modifier = Modifier
                     .size(FilterChipDefaults.IconSize)
                     .popOnChange(enabled, enabled = enabled),
+            )
+        },
+    )
+}
+
+@Composable
+private fun EqualizerChip(active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    FilterChip(
+        modifier = modifier,
+        selected = active,
+        onClick = onClick,
+        label = { Text(stringResource(R.string.equalizer_chip)) },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Filled.Tune,
+                contentDescription = null,
+                modifier = Modifier.size(FilterChipDefaults.IconSize),
             )
         },
     )

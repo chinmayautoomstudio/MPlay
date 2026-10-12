@@ -314,6 +314,7 @@ class PlaybackController(
             sleepTimer = PlaybackCommands.sleepTimerOf(extras),
             lofiEnabled = PlaybackCommands.lofiOf(extras),
             stemMode = PlaybackCommands.stemModeOf(extras),
+            equalizerActive = PlaybackCommands.equalizerActiveOf(extras),
         )
     }
 

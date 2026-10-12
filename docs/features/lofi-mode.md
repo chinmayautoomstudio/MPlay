@@ -1,6 +1,6 @@
 # Lofi mode
 
-> Status: Shipped | Added in: 2.0 | Last updated: 2026-10-09
+> Status: Shipped | Added in: 2.0 | Last updated: 2026-10-12
 
 ## Summary
 
@@ -13,8 +13,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | File | Role |
 |---|---|
 | `playback/lofi/LofiAudioProcessor.kt` | Media3 `BaseAudioProcessor` running `LofiEffect` in the ExoPlayer audio sink. |
-| `playback/lofi/LofiEffect.kt` | DSP: `LofiEffect`, `Biquad` (low-pass, peaking), `SchroederReverb`. |
-| `playback/PlaybackService.kt` | `LofiRenderersFactory`, `applyLofi()`, `LOFI_PLAYBACK = PlaybackParameters(0.85f, 0.98f)`. |
+| `playback/lofi/LofiEffect.kt` | DSP: `LofiEffect`, `SchroederReverb` (biquads from `playback/dsp/Biquad`). |
+| `playback/PlaybackService.kt` | `EffectRenderersFactory` (Lofi then Equalizer), `applyLofi()`, `LOFI_PLAYBACK = PlaybackParameters(0.85f, 0.98f)`. |
 | `ui/components/LofiWaveIcon.kt` | Animated five-bar icon. |
 | `ui/playback/NowPlayingScreen.kt` | `LofiChip` and overflow menu item. |
 
@@ -22,7 +22,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 1. `LofiChip` calls `PlayerActions.setLofi`, which sends `SET_LOFI` to the service.
 2. `applyLofi()` sets the processor's `@Volatile` enabled flag, switches `playbackParameters` between `LOFI_PLAYBACK` and default, publishes the `lofi` extra, and persists the flag.
-3. `LofiRenderersFactory` installs the processor in `DefaultAudioSink`. It is always active; toggling only changes the wet mix, so the sink is never reconfigured.
+3. `EffectRenderersFactory` installs Lofi then the [Equalizer](equalizer.md) processor in `DefaultAudioSink`. Lofi is always active; toggling only changes the wet mix, so the sink is never reconfigured.
 4. The processor accepts 16-bit and float PCM. On flush (seek) it recreates the effect already settled, so it doesn't fade in again.
 
 Wet chain per frame: for stereo, split into mid and side, apply a peaking dip to mid (vocals are usually centred) and multiply side by `SIDE_GAIN`, then recombine; other channel layouts get the dip per channel. Then low-pass, bit-crush, reverb, wet gain, and hiss, crossfaded with the dry signal and soft-clipped.
@@ -58,3 +58,4 @@ None; runs inside `PlaybackService`.
 | 2026-10-08 | | Pitch 0.98x and speed 0.92x, vocal presence dip with stereo side lift, low shelf, 5.5 kHz low-pass, lighter reverb, crackle removed. |
 | 2026-10-09 | | Retuned: speed 0.9x, side gain 1.2, low shelf removed, 5 kHz low-pass, reverb mix 0.2. |
 | 2026-10-09 | | 3.2.2: speed 0.85x, reverb mix 0.3 with comb feedback 0.8 (longer tail). |
+| 2026-10-12 | | `Biquad` moved to `playback/dsp/`; sink factory renamed `EffectRenderersFactory` (Lofi then Equalizer). |

@@ -32,10 +32,13 @@ internal object PlaybackCommands {
     private const val EXTRA_LOFI = "lofi"
     private const val EXTRA_STEM_MODE = "stem_mode"
 
+    private const val EXTRA_EQUALIZER_ACTIVE = "equalizer_active"
+
     fun extras(
         sleepTimer: SleepTimerStatus,
         lofiEnabled: Boolean,
         stemMode: StemMode = StemMode.Original,
+        equalizerActive: Boolean = false,
     ): Bundle = Bundle().apply {
         when (sleepTimer) {
             SleepTimerStatus.Off -> Unit
@@ -44,6 +47,7 @@ internal object PlaybackCommands {
         }
         putBoolean(EXTRA_LOFI, lofiEnabled)
         putString(EXTRA_STEM_MODE, stemMode.name)
+        putBoolean(EXTRA_EQUALIZER_ACTIVE, equalizerActive)
     }
 
     fun stemModeOf(extras: Bundle): StemMode = StemMode.fromName(extras.getString(EXTRA_STEM_MODE))
@@ -56,4 +60,6 @@ internal object PlaybackCommands {
     }
 
     fun lofiOf(extras: Bundle): Boolean = extras.getBoolean(EXTRA_LOFI)
+
+    fun equalizerActiveOf(extras: Bundle): Boolean = extras.getBoolean(EXTRA_EQUALIZER_ACTIVE)
 }

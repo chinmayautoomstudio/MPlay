@@ -69,6 +69,7 @@ fun ExpandablePlayer(
     suggestedSleepMinutes: Int,
     modifier: Modifier = Modifier,
     separator: SeparatorUi? = null,
+    onOpenEqualizer: () -> Unit = {},
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val fullWidth = constraints.maxWidth
@@ -142,6 +143,7 @@ fun ExpandablePlayer(
                 songActions = songActions,
                 suggestedSleepMinutes = suggestedSleepMinutes,
                 separator = separator,
+                onOpenEqualizer = onOpenEqualizer,
                 onArtworkPositioned = {
                     positions.fullArt = it
                     updateFullArtRect()

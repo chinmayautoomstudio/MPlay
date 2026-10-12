@@ -36,6 +36,8 @@
     <string name="profile_separation_summary">Settings for AI vocal separation</string>
     <string name="profile_playback">Background Playback</string>
     <string name="profile_playback_summary">Keep the music playing in background</string>
+    <string name="profile_equalizer">Equalizer</string>
+    <string name="profile_equalizer_summary">Bands, presets and sound options</string>
     <string name="profile_about">About</string>
     <string name="profile_about_summary">Version, legal and more</string>
     <string name="profile_theme_system">System</string>
@@ -562,6 +564,23 @@
     <string name="sleep_timer_fade_note">Music fades out over the last 30 seconds, then pauses.</string>
 
     <string name="lofi_mode">Lofi mode</string>
+    <string name="equalizer_title">Equalizer</string>
+    <string name="equalizer_chip">Equalizer</string>
+    <string name="equalizer_lofi_note">Lofi mode is on — both effects apply together</string>
+    <string name="equalizer_preset_menu">Preset menu</string>
+    <string name="equalizer_preset_custom">Custom</string>
+    <string name="equalizer_save_preset">Save current as preset…</string>
+    <string name="equalizer_save_preset_title">Save preset</string>
+    <string name="equalizer_rename_preset">Rename preset</string>
+    <string name="equalizer_preset_name">Name</string>
+    <string name="equalizer_rename">Rename</string>
+    <string name="equalizer_delete">Delete</string>
+    <string name="equalizer_reset">Reset</string>
+    <string name="equalizer_preamp">Preamp</string>
+    <string name="equalizer_bass_boost">Bass Boost</string>
+    <string name="equalizer_virtualizer">Virtualizer</string>
+    <string name="equalizer_loudness">Loudness</string>
+    <string name="action_save">Save</string>
     <string name="lofi_info">Adds a lofi sound effect while playing. It\'s not a remix, and your files are never changed.</string>
 
     <string name="playlist_new">New playlist</string>
