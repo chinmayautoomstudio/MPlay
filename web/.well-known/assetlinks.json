@@ -5,7 +5,7 @@
       "namespace": "android_app",
       "package_name": "com.autoomstudio.mp3studio",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_RELEASE_SIGNING_SHA256",
+        "1E:38:17:95:18:2D:AF:9B:F6:D1:AA:3F:FC:E3:BE:86:AA:1C:DE:B2:47:B5:E2:6C:B1:A0:82:94:80:EB:65:9D",
         "REPLACE_WITH_PLAY_APP_SIGNING_SHA256"
       ]
     }
