@@ -27,7 +27,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `ui/playback/ExpandablePlayer.kt` | One card that morphs from mini to full player by `expandProgress`. |
 | `ui/playback/PlayerSheet.kt` | `AnchoredDraggableState<PlayerSheetValue>` anchors, fling and drag. |
 | `ui/playback/MiniPlayer.kt` | Title/artist, play/pause, next, scrub strip, metronome indicator. |
-| `ui/playback/NowPlayingScreen.kt` | Artwork, seek bar, transport, `StemModeSelector`, chip row (lofi, metronome, separator, sing-along), sheets. |
+| `ui/playback/NowPlayingScreen.kt` | Artwork, seek bar (white thumb), outlined circular transport, `StemModeSelector`, five feature tiles (lofi, equalizer, metronome, separator, sing-along), sheets. |
 | `ui/playback/PlayPauseIcon.kt` | Lottie play/pause morph with icon fallback. |
 | `playback/ControllerAccess.kt` | `ControllerAccess` (Full, Transport, Rejected), `controllerAccess()` and `transportPlayerCommands()` for controllers of the exported service. |
 | `ui/playback/SwipeToSkip.kt` | `swipeToSkip` modifier, `SwipeSkipState` and `swipeDecision()`: swipe the album art or mini player to change song. |
@@ -139,3 +139,4 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 | 2026-10-10 | - | Controller policy for the exported service: other apps refused, trusted system controllers transport-only, `onAddMediaItems` limited to the app (`ControllerAccess.kt`). |
 | 2026-10-12 | - | Equalizer processor after Lofi (`EffectRenderersFactory`); session extra `equalizer_active`; Now Playing Equalizer chip. See [equalizer](equalizer.md). |
 | 2026-10-13 | - | Notification artwork falls back to the app logo via `AppLogoArtwork` when `AlbumArtLoader` has no art. |
+| 2026-10-13 | - | Now Playing restyle: white seek thumb, outlined circular shuffle/prev/next/repeat, five equal feature tiles instead of the chip `FlowRow`. |

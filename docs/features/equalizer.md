@@ -1,6 +1,6 @@
 # Equalizer
 
-> Status: Unreleased | Added in: Unreleased | Last updated: 2026-10-12
+> Status: Unreleased | Added in: Unreleased | Last updated: 2026-10-13
 
 ## Summary
 
@@ -41,8 +41,8 @@ flowchart LR
 - Chain order: Lofi → Equalizer → Media3 speed/pitch (`EffectRenderersFactory`).
 - Inside the equalizer: 7 bands (60 Hz low shelf … 14 kHz high shelf) → Bass Boost shelf → Loudness shelves → Virtualizer (mid/side, high-passed side boost) → Preamp → soft limiter. Automatic headroom equals the largest positive combined boost.
 - `EqualizerRepository` is created in `AppContainer`. The service applies `state.value` before building the player and collects updates so cold starts from the notification never play unequalized audio for long.
-- Session extras include `equalizer_active` for the Now Playing chip (on when enabled and not a flat Normal with extras off).
-- Entry points: Now Playing Equalizer chip, Profile → Equalizer, and Playback settings → Equalizer (`ProfilePage.Equalizer`).
+- Session extras include `equalizer_active` for the Now Playing Equalizer feature tile (on when enabled and not a flat Normal with extras off).
+- Entry points: Now Playing Equalizer tile, Profile → Equalizer, and Playback settings → Equalizer (`ProfilePage.Equalizer`).
 
 ## Data and persistence
 
@@ -85,3 +85,4 @@ None added. Uses the existing `PlaybackService` only.
 | Date | Commit | Change |
 |---|---|---|
 | 2026-10-12 | - | Initial equalizer engine, persistence, concept UI and entry points (PRD v3.3). |
+| 2026-10-13 | - | Now Playing entry is a feature tile (not a chip). See [playback](playback.md). |

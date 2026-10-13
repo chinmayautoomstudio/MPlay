@@ -13,12 +13,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -34,32 +36,41 @@ import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.State
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,9 +79,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
@@ -86,6 +99,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.model.Song
+import com.autoomstudio.mp3studio.data.plan.Feature
+import com.autoomstudio.mp3studio.data.stems.JobState
 import com.autoomstudio.mp3studio.data.stems.StemMode
 import com.autoomstudio.mp3studio.playback.NowPlayingState
 import com.autoomstudio.mp3studio.playback.RepeatMode
@@ -94,22 +109,21 @@ import com.autoomstudio.mp3studio.playback.SleepTimerStatus
 import com.autoomstudio.mp3studio.ui.common.formatDuration
 import com.autoomstudio.mp3studio.ui.components.ArtworkImage
 import com.autoomstudio.mp3studio.ui.components.LofiWaveIcon
+import com.autoomstudio.mp3studio.ui.components.MetronomeIcons
 import com.autoomstudio.mp3studio.ui.components.popOnChange
 import com.autoomstudio.mp3studio.ui.components.pressBounce
-import com.autoomstudio.mp3studio.ui.theme.MotionMedium
-import com.autoomstudio.mp3studio.ui.theme.MotionShort
 import com.autoomstudio.mp3studio.ui.library.LocalSeparatedSongIds
 import com.autoomstudio.mp3studio.ui.library.SongActions
 import com.autoomstudio.mp3studio.ui.library.SongMenuButton
-import com.autoomstudio.mp3studio.ui.metronome.MetronomeChip
 import com.autoomstudio.mp3studio.ui.metronome.MetronomeSheet
-import com.autoomstudio.mp3studio.ui.separation.SeparatorChip
-import com.autoomstudio.mp3studio.ui.separation.SeparatorUi
-import com.autoomstudio.mp3studio.ui.singalong.SingAlongChip
-import com.autoomstudio.mp3studio.ui.singalong.SingAlongSheet
+import com.autoomstudio.mp3studio.ui.metronome.MetronomeViewModel
 import com.autoomstudio.mp3studio.ui.plans.PlansViewModel
 import com.autoomstudio.mp3studio.ui.plans.UpgradeSheet
-import com.autoomstudio.mp3studio.data.plan.Feature
+import com.autoomstudio.mp3studio.ui.separation.SeparatorUi
+import com.autoomstudio.mp3studio.ui.separation.isCoolingDown
+import com.autoomstudio.mp3studio.ui.singalong.SingAlongSheet
+import com.autoomstudio.mp3studio.ui.theme.MotionMedium
+import com.autoomstudio.mp3studio.ui.theme.MotionShort
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
@@ -276,55 +290,25 @@ fun NowPlayingContent(
                 }
 
                 Spacer(Modifier.height(12.dp))
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        val chipModifier = Modifier.align(Alignment.CenterVertically)
-                        LofiChip(
-                            enabled = state.lofiEnabled,
-                            isPlaying = state.isPlaying,
-                            onToggle = actions::setLofi,
-                            modifier = chipModifier,
-                        )
-                        EqualizerChip(
-                            active = state.equalizerActive,
-                            onClick = onOpenEqualizer,
-                            modifier = chipModifier,
-                        )
-                        MetronomeChip(onClick = { showMetronomeSheet = true }, modifier = chipModifier)
-                        if (separator != null && !separated) {
-                            SeparatorChip(ui = separator, title = state.title, modifier = chipModifier)
+                PlayerFeatureTiles(
+                    state = state,
+                    separated = separated,
+                    separator = separator,
+                    songAvailable = song != null,
+                    singAlongLocked = !plan.unlocks(Feature.SingAlong),
+                    onToggleLofi = actions::setLofi,
+                    onOpenEqualizer = onOpenEqualizer,
+                    onOpenMetronome = { showMetronomeSheet = true },
+                    onOpenSingAlong = {
+                        scope.launch {
+                            if (plansViewModel.canUse(Feature.SingAlong)) {
+                                showSingAlongSheet = true
+                            } else {
+                                showSingAlongUpgrade = true
+                            }
                         }
-                        if (song != null) {
-                            SingAlongChip(
-                                onClick = {
-                                    scope.launch {
-                                        if (plansViewModel.canUse(Feature.SingAlong)) {
-                                            showSingAlongSheet = true
-                                        } else {
-                                            showSingAlongUpgrade = true
-                                        }
-                                    }
-                                },
-                                locked = !plan.unlocks(Feature.SingAlong),
-                                modifier = chipModifier,
-                            )
-                        }
-                    }
-                    Text(
-                        text = stringResource(R.string.lofi_info),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                    },
+                )
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -427,39 +411,246 @@ private fun StemModeSelector(mode: StemMode, onSelect: (StemMode) -> Unit) {
     }
 }
 
+private val FeatureTileShape = RoundedCornerShape(18.dp)
+private val FeatureTileIconSize = 22.dp
+
 @Composable
-private fun LofiChip(enabled: Boolean, isPlaying: Boolean, onToggle: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    FilterChip(
-        modifier = modifier,
-        selected = enabled,
-        onClick = { onToggle(!enabled) },
-        label = { Text(stringResource(R.string.lofi_mode)) },
-        leadingIcon = {
-            LofiWaveIcon(
-                active = enabled && isPlaying,
-                modifier = Modifier
-                    .size(FilterChipDefaults.IconSize)
-                    .popOnChange(enabled, enabled = enabled),
-            )
-        },
-    )
+private fun PlayerFeatureTiles(
+    state: NowPlayingState,
+    separated: Boolean,
+    separator: SeparatorUi?,
+    songAvailable: Boolean,
+    singAlongLocked: Boolean,
+    onToggleLofi: (Boolean) -> Unit,
+    onOpenEqualizer: () -> Unit,
+    onOpenMetronome: () -> Unit,
+    onOpenSingAlong: () -> Unit,
+    metronomeViewModel: MetronomeViewModel = viewModel(factory = MetronomeViewModel.Factory),
+) {
+    val metronome by metronomeViewModel.state.collectAsStateWithLifecycle()
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        PlayerFeatureTile(
+            selected = state.lofiEnabled,
+            onClick = { onToggleLofi(!state.lofiEnabled) },
+            label = stringResource(R.string.lofi_mode),
+            modifier = Modifier.weight(1f),
+        ) {
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
+                LofiWaveIcon(
+                    active = state.lofiEnabled && state.isPlaying,
+                    modifier = Modifier
+                        .size(FeatureTileIconSize)
+                        .popOnChange(state.lofiEnabled, enabled = state.lofiEnabled),
+                )
+            }
+        }
+        PlayerFeatureTile(
+            selected = state.equalizerActive,
+            onClick = onOpenEqualizer,
+            label = stringResource(R.string.equalizer_chip),
+            icon = Icons.Filled.Tune,
+            modifier = Modifier.weight(1f),
+        )
+        PlayerFeatureTile(
+            selected = metronome.running,
+            onClick = onOpenMetronome,
+            label = if (metronome.running) {
+                stringResource(R.string.metronome_chip_bpm, metronome.settings.bpm)
+            } else {
+                stringResource(R.string.metronome_title)
+            },
+            icon = MetronomeIcons.Default,
+            modifier = Modifier.weight(1f),
+        )
+        SeparatorFeatureTile(
+            separator = separator,
+            separated = separated,
+            title = state.title,
+            modifier = Modifier.weight(1f),
+        )
+        PlayerFeatureTile(
+            selected = false,
+            onClick = onOpenSingAlong,
+            label = stringResource(R.string.singalong_chip),
+            icon = Icons.Outlined.Mic,
+            enabled = songAvailable,
+            badgeIcon = if (singAlongLocked) Icons.Outlined.Lock else null,
+            modifier = Modifier.weight(1f),
+        )
+    }
 }
 
 @Composable
-private fun EqualizerChip(active: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    FilterChip(
-        modifier = modifier,
-        selected = active,
-        onClick = onClick,
-        label = { Text(stringResource(R.string.equalizer_chip)) },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Filled.Tune,
-                contentDescription = null,
-                modifier = Modifier.size(FilterChipDefaults.IconSize),
+private fun PlayerFeatureTile(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    icon: ImageVector? = null,
+    badgeIcon: ImageVector? = null,
+    iconContent: (@Composable () -> Unit)? = null,
+) {
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            !enabled -> MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+            selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
+        },
+        animationSpec = tween(MotionMedium),
+        label = "featureTileBorder",
+    )
+    val contentAlpha = if (enabled) 1f else 0.38f
+    Box(
+        modifier = modifier
+            .height(76.dp)
+            .clip(FeatureTileShape)
+            .border(BorderStroke(1.dp, borderColor), FeatureTileShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.35f))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 8.dp)
+            .graphicsLayer { alpha = contentAlpha },
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            when {
+                iconContent != null -> iconContent()
+                icon != null -> Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(FeatureTileIconSize),
+                )
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 11.sp),
             )
+        }
+        if (badgeIcon != null) {
+            Icon(
+                imageVector = badgeIcon,
+                contentDescription = stringResource(R.string.upgrade_locked_description),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(2.dp)
+                    .size(12.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SeparatorFeatureTile(
+    separator: SeparatorUi?,
+    separated: Boolean,
+    title: String,
+    modifier: Modifier = Modifier,
+) {
+    var confirmingCancel by rememberSaveable { mutableStateOf(false) }
+    val job = separator?.job
+    val jobState = job?.state
+    val label = when {
+        separated -> stringResource(R.string.separator_chip)
+        job == null -> stringResource(R.string.separator_chip)
+        job.isCoolingDown -> stringResource(R.string.separator_chip_cooling, (job.progress * 100).toInt())
+        jobState == JobState.Running.name && job.progress <= 0f ->
+            stringResource(R.string.separator_chip_preparing)
+        jobState == JobState.Running.name ->
+            stringResource(R.string.separator_chip_running, (job.progress * 100).toInt())
+        jobState == JobState.Failed.name -> stringResource(R.string.separator_chip_retry)
+        job.pauseReason != null -> stringResource(R.string.separator_chip_waiting)
+        else -> stringResource(R.string.separator_chip_waiting)
+    }
+    PlayerFeatureTile(
+        selected = separated || job != null,
+        onClick = {
+            when {
+                separated || separator == null -> Unit
+                job == null -> separator.onSeparate()
+                jobState == JobState.Failed.name -> separator.onRetry(job.id)
+                else -> confirmingCancel = true
+            }
+        },
+        label = label,
+        enabled = separator != null || separated,
+        modifier = modifier,
+        iconContent = {
+            when {
+                separated -> Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(FeatureTileIconSize),
+                )
+                jobState == JobState.Running.name -> if (job != null && job.progress > 0f) {
+                    CircularProgressIndicator(
+                        progress = { job.progress },
+                        modifier = Modifier.size(FeatureTileIconSize),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(FeatureTileIconSize),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                jobState == JobState.Failed.name -> Icon(
+                    imageVector = Icons.Outlined.Refresh,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(FeatureTileIconSize),
+                )
+                job != null -> Icon(
+                    imageVector = Icons.Outlined.HourglassEmpty,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(FeatureTileIconSize),
+                )
+                else -> Icon(
+                    imageVector = Icons.Outlined.AutoAwesome,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(FeatureTileIconSize),
+                )
+            }
         },
     )
+    if (confirmingCancel && job != null && separator != null) {
+        AlertDialog(
+            onDismissRequest = { confirmingCancel = false },
+            title = { Text(stringResource(R.string.separator_cancel_title)) },
+            text = { Text(stringResource(R.string.separator_cancel_message, title)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmingCancel = false
+                        separator.onCancel(job.id)
+                    },
+                ) { Text(stringResource(R.string.separator_cancel_confirm)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmingCancel = false }) {
+                    Text(stringResource(R.string.separator_cancel_keep))
+                }
+            },
+        )
+    }
 }
 
 private val ArtworkSpring = spring<Float>(dampingRatio = 0.6f, stiffness = Spring.StiffnessLow)
@@ -497,7 +688,7 @@ private fun SeekBar(durationMs: Long, position: Flow<Long>, onSeek: (Long) -> Un
             valueRange = 0f..max,
             enabled = durationMs > 0,
             colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
+                thumbColor = Color.White,
                 activeTrackColor = MaterialTheme.colorScheme.primary,
                 inactiveTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f),
             ),
@@ -524,19 +715,19 @@ private fun SeekBar(durationMs: Long, position: Flow<Long>, onSeek: (Long) -> Un
 @Composable
 private fun TransportControls(state: NowPlayingState, actions: PlayerActions) {
     val active = MaterialTheme.colorScheme.primary
-    val inactive = MaterialTheme.colorScheme.onSurface
+    val onSurface = MaterialTheme.colorScheme.onSurface
     val shuffleTint by animateColorAsState(
-        if (state.shuffleEnabled) active else inactive.copy(alpha = 0.7f),
+        if (state.shuffleEnabled) active else onSurface.copy(alpha = 0.7f),
         tween(MotionMedium),
         label = "shuffleTint",
     )
     val repeatTint by animateColorAsState(
-        if (state.repeatMode == RepeatMode.Off) inactive.copy(alpha = 0.7f) else active,
+        if (state.repeatMode == RepeatMode.Off) onSurface.copy(alpha = 0.7f) else active,
         tween(MotionMedium),
         label = "repeatTint",
     )
     val nextTint by animateColorAsState(
-        inactive.copy(alpha = if (state.hasNext) 1f else 0.38f),
+        onSurface.copy(alpha = if (state.hasNext) 1f else 0.38f),
         tween(MotionMedium),
         label = "nextTint",
     )
@@ -551,10 +742,11 @@ private fun TransportControls(state: NowPlayingState, actions: PlayerActions) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(
+        OutlinedCircleButton(
             onClick = actions::toggleShuffle,
+            active = state.shuffleEnabled,
             interactionSource = shuffleSource,
-            modifier = Modifier.pressBounce(shuffleSource),
+            modifier = Modifier.size(48.dp),
         ) {
             Icon(
                 imageVector = Icons.Filled.Shuffle,
@@ -565,18 +757,16 @@ private fun TransportControls(state: NowPlayingState, actions: PlayerActions) {
                 modifier = Modifier.popOnChange(state.shuffleEnabled, enabled = state.shuffleEnabled),
             )
         }
-        IconButton(
+        OutlinedCircleButton(
             onClick = actions::previous,
             interactionSource = previousSource,
-            modifier = Modifier
-                .size(56.dp)
-                .pressBounce(previousSource),
+            modifier = Modifier.size(56.dp),
         ) {
             Icon(
                 imageVector = Icons.Filled.SkipPrevious,
                 contentDescription = stringResource(R.string.action_previous),
-                tint = inactive,
-                modifier = Modifier.size(36.dp),
+                tint = onSurface,
+                modifier = Modifier.size(32.dp),
             )
         }
         FilledIconButton(
@@ -593,25 +783,24 @@ private fun TransportControls(state: NowPlayingState, actions: PlayerActions) {
         ) {
             PlayPauseIcon(isPlaying = state.isPlaying, tint = Color.White, modifier = Modifier.size(44.dp))
         }
-        IconButton(
+        OutlinedCircleButton(
             onClick = actions::next,
             enabled = state.hasNext,
             interactionSource = nextSource,
-            modifier = Modifier
-                .size(56.dp)
-                .pressBounce(nextSource),
+            modifier = Modifier.size(56.dp),
         ) {
             Icon(
                 imageVector = Icons.Filled.SkipNext,
                 contentDescription = stringResource(R.string.action_next),
                 tint = nextTint,
-                modifier = Modifier.size(36.dp),
+                modifier = Modifier.size(32.dp),
             )
         }
-        IconButton(
+        OutlinedCircleButton(
             onClick = actions::cycleRepeat,
+            active = state.repeatMode != RepeatMode.Off,
             interactionSource = repeatSource,
-            modifier = Modifier.pressBounce(repeatSource),
+            modifier = Modifier.size(48.dp),
         ) {
             AnimatedContent(
                 targetState = state.repeatMode == RepeatMode.One,
@@ -635,5 +824,39 @@ private fun TransportControls(state: NowPlayingState, actions: PlayerActions) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun OutlinedCircleButton(
+    onClick: () -> Unit,
+    interactionSource: MutableInteractionSource,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    active: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            active -> MaterialTheme.colorScheme.primary
+            enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+        },
+        animationSpec = tween(MotionMedium),
+        label = "outlinedCircleBorder",
+    )
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        interactionSource = interactionSource,
+        modifier = modifier
+            .border(BorderStroke(1.5.dp, borderColor), CircleShape)
+            .background(
+                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.55f),
+                CircleShape,
+            )
+            .pressBounce(interactionSource),
+    ) {
+        content()
     }
 }

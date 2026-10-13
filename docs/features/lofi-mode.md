@@ -1,6 +1,6 @@
 # Lofi mode
 
-> Status: Shipped | Added in: 2.0 | Last updated: 2026-10-12
+> Status: Shipped | Added in: 2.0 | Last updated: 2026-10-13
 
 ## Summary
 
@@ -59,3 +59,4 @@ None; runs inside `PlaybackService`.
 | 2026-10-09 | | Retuned: speed 0.9x, side gain 1.2, low shelf removed, 5 kHz low-pass, reverb mix 0.2. |
 | 2026-10-09 | | 3.2.2: speed 0.85x, reverb mix 0.3 with comb feedback 0.8 (longer tail). |
 | 2026-10-12 | | `Biquad` moved to `playback/dsp/`; sink factory renamed `EffectRenderersFactory` (Lofi then Equalizer). |
+| 2026-10-13 | | Now Playing entry is a feature tile (not a chip). See [playback](playback.md). |
