@@ -1,6 +1,6 @@
 # Settings, About, theme and shared components
 
-> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-12
+> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-13
 
 ## Summary
 
@@ -19,7 +19,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `ui/settings/EditProfileScreen.kt`, `AccountViewModel.kt` | Edit page (photo, name, Delete account), shared `Avatar` and `LogOutDialog`; documented in [accounts](accounts.md). |
 | `ui/settings/AboutScreen.kt` | Logos (`ic_mp3studio_logo`, Autoom Studio), version (no build number), website, email, privacy note, privacy policy, terms, licenses. |
 | `ui/settings/LicensesScreen.kt` | Hand-maintained license list and detail view. |
-| `ui/theme/Color.kt`, `Theme.kt`, `Type.kt`, `Motion.kt` | Palette, `MPlayAppTheme`, typography, motion durations and transitions. |
+| `ui/theme/Color.kt`, `Theme.kt`, `Type.kt`, `Motion.kt` | Palette, `MPlayAppTheme`, typography (`OutfitFamily`, `DmSansFamily`, `WordmarkStyle`), motion durations and transitions. |
+| `res/font/outfit_*.ttf`, `res/font/dm_sans_*.ttf` | Bundled Outfit (display/wordmark) and DM Sans (UI) weights. |
 | `ui/components/*` | Shared components: `ArtworkImage`, `ComingSoon`, `Interactions` (`pressBounce`, `popOnChange`), `LoadingIndicator`, `MPlayTopBar`, `MPlayWordmark`, `NowPlayingBars`, `SelectionTopBar`, `ThemedLottie`, `LofiWaveIcon`, `MetronomeIcons`. |
 
 ## How it works
@@ -27,11 +28,12 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 - `MainScreen` keeps `ProfilePage` (`Main`, `EditProfile`, `Appearance`, `Library`, `Duplicates`, `Separation`, `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `Admin`). Sub-pages go back to `Main`, except Duplicates (back to Library), the separation queue (back to Separation) and Licenses (back to About). `MPlayTopBar` is hidden on `Main`, because the Profile screen draws its own back button and "Profile" title. That back button returns to the tab that was open before Profile.
 - The subscription card shows "MP3 Studio" plus the plan name (Free, Trial or Pro). Below that it shows the days left in the trial, or the days until the Pro subscription expires or renews; Free users see an upgrade hint. Tapping it opens Plans. The Profile cards use theme colours, so they follow light and dark mode. The layout is compact so the whole screen fits above the mini player and bottom bar on a typical phone: the back button and title share one row, the avatar is 56dp, category rows are about 60dp tall, and Edit is a small pencil-only icon button (content description "Edit").
 - `MPlayAppTheme` decides dark/light from the setting (or system), or dark when `forceDark` is set (`MainActivity` sets it while signed out, so the sign-in screen is always dark), runs edge-to-edge with matching bar icons, and uses dynamic colour on API 31+ when enabled, otherwise `NeonDarkColors` / `NeonLightColors`.
+- Typography (`MPlayTypography` in `Type.kt`): Outfit for `display*` / `headline*` and `WordmarkStyle`; DM Sans for `title*` / `body*` / `label*`. Fonts are bundled under `res/font/` (offline; no downloadable Google Fonts provider). The home-screen widget keeps the system font.
 - `MainActivity` keeps the splash screen until the theme has loaded.
 - The battery item re-checks `isIgnoringBatteryOptimizations` on resume and opens system settings.
 - About picks logos by background luminance (the in-app theme doesn't change resource night mode). Links: `https://autoomstudio.com/`, `connect@autoomstudio.com`, `https://autoomstudio.com/privacy-policy`, `https://autoomstudio.com/terms` (`about_terms_url`). Long press copies a link. The privacy note (`about_privacy_note`) says there are no ads, music and recordings stay on the phone, and the Google account details, plan and usage are stored on the backend.
-- `MPlayWordmark` draws "MP3" in the neon gradient followed by " Studio".
-- Licenses: HT-Demucs (MIT), ONNX Runtime (MIT), AndroidX, Material Icons, Kotlin, Guava, Coil, Lottie (Apache 2.0).
+- `MPlayWordmark` draws "MP3" in the neon gradient followed by " Studio" using Outfit ExtraBold.
+- Licenses: HT-Demucs (MIT), ONNX Runtime (MIT), AndroidX, Material Icons, Kotlin, Guava, Coil, Lottie (Apache 2.0), Outfit and DM Sans (SIL OFL 1.1, `license_ofl`).
 - `ThemedLottie` recolours animations to the theme; `rememberAnimationsEnabled()` respects the system animation scale.
 - Motion: `MotionShort/Medium/Long` = 180/300/450 ms, `fadeThrough()`, `sharedAxisX()`.
 
@@ -104,3 +106,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-10 | - | Keys `admin_notifications_enabled` and `admin_activity_notified_at` for Admin phone notifications ([admin](admin.md)). |
 | 2026-10-12 | - | `ProfilePage.Equalizer` and Profile/Playback equalizer rows; DataStore `equalizer_settings` ([equalizer](equalizer.md)). |
 | 2026-10-12 | - | About logo regenerated from `logos/mp3-studio-logo-v2.png` (`ic_mp3studio_logo`); launcher background restored to `#030013`. |
+| 2026-10-13 | - | Bundled Outfit + DM Sans typography (`Type.kt`, `res/font/`); OFL entries on Licenses. |

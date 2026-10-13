@@ -37,6 +37,7 @@ private data class OpenSourceComponent(
 
 private const val APACHE = "Apache License 2.0"
 private const val MIT = "MIT License"
+private const val OFL = "SIL Open Font License 1.1"
 
 /** What ships inside the APK: the separation model, its runtime and the libraries linked into the app. */
 private val COMPONENTS = listOf(
@@ -63,6 +64,18 @@ private val COMPONENTS = listOf(
     OpenSourceComponent("Guava", "Copyright The Guava Authors", APACHE, R.raw.license_apache_2_0),
     OpenSourceComponent("Coil", "Copyright Coil Contributors", APACHE, R.raw.license_apache_2_0),
     OpenSourceComponent("Lottie for Android", "Copyright Airbnb, Inc.", APACHE, R.raw.license_apache_2_0),
+    OpenSourceComponent(
+        name = "Outfit",
+        notice = "Copyright 2021 The Outfit Project Authors (https://github.com/Outfitio/Outfit-Fonts)",
+        license = OFL,
+        text = R.raw.license_ofl,
+    ),
+    OpenSourceComponent(
+        name = "DM Sans",
+        notice = "Copyright 2014 The DM Sans Project Authors (https://github.com/googlefonts/dm-fonts)",
+        license = OFL,
+        text = R.raw.license_ofl,
+    ),
 )
 
 @Composable
