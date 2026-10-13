@@ -490,6 +490,7 @@ private fun PlayerFeatureTile(
     label: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    maxLines: Int = 1,
     icon: ImageVector? = null,
     badgeIcon: ImageVector? = null,
     iconContent: (@Composable () -> Unit)? = null,
@@ -531,12 +532,13 @@ private fun PlayerFeatureTile(
             Spacer(Modifier.height(6.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
-                maxLines = 2,
+                maxLines = maxLines,
                 overflow = TextOverflow.Ellipsis,
-                autoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 11.sp),
+                // Prefer shrinking over wrapping so labels like "Metronome" stay on one line.
+                autoSize = TextAutoSize.StepBased(minFontSize = 7.sp, maxFontSize = 9.sp),
             )
         }
         if (badgeIcon != null) {
@@ -587,6 +589,7 @@ private fun SeparatorFeatureTile(
         },
         label = label,
         enabled = separator != null || separated,
+        maxLines = 2,
         modifier = modifier,
         iconContent = {
             when {
