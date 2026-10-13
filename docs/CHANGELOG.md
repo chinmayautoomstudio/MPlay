@@ -6,6 +6,8 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-13
+
 ### Fixed
 - Opening Up Next no longer leaves the Now Playing cover art floating over the queue; the shared artwork fades out with the sheet expand progress. ([playback](features/playback.md#up-next))
 - Release APK no longer crashes immediately on launch. R8 `packageScope` no longer includes `kotlin.**` / `kotlinx.**` (only `androidx.**`), which stopped an `IllegalAccessError` on `kotlin.text` during `WorkManagerInitializer` / App Startup. ([architecture](architecture.md))
@@ -26,6 +28,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 - Tests: `BillingRepositoryTest`, `BillingViewModelTest`, `BillingStatusRulesTest`, billing cases in `EntitlementsResponseTest` and `AdminViewModelTest`; Deno `payu_test.ts`, `checkout_test.ts`, `webhook_test.ts`; pgTAP `payments_test.sql`, `billing_flow_test.sql`; `run_live.ps1 -Pending` tests unapplied migrations in rolled-back transactions. ([payments](features/payments.md), [backend](backend.md))
 
 ### Changed
+- `versionName` 3.2.3 to 1.0.0 and `versionCode` 10 to 11. ([settings](features/settings-and-about.md))
 - Now Playing restyled to match the player concept: white seek thumb on a purple track, shuffle/previous/next/repeat in outlined circles around the filled play button, and a fixed row of five feature tiles (Lofi, Equalizer, Metronome, AI Vocal Separator, Sing along) instead of wrapping chips. ([playback](features/playback.md))
 - Typography uses bundled Outfit (display, headlines, wordmark) and DM Sans (titles, body, labels) instead of the system default; both listed under About → Licenses (SIL OFL). ([settings](features/settings-and-about.md))
 - Missing album art shows the app logo (`ic_mp3studio_logo`) in the library, Now Playing, mini player, home-screen widget and media notification instead of a music-note placeholder. Saved clips/ringtones and sing-along recordings always embed that logo as MP4 cover art (`CoverArtEmbedder` / jaudiotagger) and set branded MediaStore album names (`MP3 Studio Clips` / `MP3 Studio Recordings`). ([library](features/library.md#album-art), [playback](features/playback.md), [widget](features/widget.md), [clips](features/clips-and-ringtones.md), [sing-along](features/sing-along.md))
