@@ -32,6 +32,7 @@ import androidx.compose.ui.util.lerp
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.model.Song
 import com.autoomstudio.mp3studio.playback.NowPlayingState
+import com.autoomstudio.mp3studio.playback.PlaybackQueue
 import com.autoomstudio.mp3studio.ui.components.ArtworkImage
 import com.autoomstudio.mp3studio.ui.library.SongActions
 import com.autoomstudio.mp3studio.ui.separation.SeparatorUi
@@ -70,6 +71,7 @@ fun ExpandablePlayer(
     modifier: Modifier = Modifier,
     separator: SeparatorUi? = null,
     onOpenEqualizer: () -> Unit = {},
+    queue: PlaybackQueue = PlaybackQueue.Empty,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val fullWidth = constraints.maxWidth
@@ -97,8 +99,11 @@ fun ExpandablePlayer(
         val artScale = animateArtworkScale(state.isPlaying)
         val artShadow = animateArtworkShadow(state.isPlaying, FullArtShadow)
 
+        val upNextSheetState = rememberUpNextSheetState()
+        val upNextProgress = { upNextSheetState.expandProgress }
         val showMini by remember { derivedStateOf { progress() < 0.3f } }
         val prominentArt by remember { derivedStateOf { progress() > 0.5f } }
+        val artAboveUpNext by remember { derivedStateOf { upNextProgress() < 0.5f } }
         val backEnabled = sheetState.targetValue == PlayerSheetValue.Expanded
         val swipe = rememberSwipeSkipState()
 
@@ -144,6 +149,8 @@ fun ExpandablePlayer(
                 suggestedSleepMinutes = suggestedSleepMinutes,
                 separator = separator,
                 onOpenEqualizer = onOpenEqualizer,
+                queue = queue,
+                upNextSheetState = upNextSheetState,
                 onArtworkPositioned = {
                     positions.fullArt = it
                     updateFullArtRect()
@@ -211,7 +218,7 @@ fun ExpandablePlayer(
                         }
                     }
                     .then(
-                        if (prominentArt) {
+                        if (prominentArt && artAboveUpNext) {
                             Modifier.swipeToSkip(
                                 state = swipe,
                                 canNext = state.hasNext,
@@ -227,7 +234,13 @@ fun ExpandablePlayer(
                         val p = progress()
                         val offset = swipe.offset.value
                         translationX = offset
-                        if (size.width > 0f) alpha = 1f - (abs(offset) / size.width * 0.5f).coerceIn(0f, 0.5f)
+                        val swipeFade =
+                            if (size.width > 0f) {
+                                1f - (abs(offset) / size.width * 0.5f).coerceIn(0f, 0.5f)
+                            } else {
+                                1f
+                            }
+                        alpha = swipeFade * (1f - upNextProgress())
                         val scale = lerp(1f, artScale.value, p)
                         scaleX = scale
                         scaleY = scale

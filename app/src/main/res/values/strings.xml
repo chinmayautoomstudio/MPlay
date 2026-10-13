@@ -534,6 +534,12 @@
     <string name="action_repeat_one">Repeat one</string>
     <string name="action_collapse_player">Close player</string>
     <string name="action_open_player">Open player for %1$s</string>
+    <string name="up_next_title">Up Next</string>
+    <string name="up_next_empty">Nothing queued</string>
+    <string name="up_next_expand">Show Up Next queue</string>
+    <string name="up_next_collapse">Hide Up Next queue</string>
+    <string name="up_next_reorder_handle">Drag to reorder %1$s</string>
+    <string name="up_next_remove">Remove %1$s from queue</string>
     <string name="seek_bar_description">Playback position</string>
     <string name="scrub_position">%1$s / %2$s</string>
 

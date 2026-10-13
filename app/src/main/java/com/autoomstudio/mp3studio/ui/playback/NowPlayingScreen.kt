@@ -103,6 +103,7 @@ import com.autoomstudio.mp3studio.data.plan.Feature
 import com.autoomstudio.mp3studio.data.stems.JobState
 import com.autoomstudio.mp3studio.data.stems.StemMode
 import com.autoomstudio.mp3studio.playback.NowPlayingState
+import com.autoomstudio.mp3studio.playback.PlaybackQueue
 import com.autoomstudio.mp3studio.playback.RepeatMode
 import com.autoomstudio.mp3studio.playback.SleepTimer
 import com.autoomstudio.mp3studio.playback.SleepTimerStatus
@@ -143,9 +144,12 @@ fun NowPlayingContent(
     suggestedSleepMinutes: Int = SleepTimer.DEFAULT_MINUTES,
     separator: SeparatorUi? = null,
     onOpenEqualizer: () -> Unit = {},
+    queue: PlaybackQueue = PlaybackQueue.Empty,
+    upNextSheetState: UpNextSheetState = rememberUpNextSheetState(),
     plansViewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
 ) {
-    BackHandler(enabled = backEnabled, onBack = onCollapse)
+    val upNextExpanded = upNextSheetState.targetValue == UpNextSheetValue.Expanded
+    BackHandler(enabled = backEnabled && !upNextExpanded, onBack = onCollapse)
     var showSleepSheet by rememberSaveable { mutableStateOf(false) }
     var showMetronomeSheet by rememberSaveable { mutableStateOf(false) }
     var showSingAlongSheet by rememberSaveable { mutableStateOf(false) }
@@ -166,7 +170,8 @@ fun NowPlayingContent(
             modifier = Modifier
                 .fillMaxSize()
                 .safeDrawingPadding()
-                .padding(horizontal = 24.dp, vertical = 8.dp),
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .padding(bottom = 48.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Box(
@@ -312,6 +317,15 @@ fun NowPlayingContent(
             }
             Spacer(Modifier.height(16.dp))
         }
+
+        UpNextSheet(
+            queue = queue,
+            isPlaying = state.isPlaying,
+            onPlayIndex = actions::playQueueIndex,
+            onMove = actions::moveQueueItem,
+            onRemove = actions::removeQueueIndex,
+            sheetState = upNextSheetState,
+        )
     }
 
     if (showSleepSheet) {

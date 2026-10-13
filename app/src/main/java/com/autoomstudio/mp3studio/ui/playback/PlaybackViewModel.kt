@@ -10,6 +10,7 @@ import com.autoomstudio.mp3studio.data.model.Song
 import com.autoomstudio.mp3studio.data.stems.StemMode
 import com.autoomstudio.mp3studio.di.AppContainer
 import com.autoomstudio.mp3studio.playback.NowPlayingState
+import com.autoomstudio.mp3studio.playback.PlaybackQueue
 import com.autoomstudio.mp3studio.playback.SleepTimer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,6 +25,7 @@ class PlaybackViewModel(container: AppContainer) : ViewModel(), PlayerActions {
     private val appSettings = container.appSettings
 
     val state: StateFlow<NowPlayingState?> = controller.state
+    val queue: StateFlow<PlaybackQueue> = controller.queue
     val position: Flow<Long> = controller.positionMs()
 
     /** Preselected duration in the sleep timer sheet: the last one used, or the default. */
@@ -65,6 +67,9 @@ class PlaybackViewModel(container: AppContainer) : ViewModel(), PlayerActions {
     override fun cancelSleepTimer() = controller.cancelSleepTimer()
     override fun setLofi(enabled: Boolean) = controller.setLofi(enabled)
     override fun setStemMode(mode: StemMode) = controller.setStemMode(mode)
+    override fun playQueueIndex(index: Int) = controller.playQueueIndex(index)
+    override fun moveQueueItem(from: Int, to: Int) = controller.moveQueueItem(from, to)
+    override fun removeQueueIndex(index: Int) = controller.removeQueueIndex(index)
 
     override fun onCleared() {
         controller.release()

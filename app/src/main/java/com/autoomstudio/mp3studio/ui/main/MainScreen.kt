@@ -76,6 +76,7 @@ import com.autoomstudio.mp3studio.data.settings.ThemeMode
 import com.autoomstudio.mp3studio.data.stems.StemMode
 import com.autoomstudio.mp3studio.data.settings.ThemeSettings
 import com.autoomstudio.mp3studio.playback.NowPlayingState
+import com.autoomstudio.mp3studio.playback.PlaybackQueue
 import com.autoomstudio.mp3studio.data.library.SongDeleter
 import com.autoomstudio.mp3studio.ui.admin.AdminScreen
 import com.autoomstudio.mp3studio.ui.common.rememberWithLegacyStorage
@@ -159,6 +160,7 @@ private enum class Destination(
 fun MainScreen(
     libraryState: LibraryUiState,
     nowPlaying: NowPlayingState?,
+    queue: PlaybackQueue,
     position: Flow<Long>,
     playerActions: PlayerActions,
     suggestedSleepMinutes: Int,
@@ -713,6 +715,7 @@ fun MainScreen(
                 songActions = songActions,
                 suggestedSleepMinutes = suggestedSleepMinutes,
                 separator = separator,
+                queue = queue,
                 onOpenEqualizer = {
                     onShowNowPlayingChange(false)
                     openProfile()

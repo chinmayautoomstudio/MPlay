@@ -191,6 +191,7 @@ private fun MPlayRoot(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
     val nowPlaying by playbackViewModel.state.collectAsStateWithLifecycle()
+    val queue by playbackViewModel.queue.collectAsStateWithLifecycle()
     val suggestedSleepMinutes by playbackViewModel.suggestedSleepMinutes.collectAsStateWithLifecycle()
     val playlists by playlistsViewModel.playlists.collectAsStateWithLifecycle()
     val content = uiState as? LibraryUiState.Content
@@ -213,6 +214,7 @@ private fun MPlayRoot(
         MainScreen(
             libraryState = uiState,
             nowPlaying = nowPlaying,
+            queue = queue,
             position = playbackViewModel.position,
             playerActions = playbackViewModel,
             suggestedSleepMinutes = suggestedSleepMinutes,

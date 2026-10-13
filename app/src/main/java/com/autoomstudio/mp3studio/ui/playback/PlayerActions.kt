@@ -22,4 +22,13 @@ interface PlayerActions {
     fun cancelSleepTimer()
     fun setLofi(enabled: Boolean)
     fun setStemMode(mode: StemMode)
+
+    /** Jump to a timeline index and play from the start. */
+    fun playQueueIndex(index: Int)
+
+    /** Reorder two timeline entries. */
+    fun moveQueueItem(from: Int, to: Int)
+
+    /** Drop one timeline entry by index. */
+    fun removeQueueIndex(index: Int)
 }

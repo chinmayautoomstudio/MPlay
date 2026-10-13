@@ -50,6 +50,11 @@ class PlaybackController(
     /** Null while nothing is queued. */
     val state: StateFlow<NowPlayingState?> = _state.asStateFlow()
 
+    private val _queue = MutableStateFlow(PlaybackQueue.Empty)
+
+    /** Full Media3 timeline; empty when nothing is queued. */
+    val queue: StateFlow<PlaybackQueue> = _queue.asStateFlow()
+
     private val _songId = MutableStateFlow<Long?>(null)
     override val songId: StateFlow<Long?> = _songId.asStateFlow()
 
@@ -158,6 +163,25 @@ class PlaybackController(
         }
     }
 
+    /** Starts [index] from the beginning and plays. */
+    fun playQueueIndex(index: Int) = withController { controller ->
+        if (index !in 0 until controller.mediaItemCount) return@withController
+        controller.seekTo(index, 0L)
+        controller.play()
+    }
+
+    /** Moves a timeline entry; no-op when either index is out of range. */
+    fun moveQueueItem(from: Int, to: Int) = withController { controller ->
+        val move = clampQueueMove(from, to, controller.mediaItemCount) ?: return@withController
+        controller.moveMediaItem(move.first, move.second)
+    }
+
+    /** Removes the entry at [index]; Media3 advances when it was the current song. */
+    fun removeQueueIndex(index: Int) = withController { controller ->
+        if (index !in 0 until controller.mediaItemCount) return@withController
+        controller.removeMediaItem(index)
+    }
+
     fun playPause() = withController { controller ->
         if (controller.isPlaying) {
             controller.pause()
@@ -232,6 +256,8 @@ class PlaybackController(
         controller = null
         _playing.value = false
         _songId.value = null
+        _state.value = null
+        _queue.value = PlaybackQueue.Empty
     }
 
     private fun withController(block: (MediaController) -> Unit) {
@@ -296,7 +322,28 @@ class PlaybackController(
         _songId.value = player.currentMediaItem?.mediaId?.toLongOrNull()
         if (player.mediaItemCount == 0) {
             _state.value = null
+            _queue.value = PlaybackQueue.Empty
             return
+        }
+        _queue.value = playbackQueueOf(
+            count = player.mediaItemCount,
+            currentIndex = player.currentMediaItemIndex,
+        ) { index ->
+            val item = player.getMediaItemAt(index)
+            val meta = item.mediaMetadata
+            val durationFromMeta = meta.durationMs?.coerceAtLeast(0L)
+            val duration = if (index == player.currentMediaItemIndex) {
+                player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0L) ?: durationFromMeta ?: 0L
+            } else {
+                durationFromMeta ?: 0L
+            }
+            QueueEntry(
+                mediaId = item.mediaId.toLongOrNull() ?: 0L,
+                title = meta.title?.toString().orEmpty(),
+                artist = meta.artist?.toString().orEmpty(),
+                artworkUri = meta.artworkUri,
+                durationMs = duration,
+            )
         }
         val metadata = player.mediaMetadata
         val extras = (player as? MediaController)?.sessionExtras ?: Bundle.EMPTY
