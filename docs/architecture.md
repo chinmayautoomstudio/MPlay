@@ -24,7 +24,7 @@ Other top-level folders: `supabase/` (backend config, migrations, Edge Functions
 - `BuildConfig.SUPABASE_URL`, `SUPABASE_KEY` and `GOOGLE_WEB_CLIENT_ID` come from `local.properties` (`supabase.url`, `supabase.key`, `google.webClientId`). See [accounts](features/accounts.md#build-configuration).
 - `pay.returnHost` in `local.properties` (default `autoomstudio.com`) sets the payment App Link host: the manifest placeholder `payReturnHost` and `BuildConfig.PAY_RETURN_HOST`. See [payments](features/payments.md).
 - The Kotlin serialization plugin is applied (supabase-kt models).
-- Release signing reads an uncommitted `keystore.properties`. Release enables R8 optimisation.
+- Release signing reads an uncommitted `keystore.properties`. Release enables R8 with `optimization.packageScope` limited to `androidx.**` (`android.r8.gradual.support=true`). Kotlin/KotlinX stay out of the scope so R8 does not repackage `kotlin.text` helpers in a way that crashes WorkManager startup.
 - `androidResources.noCompress += "onnx"` so the model can be memory-mapped from the APK.
 - ONNX Runtime native libraries are stripped for every ABI outside `SEPARATION_ABIS`.
 - Custom tasks:
@@ -191,3 +191,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-10 | - | `PlaybackService` controller policy: other apps are refused, trusted system controllers get transport-only commands (`ControllerAccess`). |
 | 2026-10-12 | - | Equalizer: `equalizerRepository` in `AppContainer`, `EffectRenderersFactory` (Lofi then EQ), `ProfilePage.Equalizer`, session extra `equalizer_active`. |
 | 2026-10-13 | - | `coverArtEmbedder` in `AppContainer`; app-logo album-art fallback and embed-on-save for clips/sing-along. |
+| 2026-10-13 | - | Release R8 `packageScope` limited to `androidx.**` (with `android.r8.gradual.support=true`) so Kotlin stdlib is not repackaged in a way that crashes WorkManager at launch. |

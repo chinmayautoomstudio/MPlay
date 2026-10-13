@@ -6,6 +6,9 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+### Fixed
+- Release APK no longer crashes immediately on launch. R8 `packageScope` no longer includes `kotlin.**` / `kotlinx.**` (only `androidx.**`), which stopped an `IllegalAccessError` on `kotlin.text` during `WorkManagerInitializer` / App Startup. ([architecture](architecture.md))
+
 ### Added
 - Equalizer (PRD v3.3): 7-band EQ with genre presets, Custom curve, Preamp, and Bass Boost / Virtualizer / Loudness. Custom Media3 processor after Lofi (not system `AudioEffect`); DataStore persistence loaded in `PlaybackService` before play. Reachable from Now Playing chip, Profile → Equalizer, and Playback settings. Free for everyone. New `playback/equalizer/`, `playback/dsp/Biquad`, `data/equalizer/EqualizerRepository`, `ui/equalizer/`; `EqualizerEffectTest`, `EqualizerRepositoryCodecTest`. ([equalizer](features/equalizer.md))
 - Yearly Pro at ₹999 a year, next to monthly Pro at ₹99. The checkout sheet has a Monthly/Yearly picker ("Save ₹189") and the Pay button and terms follow it. Yearly autopay uses a yearly PayU standing instruction, or a one-off link in manual mode. Autopay subscribers get "Switch to yearly", or "Switch to monthly" in the last month of a yearly plan. The old mandate is cancelled, the new interval is paid now and starts when the current paid period ends, and nothing is prorated. The Plans screen shows "Pro · Monthly" or "Pro · Yearly" and the amount autopay will charge; history shows yearly renewals; the Admin plan card shows the interval. New `BillingInterval`, `CheckoutPurpose.SwitchInterval`, `BillingAction.SwitchToYearly`/`SwitchToMonthly`, `BillingError.SwitchNotYet`; `start-checkout` takes `interval`. ([payments](features/payments.md#switching-between-monthly-and-yearly), [backend](backend.md#billing-payu))

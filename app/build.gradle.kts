@@ -71,9 +71,13 @@ android {
         release {
             buildConfigField("String", "SEPARATION_ABIS", "\"${separationAbis(debug = false).joinToString(",")}\"")
             signingConfig = signingConfigs.findByName("release")
+            // Scope R8 to AndroidX only. Including kotlin.** made R8 repackage
+            // StringsKt__StringBuilderKt outside kotlin.text while it still extended a
+            // package-private kotlin.text class, which crashed WorkManager at process start
+            // (IllegalAccessError via InitializationProvider).
             optimization {
                 enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
+                packageScope = setOf("androidx.**")
             }
         }
     }
