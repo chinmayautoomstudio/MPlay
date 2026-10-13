@@ -59,6 +59,7 @@ class ClipStore(private val context: Context) {
             put(MediaStore.Audio.Media.DISPLAY_NAME, ClipNames.fileName(name, "Clip"))
             put(MediaStore.Audio.Media.TITLE, name)
             put(MediaStore.Audio.Media.ARTIST, artist)
+            put(MediaStore.Audio.Media.ALBUM, CLIPS_FOLDER)
             put(MediaStore.Audio.Media.MIME_TYPE, MIME_TYPE)
             put(MediaStore.Audio.Media.RELATIVE_PATH, CLIPS_RELATIVE_PATH)
             put(MediaStore.Audio.Media.IS_MUSIC, 1)

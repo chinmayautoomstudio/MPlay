@@ -1,31 +1,30 @@
 package com.autoomstudio.mp3studio.ui.components
 
 import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
+import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.ui.theme.NeonBrush
 
 /**
- * Album art with a music-note placeholder underneath, visible when the file has no art.
- * [prominent] uses the neon gradient placeholder for large surfaces such as Now Playing.
+ * Album art with the app logo underneath, visible when the file has no art or the load fails.
+ * [prominent] uses the neon gradient behind the logo for large surfaces such as Now Playing.
  */
 @Composable
 fun ArtworkImage(
@@ -58,11 +57,11 @@ fun ArtworkImage(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = Icons.Filled.MusicNote,
-            contentDescription = null,
-            tint = if (prominent) Color.White.copy(alpha = 0.9f) else MaterialTheme.colorScheme.primary,
-            modifier = Modifier.fillMaxSize(if (prominent) 0.4f else 0.45f),
+        Image(
+            painter = painterResource(R.drawable.ic_mp3studio_logo),
+            contentDescription = if (uri == null) contentDescription else null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize(),
         )
         if (uri != null) {
             AsyncImage(

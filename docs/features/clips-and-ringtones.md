@@ -1,6 +1,6 @@
 # Clips and ringtones
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-07
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-13
 
 ## Summary
 
@@ -14,7 +14,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 |---|---|
 | `data/clip/ClipExporter.kt` | Cuts the range to a temp AAC/M4A in `cacheDir` with Media3 Transformer. |
 | `data/clip/ClipNames.kt` | Default name `"<title> (clip)"`, sanitising, `.m4a` extension. |
-| `data/clip/ClipStore.kt` | Free-space check, MediaStore save, mark as sound, delete; `NotEnoughStorageException`. |
+| `data/clip/ClipStore.kt` | Free-space check, MediaStore save (album `MP3 Studio Clips`), mark as sound, delete; `NotEnoughStorageException`. |
+| `data/library/CoverArtEmbedder.kt` | Embeds the app logo as MP4 cover art before MediaStore save. |
 | `data/clip/PeakAccumulator.kt` | Folds 16-bit PCM into N normalised peak buckets. |
 | `data/clip/RingtoneSetter.kt` | `Settings.System.canWrite` and `RingtoneManager` default URIs. |
 | `data/clip/SoundType.kt` | `Ringtone` / `Notification` / `Alarm` mapping. |
@@ -32,11 +33,12 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 3. **Preview:** a private `ExoPlayer` loops the range (polls every 50 ms). It stops on `ON_STOP` and on audio focus loss.
 4. **Export:** Media3 Transformer with `ClippingConfiguration`, video removed, AAC at 192 kbps, `InAppMp4Muxer` (non-streamable to avoid a ~400 KB reservation). Output `cacheDir/clip-<millis>.m4a`. Cancellable.
 5. **Space check:** estimated clip size x2 plus 5 MB margin against the smaller of cache and external free space.
-6. **Save:**
-   - Android 10+: MediaStore insert into `Music/MP3 Studio Clips/` with `IS_PENDING`, `IS_MUSIC = 1`, title and artist.
+6. **Cover art:** after export, `CoverArtEmbedder.embedLogo` writes `ic_mp3studio_logo` as MP4 `covr` (always, even if the source track had art).
+7. **Save:**
+   - Android 10+: MediaStore insert into `Music/MP3 Studio Clips/` with `IS_PENDING`, `IS_MUSIC = 1`, title, artist and album `MP3 Studio Clips`.
    - Android 8-9: file in the public Music folder with `(n)` collision suffix, then media scan.
-7. **Ringtone flow:** pick a type; if `Settings.System.canWrite()` is false, a dialog offers `ACTION_MANAGE_WRITE_SETTINGS` and retries on resume. The clip is saved, flagged `IS_RINGTONE` / `IS_NOTIFICATION` / `IS_ALARM`, and set as default. Undo restores the previous default URI. Without permission it shows a snackbar linking to sound settings.
-8. **Errors:** storage, permission, unsupported file, export failed and save failed each map to a `TrimError` message.
+8. **Ringtone flow:** pick a type; if `Settings.System.canWrite()` is false, a dialog offers `ACTION_MANAGE_WRITE_SETTINGS` and retries on resume. The clip is saved, flagged `IS_RINGTONE` / `IS_NOTIFICATION` / `IS_ALARM`, and set as default. Undo restores the previous default URI. Without permission it shows a snackbar linking to sound settings.
+9. **Errors:** storage, permission, unsupported file, export failed and save failed each map to a `TrimError` message.
 
 Constants (`TrimRange`): `MIN_CLIP_MS = 1000`, `NUDGE_MS = 100`, `RINGTONE_DEFAULT_MS = 30000`, `LONG_RINGTONE_MS = 40000` (warning shown above this).
 
@@ -54,6 +56,7 @@ Constants (`TrimRange`): `MIN_CLIP_MS = 1000`, `NUDGE_MS = 100`, `RINGTONE_DEFAU
 ## Tests
 
 - `data/clip/ClipNamesTest.kt`, `PeakAccumulatorTest.kt`, `TrimRangeTest.kt`.
+- Cover embedding covered by `androidTest` `CoverArtEmbedderTest` (see [library](library.md#tests)).
 - No tests for exporter, store, extractor, setter or ViewModel.
 
 ## Known limitations and TODOs
@@ -71,3 +74,4 @@ Constants (`TrimRange`): `MIN_CLIP_MS = 1000`, `NUDGE_MS = 100`, `RINGTONE_DEFAU
 |---|---|---|
 | 2026-10-02 | `23e2ee1` | Clip editing, trim editor, ringtone setting. |
 | 2026-10-07 | - | Clips folder renamed to `Music/MP3 Studio Clips` (`ClipStore.CLIPS_FOLDER`); `LEGACY_CLIPS_RELATIVE_PATH` keeps old clips exempt from the 30 s minimum. `TrimEditorActivity` finishes on sign-out. |
+| 2026-10-13 | - | Saved clips get the app logo as embedded cover art (`CoverArtEmbedder`); scoped MediaStore rows set album `MP3 Studio Clips`. |

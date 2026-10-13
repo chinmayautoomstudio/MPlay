@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-10-10
+> Last updated: 2026-10-13
 
 ## Modules
 
@@ -46,6 +46,7 @@ There is no DI framework. [`di/AppContainer.kt`](../app/src/main/java/com/autoom
 - Admin: `adminBackend` (`SupabaseAdminBackend` over the `admin` Edge Function). `AdminViewModel` also gets `signedInUserId` and `entitlementsRepository.refresh`. See [admin](features/admin.md).
 - Payments: `billingRepository` (`BillingRepository` over `SupabaseBillingBackend` and `DataStorePendingPaymentStore`, with `refreshPlan = entitlementsRepository::refresh`). `AuthEffects` clears it on sign-out. `BillingViewModel` and `PaymentHistoryViewModel` use it. See [payments](features/payments.md).
 - `albumArtLoader` (`AlbumArtLoader`) is shared by Coil, the media session and the widget. `MPlayApp` implements Coil's `SingletonImageLoader.Factory` and registers `AlbumArtFetcher` on it. See [library](features/library.md#album-art).
+- `coverArtEmbedder` (`CoverArtEmbedder`) embeds the app logo as MP4 cover art when saving clips and sing-along recordings.
 - `musicPlaying: MutableStateFlow<Boolean>` is shared state: `PlaybackService` writes it, `MetronomeController` reads it.
 - A private `mainScope` (`Dispatchers.Main.immediate`) backs a private app-scoped `PlaybackController` (`restoresSession = false`) passed to `MetronomeController` as its `MusicTimeline`, for syncing with the song. It binds to `PlaybackService` only while sync is on.
 - Factories: `createWidgetStatePublisher()` and `createPlaybackController(scope)` return new instances per call.
@@ -189,3 +190,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-10 | - | `AdminActivityWorker` (periodic, scheduled by `AuthEffects` for admins) and notification channel `admin_activity`; `MainActivity` handles `ACTION_OPEN_ADMIN_ACTIVITY`. |
 | 2026-10-10 | - | `PlaybackService` controller policy: other apps are refused, trusted system controllers get transport-only commands (`ControllerAccess`). |
 | 2026-10-12 | - | Equalizer: `equalizerRepository` in `AppContainer`, `EffectRenderersFactory` (Lofi then EQ), `ProfilePage.Equalizer`, session extra `equalizer_active`. |
+| 2026-10-13 | - | `coverArtEmbedder` in `AppContainer`; app-logo album-art fallback and embed-on-save for clips/sing-along. |

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.autoomstudio.mp3studio.data.library.CoverArtEmbedder
 import com.autoomstudio.mp3studio.data.model.Song
 import com.autoomstudio.mp3studio.data.stems.StemMode
 import com.autoomstudio.mp3studio.data.stems.StemRepository
@@ -64,6 +65,7 @@ class SingAlongSession(
     private val recordingStore: RecordingStore,
     private val metronome: MetronomeController,
     private val createPlayback: (CoroutineScope) -> PlaybackController,
+    private val coverArtEmbedder: CoverArtEmbedder,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val tempDir = File(context.cacheDir, TEMP_DIR)
@@ -191,6 +193,7 @@ class SingAlongSession(
                         shouldStop = { job?.isActive == false },
                     )
                 }
+                withContext(Dispatchers.IO) { coverArtEmbedder.embedLogo(temp) }
                 recordingStore.save(temp, name, take.artist)
                 releaseTake()
                 _state.value = SingAlongState.Saved(name)

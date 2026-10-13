@@ -26,7 +26,9 @@ import com.autoomstudio.mp3studio.data.clip.RingtoneSetter
 import com.autoomstudio.mp3studio.data.clip.SoundType
 import com.autoomstudio.mp3studio.data.clip.TrimRange
 import com.autoomstudio.mp3studio.data.clip.WaveformExtractor
+import com.autoomstudio.mp3studio.data.library.CoverArtEmbedder
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -38,6 +40,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.IOException
 
 enum class TrimMode { Cut, Ringtone }
@@ -88,6 +91,7 @@ class TrimEditorViewModel(
     private val exporter: ClipExporter,
     private val clipStore: ClipStore,
     private val ringtoneSetter: RingtoneSetter,
+    private val coverArtEmbedder: CoverArtEmbedder,
 ) : ViewModel() {
 
     private val sourceUri: Uri = checkNotNull(savedState[TrimEditorActivity.EXTRA_URI])
@@ -281,6 +285,7 @@ class TrimEditorViewModel(
             _state.update { it.copy(export = ExportStatus.Exporting(progress)) }
         }
         _state.update { it.copy(export = ExportStatus.Saving) }
+        withContext(Dispatchers.IO) { coverArtEmbedder.embedLogo(temp) }
         return clipStore.save(temp, ClipNames.clean(name, defaultClipName), artist)
     }
 
@@ -319,6 +324,7 @@ class TrimEditorViewModel(
                     exporter = container.clipExporter,
                     clipStore = container.clipStore,
                     ringtoneSetter = container.ringtoneSetter,
+                    coverArtEmbedder = container.coverArtEmbedder,
                 )
             }
         }

@@ -21,6 +21,7 @@ import com.autoomstudio.mp3studio.data.duplicates.FileFingerprinter
 import com.autoomstudio.mp3studio.data.library.AlbumArtLoader
 import com.autoomstudio.mp3studio.data.library.AudioFolderScanner
 import com.autoomstudio.mp3studio.data.library.AudioFolderWatcher
+import com.autoomstudio.mp3studio.data.library.CoverArtEmbedder
 import com.autoomstudio.mp3studio.data.library.LibraryPreferences
 import com.autoomstudio.mp3studio.data.library.MediaStoreSongSource
 import com.autoomstudio.mp3studio.data.library.SongDeleter
@@ -86,6 +87,8 @@ class AppContainer(context: Context) {
     }
 
     val albumArtLoader: AlbumArtLoader by lazy { AlbumArtLoader(appContext) }
+
+    val coverArtEmbedder: CoverArtEmbedder by lazy { CoverArtEmbedder(appContext) }
 
     val playbackSessionStore: PlaybackSessionStore by lazy { PlaybackSessionStore(appContext) }
 
@@ -237,7 +240,14 @@ class AppContainer(context: Context) {
     val recordingStore: RecordingStore by lazy { RecordingStore(appContext) }
 
     val singAlongSession: SingAlongSession by lazy {
-        SingAlongSession(appContext, stemRepository, recordingStore, metronomeController, ::createPlaybackController)
+        SingAlongSession(
+            appContext,
+            stemRepository,
+            recordingStore,
+            metronomeController,
+            ::createPlaybackController,
+            coverArtEmbedder,
+        )
     }
 
     val taskRemoval: TaskRemoval by lazy {

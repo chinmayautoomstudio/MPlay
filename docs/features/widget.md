@@ -1,6 +1,6 @@
 # Home screen widget
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-10
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-13
 
 ## Summary
 
@@ -22,9 +22,9 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 ## How it works
 
-- **Publishing:** on item transition, play state, timeline or metadata change, the publisher snapshots state on the player thread, skips unchanged states, then (under a `Mutex` on `applicationScope`) saves state, decodes artwork to 256 px if it changed (read once through `AlbumArtLoader`, so songs in `Download/` get their embedded cover; see [library](library.md#album-art)), and calls `MPlayWidget().updateAll()`. `onDestroy` publishes a paused state.
-- **Rendering:** artwork at WIDE, title/artist at MEDIUM and above, buttons only at SMALL. Uses the app's Neon colour schemes.
-- **Signed out (PRD AU4):** `provideGlance` waits for `AuthRepository.awaitReady()` and collects `AuthRepository.state`. Unless signed in, `SignedOutContent` shows "Sign in to MP3 Studio" (`widget_signed_out`) with no controls, and a tap opens `MainActivity` (the sign-in screen). `di/AuthEffects` calls `MPlayWidget().updateAll()` on every sign-in and sign-out so the widget switches even without a running session.
+- **Publishing:** on item transition, play state, timeline or metadata change, the publisher snapshots state on the player thread, skips unchanged states, then (under a `Mutex` on `applicationScope`) saves state, decodes artwork to 256 px if it changed (read once through `AlbumArtLoader`, so songs in `Download/` get their embedded cover; see [library](library.md#album-art)), and calls `MPlayWidget().updateAll()`. When there is no art, it saves `AppLogoArtwork` instead. `onDestroy` publishes a paused state.
+- **Rendering:** artwork at WIDE, title/artist at MEDIUM and above, buttons only at SMALL. Uses the app's Neon colour schemes. A null artwork bitmap (e.g. idle) shows `ic_mp3studio_logo` full-bleed.
+- **Signed out (PRD AU4):** `provideGlance` waits for `AuthRepository.awaitReady()` and collects `AuthRepository.state`. Unless signed in, `SignedOutContent` shows "Sign in to MP3 Studio" (`widget_signed_out`) with no controls and a small app-logo icon, and a tap opens `MainActivity` (the sign-in screen). `di/AuthEffects` calls `MPlayWidget().updateAll()` on every sign-in and sign-out so the widget switches even without a running session.
 - **Actions:**
   - Whole widget: opens `MainActivity` with `EXTRA_OPEN_NOW_PLAYING` (unless idle).
   - Play/pause: broadcasts `KEYCODE_MEDIA_PLAY_PAUSE` to `playback.SignedInMediaButtonReceiver`, which can start the service and trigger `onPlaybackResumption` (only when signed in).
@@ -57,3 +57,4 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | 2026-10-03 | `73cdb66` | Widget added with notification permission support. |
 | 2026-10-07 | - | Signed-out view without controls; play/pause goes through `SignedInMediaButtonReceiver`; refreshed on sign-in and sign-out. See [accounts](accounts.md). |
 | 2026-10-10 | - | Artwork loaded through `AlbumArtLoader` (embedded-picture fallback for `Download/`), read once instead of twice. |
+| 2026-10-13 | - | Missing artwork and signed-out icon use `ic_mp3studio_logo` instead of the music-note drawable. |

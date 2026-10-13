@@ -1,6 +1,6 @@
 # Sing-along recording
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-08
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-13
 
 ## Summary
 
@@ -18,7 +18,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `singalong/SingAlongMixer.kt` | `MixSettings`, alignment, mixing, soft limiter. |
 | `singalong/TakeRenderer.kt` | `Take`, `EndReason`, streaming mix and AAC export. |
 | `singalong/TakePreview.kt` | Live-adjustable preview through `AudioTrack`. |
-| `singalong/RecordingStore.kt` | MediaStore save, space check, pending-row cleanup. |
+| `singalong/RecordingStore.kt` | MediaStore save (album `MP3 Studio Recordings`), space check, pending-row cleanup. |
+| `data/library/CoverArtEmbedder.kt` | Embeds the app logo as MP4 cover art before MediaStore save. |
 | `singalong/RecordingNames.kt` | Name suggestion, sanitising, de-duplication. |
 | `singalong/RecordingService.kt` | Microphone foreground service with Stop action. |
 | `ui/singalong/SingAlongSheet.kt` | `SingAlongChip` (lock icon when the plan doesn't include it) and setup sheet. |
@@ -79,7 +80,8 @@ Mono 16-bit at 44.1 kHz, 1024-frame reads, on an urgent-audio thread. Sources tr
 ### Saving
 
 - Renders on `Dispatchers.Default` to `cacheDir/singalong/mix-<millis>.m4a`: AAC-LC, 44.1 kHz stereo, 192 kbps (`AacFileWriter` from `:separation`).
-- Android 10+: MediaStore insert into `Music/MP3 Studio Recordings/` with `IS_PENDING`, `IS_MUSIC = 1`, title and artist.
+- Before MediaStore copy, `CoverArtEmbedder.embedLogo` writes `ic_mp3studio_logo` as MP4 `covr`.
+- Android 10+: MediaStore insert into `Music/MP3 Studio Recordings/` with `IS_PENDING`, `IS_MUSIC = 1`, title, artist and album `MP3 Studio Recordings`.
 - Android 8-9: write `.<name>.partial`, rename, scan.
 - Names: `"<title> - Sing along"`, sanitised, max 100 characters, `(2)`, `(3)` suffix on collision.
 - Space check: `(seconds + 1) * (88,200 + 2 * 24,000) bytes + 20 MiB`; Start is disabled if short.
@@ -116,6 +118,7 @@ The sheet warns when no headphones are connected (music will leak into the mic) 
 
 - `singalong/RecordingNamesTest.kt`: suggestion, sanitising, length, collision suffix.
 - `singalong/SingAlongMixerTest.kt`: limiter, gains, centring, muting, offset, `VoiceFile` padding.
+- Cover embedding covered by `androidTest` `CoverArtEmbedderTest` (see [library](library.md#tests)).
 - No tests for the session, recorder, store, renderer, preview, service or UI (animations were checked by hand on an emulator).
 
 ## Known limitations and TODOs
@@ -138,3 +141,4 @@ The sheet warns when no headphones are connected (music will leak into the mic) 
 | 2026-10-07 | - | Recordings folder renamed to `Music/MP3 Studio Recordings`; the old `Music/MPlay Recordings/` stays exempt from the 30 s minimum. A running session is cancelled on sign-out (`di/AuthEffects`). |
 | 2026-10-08 | - | Sing Along needs Trial or Pro: the chip opens the upgrade sheet on Free. See [plans](plans.md). |
 | 2026-10-08 | - | A session is discarded when the app is swiped away from recents (`RecordingService.onTaskRemoved`, `TaskRemoval`). |
+| 2026-10-13 | - | Saved recordings get the app logo as embedded cover art (`CoverArtEmbedder`); scoped MediaStore rows set album `MP3 Studio Recordings`. |

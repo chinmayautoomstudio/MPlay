@@ -180,10 +180,10 @@ private fun SignedOutContent() {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Image(
-            provider = ImageProvider(R.drawable.ic_widget_music_note),
+            provider = ImageProvider(R.drawable.ic_mp3studio_logo),
             contentDescription = null,
-            colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
-            modifier = GlanceModifier.size(24.dp),
+            contentScale = ContentScale.Crop,
+            modifier = GlanceModifier.size(24.dp).cornerRadius(6.dp),
         )
         Spacer(GlanceModifier.width(10.dp))
         Text(
@@ -213,10 +213,10 @@ private fun Artwork(artwork: Bitmap?, contentDescription: String) {
             )
         } else {
             Image(
-                provider = ImageProvider(R.drawable.ic_widget_music_note),
+                provider = ImageProvider(R.drawable.ic_mp3studio_logo),
                 contentDescription = null,
-                colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
-                modifier = GlanceModifier.size(24.dp),
+                contentScale = ContentScale.Crop,
+                modifier = GlanceModifier.fillMaxSize().cornerRadius(12.dp),
             )
         }
     }

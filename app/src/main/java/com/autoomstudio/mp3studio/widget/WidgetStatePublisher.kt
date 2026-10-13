@@ -10,6 +10,7 @@ import androidx.glance.appwidget.updateAll
 import androidx.media3.common.Player
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.library.AlbumArtLoader
+import com.autoomstudio.mp3studio.data.library.AppLogoArtwork
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -71,7 +72,12 @@ class WidgetStatePublisher(
             writeLock.withLock {
                 try {
                     store.save(state)
-                    if (artworkChanged) store.saveArtwork(artworkKey.second?.let { loadArtwork(it) })
+                    if (artworkChanged) {
+                        store.saveArtwork(
+                            artworkKey.second?.let { loadArtwork(it) }
+                                ?: if (hasItem) AppLogoArtwork.bitmap(context, ARTWORK_PX) else null,
+                        )
+                    }
                     MPlayWidget().updateAll(context)
                 } catch (e: CancellationException) {
                     throw e
@@ -83,31 +89,42 @@ class WidgetStatePublisher(
     }
 
     /** Decodes album art at roughly [ARTWORK_PX] so the widget's RemoteViews stay well under binder limits. */
-    private suspend fun loadArtwork(uri: Uri): Bitmap? = withContext(Dispatchers.IO) {
+    private suspend fun loadArtwork(uri: Uri): Bitmap = withContext(Dispatchers.IO) {
         try {
-            val bytes = albumArt.load(uri) ?: return@withContext null
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@withContext null
-            var sample = 1
-            while (bounds.outWidth / (sample * 2) >= ARTWORK_PX && bounds.outHeight / (sample * 2) >= ARTWORK_PX) {
-                sample *= 2
+            val bytes = albumArt.load(uri)
+            if (bytes != null) {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                if (bounds.outWidth > 0 && bounds.outHeight > 0) {
+                    var sample = 1
+                    while (bounds.outWidth / (sample * 2) >= ARTWORK_PX && bounds.outHeight / (sample * 2) >= ARTWORK_PX) {
+                        sample *= 2
+                    }
+                    val decoded = BitmapFactory.decodeByteArray(
+                        bytes,
+                        0,
+                        bytes.size,
+                        BitmapFactory.Options().apply { inSampleSize = sample },
+                    )
+                    if (decoded != null) {
+                        val side = minOf(decoded.width, decoded.height)
+                        val cropped = Bitmap.createBitmap(
+                            decoded,
+                            (decoded.width - side) / 2,
+                            (decoded.height - side) / 2,
+                            side,
+                            side,
+                        )
+                        return@withContext if (side <= ARTWORK_PX) cropped else cropped.scale(ARTWORK_PX, ARTWORK_PX)
+                    }
+                }
             }
-            val decoded = BitmapFactory.decodeByteArray(
-                bytes,
-                0,
-                bytes.size,
-                BitmapFactory.Options().apply { inSampleSize = sample },
-            ) ?: return@withContext null
-            val side = minOf(decoded.width, decoded.height)
-            val cropped = Bitmap.createBitmap(decoded, (decoded.width - side) / 2, (decoded.height - side) / 2, side, side)
-            if (side <= ARTWORK_PX) cropped else cropped.scale(ARTWORK_PX, ARTWORK_PX)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            // No embedded art or the file is gone: the widget shows its placeholder.
-            null
+            Log.w(TAG, "Could not decode album art; using app logo", e)
         }
+        AppLogoArtwork.bitmap(context, ARTWORK_PX)
     }
 
     private companion object {

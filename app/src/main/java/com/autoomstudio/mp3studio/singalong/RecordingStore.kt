@@ -73,6 +73,7 @@ class RecordingStore(private val context: Context) {
             put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
             put(MediaStore.Audio.Media.TITLE, fileName.removeSuffix(RecordingNames.EXTENSION))
             put(MediaStore.Audio.Media.ARTIST, artist)
+            put(MediaStore.Audio.Media.ALBUM, FOLDER)
             put(MediaStore.Audio.Media.MIME_TYPE, MIME_TYPE)
             put(MediaStore.Audio.Media.RELATIVE_PATH, RELATIVE_PATH)
             put(MediaStore.Audio.Media.IS_MUSIC, 1)

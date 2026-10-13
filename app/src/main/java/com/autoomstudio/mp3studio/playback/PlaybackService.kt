@@ -148,7 +148,7 @@ class PlaybackService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val bitmapLoader = CacheBitmapLoader(
-            AlbumArtBitmapLoader(container.albumArtLoader, DataSourceBitmapLoader.Builder(this).build(), serviceScope),
+            AlbumArtBitmapLoader(this, container.albumArtLoader, DataSourceBitmapLoader.Builder(this).build(), serviceScope),
         )
         mediaSession = MediaSession.Builder(this, player)
             .setSessionActivity(sessionActivity)
