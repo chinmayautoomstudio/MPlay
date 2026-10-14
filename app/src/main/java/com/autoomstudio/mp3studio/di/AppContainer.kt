@@ -76,6 +76,8 @@ class AppContainer(context: Context) {
     /** Outlives screens and services, for writes that must finish after their caller is gone. */
     val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
+    val libraryPreferences: LibraryPreferences by lazy { LibraryPreferences(appContext) }
+
     val songRepository: SongRepository by lazy {
         val scanner = AudioFolderScanner(appContext)
         SongRepository(
@@ -83,6 +85,7 @@ class AppContainer(context: Context) {
             source = MediaStoreSongSource(contentResolver),
             scanner = scanner,
             watcher = AudioFolderWatcher(scanner.folders()),
+            libraryPreferences = libraryPreferences,
         )
     }
 
@@ -91,8 +94,6 @@ class AppContainer(context: Context) {
     val coverArtEmbedder: CoverArtEmbedder by lazy { CoverArtEmbedder(appContext) }
 
     val playbackSessionStore: PlaybackSessionStore by lazy { PlaybackSessionStore(appContext) }
-
-    val libraryPreferences: LibraryPreferences by lazy { LibraryPreferences(appContext) }
 
     private val database: MPlayDatabase by lazy { MPlayDatabase.create(appContext) }
 

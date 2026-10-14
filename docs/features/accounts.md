@@ -1,6 +1,6 @@
 # Accounts and Google sign-in
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-12
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-14
 
 ## Summary
 
@@ -40,7 +40,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 ### Sign-in screen
 
 `SignInScreen` is always dark: `MainActivity` passes `forceDark` to `MPlayAppTheme` while signed out, which also gives light status bar icons. From top to bottom:
-- the MP3 Studio logo (`ic_mp3studio_logo`, built by `tools/generate_logo_assets.py` from `logos/mp3-studio-logo-v2.png`) with a pulsing glow;
+- the MP3 Studio logo (`ic_mp3studio_logo`, built by `tools/generate_logo_assets.py` from `logos/mp3-studio-logo-v3.png`) with a pulsing glow;
 - "MP3 Studio" with a gradient "Studio";
 - the tagline `signin_tagline`;
 - the hero;
@@ -151,3 +151,4 @@ Delete account (at the bottom of the Edit page, in the error color) opens a dial
 | 2026-10-09 | - | 3.2.3: sign-in logo is the new MP3 Studio logo (`ic_mp3studio_logo`); the stand-in `ic_mp3studio_mark` was removed. |
 | 2026-10-10 | - | Delete account cancels a PayU autopay mandate first; `DeletionError.MandateCancelFailed` replaces `ActiveSubscription`; sign-out also clears the awaited payment. |
 | 2026-10-12 | - | Sign-in logo regenerated from `logos/mp3-studio-logo-v2.png` (`ic_mp3studio_logo`). |
+| 2026-10-14 | - | Sign-in logo regenerated from `logos/mp3-studio-logo-v3.png` (`ic_mp3studio_logo`). |

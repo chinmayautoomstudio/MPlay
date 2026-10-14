@@ -110,6 +110,7 @@ fun LibrarySettingsScreen(
     onHideDuplicatesChange: (Boolean) -> Unit,
     duplicateGroupCount: Int,
     onReviewDuplicates: () -> Unit,
+    onExcludeFolders: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     backEnabled: Boolean = true,
@@ -143,6 +144,12 @@ fun LibrarySettingsScreen(
             },
             colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
             modifier = Modifier.clickable(onClick = onReviewDuplicates),
+        )
+        ListItem(
+            headlineContent = { Text(stringResource(R.string.settings_exclude_folders)) },
+            supportingContent = { Text(stringResource(R.string.settings_exclude_folders_summary)) },
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.background),
+            modifier = Modifier.clickable(onClick = onExcludeFolders),
         )
     }
 }

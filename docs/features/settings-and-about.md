@@ -1,10 +1,10 @@
 # Settings, About, theme and shared components
 
-> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-13
+> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-14
 
 ## Summary
 
-The last bottom tab is Profile, and its icon is the account photo. The Profile screen shows the photo, name, email and an Edit button ([accounts](accounts.md)), a subscription card, an Admin card (admins only), then cards for Appearance (System/Light/Dark, dynamic colour on Android 12+), Library (hide and review duplicates), Vocal Separation, Background Playback (battery optimisation) and About, and finally Log out. Each card opens its own page. About MP3 Studio shows the version, Autoom Studio links, a privacy note, the privacy policy and terms links, and open-source licenses. The UI uses the "Neon Midnight" purple palette, or wallpaper colours.
+The last bottom tab is Profile, and its icon is the account photo. The Profile screen shows the photo, name, email and an Edit button ([accounts](accounts.md)), a subscription card, an Admin card (admins only), then cards for Appearance (System/Light/Dark, dynamic colour on Android 12+), Library (hide and review duplicates, exclude folders), Vocal Separation, Background Playback (battery optimisation) and About, and finally Log out. Each card opens its own page. About MP3 Studio shows the version, Autoom Studio links, a privacy note, the privacy policy and terms links, and open-source licenses. The UI uses the "Neon Midnight" purple palette, or wallpaper colours.
 
 ## Key files
 
@@ -16,6 +16,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `ui/settings/SettingsViewModel.kt` | `theme: StateFlow<ThemeSettings?>` (null until loaded), theme setters, `claimNotificationPrompt()`. |
 | `ui/settings/ProfileScreen.kt` | Profile tab: header, identity row, subscription card, category cards, Log out; `ProfileTabIcon` for the bottom bar. |
 | `ui/settings/SettingsPages.kt` | Sub-pages `AppearanceSettingsScreen`, `LibrarySettingsScreen`, `SeparationSettingsScreen`, `PlaybackSettingsScreen`, and the shared `SubPageHeader`. |
+| `ui/settings/ExcludeFoldersScreen.kt` | Library sub-page to hide MediaStore folders ([library](library.md)). |
 | `ui/settings/EditProfileScreen.kt`, `AccountViewModel.kt` | Edit page (photo, name, Delete account), shared `Avatar` and `LogOutDialog`; documented in [accounts](accounts.md). |
 | `ui/settings/AboutScreen.kt` | Logos (`ic_mp3studio_logo`, Autoom Studio), version (no build number), website, email, privacy note, privacy policy, terms, licenses. |
 | `ui/settings/LicensesScreen.kt` | Hand-maintained license list and detail view. |
@@ -25,7 +26,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 ## How it works
 
-- `MainScreen` keeps `ProfilePage` (`Main`, `EditProfile`, `Appearance`, `Library`, `Duplicates`, `Separation`, `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `Admin`). Sub-pages go back to `Main`, except Duplicates (back to Library), the separation queue (back to Separation) and Licenses (back to About). `MPlayTopBar` is hidden on `Main`, because the Profile screen draws its own back button and "Profile" title. That back button returns to the tab that was open before Profile.
+- `MainScreen` keeps `ProfilePage` (`Main`, `EditProfile`, `Appearance`, `Library`, `Duplicates`, `ExcludeFolders`, `Separation`, `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `Admin`). Sub-pages go back to `Main`, except Duplicates and Exclude folders (back to Library), the separation queue (back to Separation) and Licenses (back to About). `MPlayTopBar` is hidden on `Main`, because the Profile screen draws its own back button and "Profile" title. That back button returns to the tab that was open before Profile.
 - The subscription card shows "MP3 Studio" plus the plan name (Free, Trial or Pro). Below that it shows the days left in the trial, or the days until the Pro subscription expires or renews; Free users see an upgrade hint. Tapping it opens Plans. The Profile cards use theme colours, so they follow light and dark mode. The layout is compact so the whole screen fits above the mini player and bottom bar on a typical phone: the back button and title share one row, the avatar is 56dp, category rows are about 60dp tall, and Edit is a small pencil-only icon button (content description "Edit").
 - `MPlayAppTheme` decides dark/light from the setting (or system), or dark when `forceDark` is set (`MainActivity` sets it while signed out, so the sign-in screen is always dark), runs edge-to-edge with matching bar icons, and uses dynamic colour on API 31+ when enabled, otherwise `NeonDarkColors` / `NeonLightColors`.
 - Typography (`MPlayTypography` in `Type.kt`): Outfit for `display*` / `headline*` and `WordmarkStyle`; DM Sans for `title*` / `body*` / `label*`. Fonts are bundled under `res/font/` (offline; no downloadable Google Fonts provider). The home-screen widget keeps the system font.
@@ -65,7 +66,9 @@ All keys in DataStore `app_settings`:
 | `admin_notifications_enabled` | Boolean | `true` | [Admin](admin.md) phone notifications switch |
 | `admin_activity_notified_at` | Long | 0 (epoch ms; cleared on sign-out) | [Admin](admin.md) newest event posted as a notification |
 
-Other DataStores: `playback_session`, `library_prefs`, `widget_state`, and `auth_session` (key `session`: the Supabase session, encrypted with Tink, excluded from backup; see [accounts](accounts.md)). The Tink keyset lives in SharedPreferences `auth_keyset_prefs`. DataStore `entitlements` (key `entitlements_json`: the last plan answer from the server, cleared on sign-out; see [plans](plans.md)). DataStore `billing` (keys `pending_payment_user` and `pending_payment_txn`: the PayU payment the app is waiting for, cleared when it settles and on sign-out; see [payments](payments.md)). DataStore `equalizer_settings` (equalizer on/off, bands, presets and switches; see [equalizer](equalizer.md)).
+Other DataStores: `playback_session`, `library_prefs` (`sort_order`; `excluded_folders` string set — see [library](library.md)), `widget_state`, and `auth_session` (key `session`: the Supabase session, encrypted with Tink, excluded from backup; see [accounts](accounts.md)). The Tink keyset lives in SharedPreferences `auth_keyset_prefs`. DataStore `entitlements` (key `entitlements_json`: the last plan answer from the server, cleared on sign-out; see [plans](plans.md)). DataStore `billing` (keys `pending_payment_user` and `pending_payment_txn`: the PayU payment the app is waiting for, cleared when it settles and on sign-out; see [payments](payments.md)). DataStore `equalizer_settings` (equalizer on/off, bands, presets and switches; see [equalizer](equalizer.md)).
+
+Splash and About logos: `drawable-nodpi/splash_logo` and `ic_mp3studio_logo`, rebuilt by `tools/generate_logo_assets.py` from `logos/mp3-studio-logo-v3.png`.
 
 ## Manifest, permissions and notifications
 
@@ -107,3 +110,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-12 | - | `ProfilePage.Equalizer` and Profile/Playback equalizer rows; DataStore `equalizer_settings` ([equalizer](equalizer.md)). |
 | 2026-10-12 | - | About logo regenerated from `logos/mp3-studio-logo-v2.png` (`ic_mp3studio_logo`); launcher background restored to `#030013`. |
 | 2026-10-13 | - | Bundled Outfit + DM Sans typography (`Type.kt`, `res/font/`); OFL entries on Licenses. |
+| 2026-10-14 | - | Profile → Library → Exclude folders (`ProfilePage.ExcludeFolders`); splash/About logos from `logos/mp3-studio-logo-v3.png`. |

@@ -748,6 +748,15 @@
         <item quantity="other">%d groups of duplicates found</item>
     </plurals>
     <string name="settings_review_duplicates_none">No duplicates found</string>
+    <string name="settings_exclude_folders">Exclude folders</string>
+    <string name="settings_exclude_folders_summary">Hide songs in chosen folders from your library</string>
+    <string name="exclude_folders_intro">Turn on a folder to hide its songs from the library. Files stay on your device.</string>
+    <string name="exclude_folders_empty_title">No folders</string>
+    <string name="exclude_folders_empty_message">When music appears in your library, you can hide whole folders here.</string>
+    <plurals name="exclude_folders_song_count">
+        <item quantity="one">%d song</item>
+        <item quantity="other">%d songs</item>
+    </plurals>
 
     <string name="duplicates_title">Review duplicates</string>
     <string name="duplicates_empty_title">No duplicates</string>

@@ -128,6 +128,7 @@ import com.autoomstudio.mp3studio.ui.settings.AboutScreen
 import com.autoomstudio.mp3studio.ui.settings.AccountViewModel
 import com.autoomstudio.mp3studio.ui.settings.AppearanceSettingsScreen
 import com.autoomstudio.mp3studio.ui.settings.EditProfileScreen
+import com.autoomstudio.mp3studio.ui.settings.ExcludeFoldersScreen
 import com.autoomstudio.mp3studio.ui.settings.LibrarySettingsScreen
 import com.autoomstudio.mp3studio.ui.settings.LicensesScreen
 import com.autoomstudio.mp3studio.ui.equalizer.EqualizerScreen
@@ -601,6 +602,7 @@ fun MainScreen(
                                         onHideDuplicatesChange = duplicateActions.onHideDuplicatesChange,
                                         duplicateGroupCount = duplicates.groups.size,
                                         onReviewDuplicates = { profilePage = ProfilePage.Duplicates },
+                                        onExcludeFolders = { profilePage = ProfilePage.ExcludeFolders },
                                         onBack = backToMain,
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
@@ -609,6 +611,11 @@ fun MainScreen(
                                         duplicates = duplicates,
                                         actions = duplicateActions,
                                         onDeleteHidden = { songs -> deleteSongIds = songs.map { it.id }.toLongArray() },
+                                        onBack = { profilePage = ProfilePage.Library },
+                                        modifier = contentModifier,
+                                        backEnabled = pageBackEnabled,
+                                    )
+                                    ProfilePage.ExcludeFolders -> ExcludeFoldersScreen(
                                         onBack = { profilePage = ProfilePage.Library },
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
@@ -821,6 +828,7 @@ private enum class ProfilePage {
     Appearance,
     Library,
     Duplicates,
+    ExcludeFolders,
     Separation,
     SeparationQueue,
     Playback,

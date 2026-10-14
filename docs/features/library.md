@@ -1,6 +1,6 @@
 # Library
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-13
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-14
 
 ## Summary
 
@@ -22,7 +22,11 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `data/library/AudioFolderScanner.kt` | Runs `MediaScannerConnection` over public audio folders. |
 | `data/library/AudioFolderWatcher.kt` | `FileObserver`-based change flow for those folders. |
 | `data/library/LibraryQueries.kt` | Pure filter, sort and grouping; `SongSortOrder`. |
-| `data/library/LibraryPreferences.kt` | Sort order in DataStore. |
+| `data/library/LibraryPreferences.kt` | Sort order and excluded folders in DataStore. |
+| `data/library/FolderPaths.kt` | Normalize MediaStore folder paths for exclusion. |
+| `data/library/AudioFolder.kt` | Folder path + song count for the exclude-folders UI. |
+| `ui/library/ExcludeFoldersViewModel.kt` | Loads folders and toggles exclusions. |
+| `ui/settings/ExcludeFoldersScreen.kt` | Profile → Library → Exclude folders. |
 | `data/library/SongMapper.kt` | Text cleanup and bitrate estimate. |
 | `data/library/SongDeleter.kt` | Deletes files through MediaStore. |
 | `data/model/Song.kt`, `Album.kt`, `Artist.kt` | Models. |
@@ -43,6 +47,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 - Collection: `getContentUri(VOLUME_EXTERNAL)` on Android 10+, else `EXTERNAL_CONTENT_URI`. `BITRATE` only on Android 11+.
 - Filter: `IS_MUSIC != 0 OR NULL`, and duration at least 30 s (`MIN_DURATION_MS`) or NULL. Files in `Music/MP3 Studio Clips/`, `Music/MP3 Studio Recordings/` and the pre-rename `Music/MPlay Clips/` and `Music/MPlay Recordings/` skip the length check (`SavedFolders.likePatterns`, tested in `data/library/SavedFoldersTest.kt`).
+- Excluded folders: relative paths from DataStore `excluded_folders` become `AND NOT (path LIKE ? OR …)` via `SavedFolders.likePatterns` (scoped `RELATIVE_PATH` on Android 10+, else absolute `DATA`). Applied in `querySongs` so library UI and playback restore stay consistent. Profile → Library → Exclude folders lists distinct folders from `queryAudioFolders()` (same music rules, without exclusions) with per-folder switches.
 - Sorted by title (case-insensitive). Track number is `TRACK % 1000`.
 - Album art: `content://media/external/audio/albumart/<albumId>` (`AlbumArtLoader.ALBUM_ART_URI`). See [Album art](#album-art).
 - Missing title falls back to the file name; missing artist/album become "Unknown Artist"/"Unknown Album". Bitrate is estimated from size and duration when MediaStore has none.
@@ -59,7 +64,7 @@ MediaProvider refuses album-art thumbnails for files in `Download/` (`FileNotFou
 
 ### Refresh
 
-`SongRepository.songs()` merges a `ContentObserver` (300 ms debounce), manual `refresh()` calls, and automatic scans (folder watcher debounced 2 s, plus every 60 s). Scans cover Music, Download, Podcasts, Audiobooks (10+), Recordings (12+), time out after 15 s, and never overlap (`Mutex`).
+`SongRepository.songs()` merges a `ContentObserver` (300 ms debounce), manual `refresh()` calls, and automatic scans (folder watcher debounced 2 s, plus every 60 s), then combines with `LibraryPreferences.excludedFolders` so toggles reload the list without a media rescan. Scans cover Music, Download, Podcasts, Audiobooks (10+), Recordings (12+), time out after 15 s, and never overlap (`Mutex`).
 
 ### ViewModel
 
@@ -81,7 +86,7 @@ Long-press starts selection; taps toggle. Bulk actions: add to playlist, play ne
 
 ## Data and persistence
 
-- DataStore `library_prefs`: `sort_order` (default `Title`).
+- DataStore `library_prefs`: `sort_order` (default `Title`); `excluded_folders` (string set of relative paths with trailing slash, default empty).
 - DataStore `app_settings`: `hide_duplicates` (default `true`).
 - No Room tables.
 
@@ -92,6 +97,7 @@ Long-press starts selection; taps toggle. Bulk actions: add to playlist, play ne
 ## Tests
 
 - `data/library/LibraryQueriesTest.kt`: filtering, every sort order, grouping, Various Artists, Unknown Artist last.
+- `data/library/FolderPathsTest.kt`: path normalize, absolute→relative, exclusion LIKE patterns.
 - `data/library/SongMapperTest.kt`: bitrate and fallbacks.
 - `data/library/AlbumArtLoaderTest.kt`: `albumIdOf` parsing of album-art URIs.
 - `androidTest` `data/library/CoverArtEmbedderTest.kt`: embeds logo JPEG into a silent M4A; jaudiotagger and `MediaMetadataRetriever` both see cover art.
@@ -118,3 +124,4 @@ Long-press starts selection; taps toggle. Bulk actions: add to playlist, play ne
 | 2026-10-07 | - | `data/library/SavedFolders.kt` builds the minimum-length exemption for the new MP3 Studio folders and the legacy MPlay ones. |
 | 2026-10-10 | - | `AlbumArtLoader` and `AlbumArtFetcher`: embedded-picture fallback for songs in `Download/`. |
 | 2026-10-13 | - | Missing album art shows `ic_mp3studio_logo` in `ArtworkImage`; `AppLogoArtwork` / `CoverArtEmbedder` for clip and sing-along cover embedding. |
+| 2026-10-14 | - | Exclude folders: `excluded_folders` in `library_prefs`, SQL filter in `MediaStoreSongSource`, Profile → Library → Exclude folders UI. |

@@ -11,10 +11,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
@@ -24,26 +25,36 @@ class SongRepository(
     private val source: MediaStoreSongSource,
     private val scanner: AudioFolderScanner,
     private val watcher: AudioFolderWatcher,
+    private val libraryPreferences: LibraryPreferences,
 ) {
 
     private val refreshRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     /**
      * Emits the song list immediately, on [refresh] or [rescan], whenever MediaStore audio changes,
-     * and after automatic scans while collected (folder changes and a periodic fallback).
+     * after automatic scans while collected (folder changes and a periodic fallback), and when
+     * excluded folders change.
      */
     @OptIn(FlowPreview::class)
-    fun songs(): Flow<List<Song>> = merge(
-        mediaStoreChanges().debounce(CHANGE_DEBOUNCE_MS),
-        refreshRequests,
-        automaticScans(),
-    )
-        .onStart { emit(Unit) }
-        .conflate()
-        .map { source.querySongs() }
+    fun songs(): Flow<List<Song>> {
+        val triggers = merge(
+            mediaStoreChanges().debounce(CHANGE_DEBOUNCE_MS),
+            refreshRequests,
+            automaticScans(),
+        )
+            .onStart { emit(Unit) }
+            .conflate()
+        return combine(triggers, libraryPreferences.excludedFolders) { _, excluded ->
+            source.querySongs(excluded)
+        }
+    }
 
     /** One-off snapshot of the library. */
-    suspend fun loadSongs(): List<Song> = source.querySongs()
+    suspend fun loadSongs(): List<Song> =
+        source.querySongs(libraryPreferences.excludedFolders.first())
+
+    /** Folders with library-eligible audio (includes currently excluded folders). */
+    suspend fun loadAudioFolders(): List<AudioFolder> = source.queryAudioFolders()
 
     fun refresh() {
         refreshRequests.tryEmit(Unit)

@@ -18,7 +18,9 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         }
 
-    suspend fun querySongs(): List<Song> = withContext(Dispatchers.IO) {
+    suspend fun querySongs(
+        excludedRelativePaths: Collection<String> = emptyList(),
+    ): List<Song> = withContext(Dispatchers.IO) {
         val hasBitrate = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
         val projection = listOfNotNull(
             MediaStore.Audio.Media._ID,
@@ -35,18 +37,7 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
             MediaStore.Audio.Media.MIME_TYPE,
             if (hasBitrate) MediaStore.Audio.Media.BITRATE else null,
         ).toTypedArray()
-        // Saved clips and sing-alongs can be shorter than the minimum, so their folders skip the length check.
-        val scoped = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-        @Suppress("DEPRECATION")
-        val pathColumn = if (scoped) MediaStore.Audio.Media.RELATIVE_PATH else MediaStore.Audio.Media.DATA
-        val folderPatterns = SavedFolders.likePatterns(scoped = scoped)
-        val folderClauses = folderPatterns.joinToString(" OR ") { "$pathColumn LIKE ?" }
-        // NULL means the scanner has not extracted metadata yet; show those rows rather than hide them.
-        val selection =
-            "(${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.IS_MUSIC} IS NULL)" +
-                " AND (${MediaStore.Audio.Media.DURATION} >= ? OR ${MediaStore.Audio.Media.DURATION} IS NULL" +
-                " OR $folderClauses)"
-        val selectionArgs = arrayOf(MIN_DURATION_MS.toString()) + folderPatterns
+        val (selection, selectionArgs) = musicSelection(excludedRelativePaths)
         val sortOrder = "${MediaStore.Audio.Media.TITLE} COLLATE NOCASE ASC"
 
         val songs = mutableListOf<Song>()
@@ -98,6 +89,65 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
                 }
             }
         songs
+    }
+
+    /**
+     * Distinct folders with library-eligible audio. Does not apply folder exclusions so the
+     * settings screen can still list (and un-exclude) hidden folders.
+     */
+    suspend fun queryAudioFolders(): List<AudioFolder> = withContext(Dispatchers.IO) {
+        val scoped = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        @Suppress("DEPRECATION")
+        val pathColumn = if (scoped) MediaStore.Audio.Media.RELATIVE_PATH else MediaStore.Audio.Media.DATA
+        val (selection, selectionArgs) = musicSelection(excludedRelativePaths = emptyList())
+        val counts = linkedMapOf<String, Int>()
+        contentResolver.query(collectionUri, arrayOf(pathColumn), selection, selectionArgs, null)
+            ?.use { cursor ->
+                val col = cursor.getColumnIndexOrThrow(pathColumn)
+                while (cursor.moveToNext()) {
+                    val raw = cursor.getString(col) ?: continue
+                    val folder = if (scoped) {
+                        FolderPaths.normalize(raw)
+                    } else {
+                        FolderPaths.fromAbsoluteDataPath(raw) ?: continue
+                    }
+                    if (folder.isEmpty()) continue
+                    counts[folder] = (counts[folder] ?: 0) + 1
+                }
+            }
+        counts.entries
+            .sortedBy { it.key.lowercase() }
+            .map { AudioFolder(relativePath = it.key, songCount = it.value) }
+    }
+
+    private fun musicSelection(
+        excludedRelativePaths: Collection<String>,
+    ): Pair<String, Array<String>> {
+        val scoped = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        @Suppress("DEPRECATION")
+        val pathColumn = if (scoped) MediaStore.Audio.Media.RELATIVE_PATH else MediaStore.Audio.Media.DATA
+        // Saved clips and sing-alongs can be shorter than the minimum, so their folders skip the length check.
+        val folderPatterns = SavedFolders.likePatterns(scoped = scoped)
+        val folderClauses = folderPatterns.joinToString(" OR ") { "$pathColumn LIKE ?" }
+        // NULL means the scanner has not extracted metadata yet; show those rows rather than hide them.
+        var selection =
+            "(${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.IS_MUSIC} IS NULL)" +
+                " AND (${MediaStore.Audio.Media.DURATION} >= ? OR ${MediaStore.Audio.Media.DURATION} IS NULL" +
+                " OR $folderClauses)"
+        val args = mutableListOf(MIN_DURATION_MS.toString())
+        args += folderPatterns
+
+        val excluded = excludedRelativePaths
+            .map { FolderPaths.normalize(it) }
+            .filter { it.isNotEmpty() }
+            .distinct()
+        val excludedPatterns = SavedFolders.likePatterns(paths = excluded, scoped = scoped)
+        if (excludedPatterns.isNotEmpty()) {
+            val notLike = excludedPatterns.joinToString(" OR ") { "$pathColumn LIKE ?" }
+            selection += " AND NOT ($notLike)"
+            args += excludedPatterns
+        }
+        return selection to args.toTypedArray()
     }
 
     private companion object {

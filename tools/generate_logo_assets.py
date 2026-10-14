@@ -15,7 +15,7 @@ import numpy as np
 from PIL import Image
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
-DEFAULT_LOGO = os.path.join(ROOT, "logos", "mp3-studio-logo-v2.png")
+DEFAULT_LOGO = os.path.join(ROOT, "logos", "mp3-studio-logo-v3.png")
 OUT_DIR = os.path.join(ROOT, "app", "src", "main", "res", "drawable-nodpi")
 
 MASTER_SIZE = 1000

@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-10-13
+> Last updated: 2026-10-14
 
 ## Modules
 
@@ -68,7 +68,7 @@ ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `Sepa
 ## Startup
 
 1. `MPlayApp.onCreate` builds the container. In the main process only, it calls `authRepository.start()` (reads the saved session), `separationController.start()`, `AuthEffects(...).start()` (refreshes the plan, schedules `UsageSyncWorker` and resumes the separation queue after sign-in, keeps `AdminActivityWorker` scheduled for admins, stops background features on sign-out, refreshes the widget) and `singAlongSession.cleanUpLeftovers()`. The `:separator` process skips all of these.
-2. The system splash (`Theme.MPlay.Splash`) shows `drawable-nodpi/splash_logo` on `splash_screen_background` (`#030013`); the launcher icons come from Android Studio's Image Asset wizard (foreground from v2; background `#030013`), and `tools/generate_logo_assets.py` rebuilds the splash and in-app logo from `logos/mp3-studio-logo-v2.png`. `MainActivity.onCreate` keeps the splash screen until `SettingsViewModel.theme` has loaded (avoids a theme flash) and `AuthState` is no longer `Loading`. Signed out, it renders `SignInScreen`; signed in, `MPlayAppTheme { MPlayRoot(...) }` inside the signed-in `ViewModelStoreOwner`. `onStart` runs `AuthViewModel.verifyAccount()` (disabled or revoked accounts are signed out). See [accounts](features/accounts.md).
+2. The system splash (`Theme.MPlay.Splash`) shows `drawable-nodpi/splash_logo` on `splash_screen_background` (`#030013`); the launcher icons come from Android Studio's Image Asset wizard (foreground from v2; background `#030013`), and `tools/generate_logo_assets.py` rebuilds the splash and in-app logo from `logos/mp3-studio-logo-v3.png`. `MainActivity.onCreate` keeps the splash screen until `SettingsViewModel.theme` has loaded (avoids a theme flash) and `AuthState` is no longer `Loading`. Signed out, it renders `SignInScreen`; signed in, `MPlayAppTheme { MPlayRoot(...) }` inside the signed-in `ViewModelStoreOwner`. `onStart` runs `AuthViewModel.verifyAccount()` (disabled or revoked accounts are signed out). See [accounts](features/accounts.md).
 3. `handleIntent` (also from `onNewIntent`; the activity is `singleTop`) turns these into one-shot UI flags:
    - `EXTRA_OPEN_NOW_PLAYING` from the media notification and widget
    - `SeparationLinks.ACTION_OPEN_QUEUE` from the separation notification
@@ -82,7 +82,7 @@ ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `Sepa
 No Navigation-Compose. [`ui/main/MainScreen.kt`](../app/src/main/java/com/autoomstudio/mp3studio/ui/main/MainScreen.kt) holds state in `rememberSaveable` and swaps screens with `AnimatedContent` + `fadeThrough()`.
 
 - Bottom bar (`Destination`): `Library`, `Playlists`, `Metronome`, `Profile` (its icon is the account photo, from `AccountViewModel`).
-- Profile sub-pages (`ProfilePage`): `Main` (the Profile screen; `MPlayTopBar` is hidden here), `EditProfile`, `Appearance`, `Library`, `Duplicates`, `Separation` (settings), `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `PaymentHistory` (from Plans), `Admin` (shown to admins; it keeps its own page stack in `AdminViewModel`). See [settings](features/settings-and-about.md). `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`. The Now Playing Equalizer chip also collapses the player and opens `Equalizer`.
+- Profile sub-pages (`ProfilePage`): `Main` (the Profile screen; `MPlayTopBar` is hidden here), `EditProfile`, `Appearance`, `Library`, `Duplicates`, `ExcludeFolders`, `Separation` (settings), `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `PaymentHistory` (from Plans), `Admin` (shown to admins; it keeps its own page stack in `AdminViewModel`). See [settings](features/settings-and-about.md). `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`. The Now Playing Equalizer chip also collapses the player and opens `Equalizer`.
 - The trial banner (last 3 days of the trial) sits above the screen content inside the scaffold.
 - Library back stack: route strings `album:<id>` / `artist:<name>`.
 - `ExpandablePlayer` is a draggable sheet from the mini player to Now Playing.
@@ -192,3 +192,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-12 | - | Equalizer: `equalizerRepository` in `AppContainer`, `EffectRenderersFactory` (Lofi then EQ), `ProfilePage.Equalizer`, session extra `equalizer_active`. |
 | 2026-10-13 | - | `coverArtEmbedder` in `AppContainer`; app-logo album-art fallback and embed-on-save for clips/sing-along. |
 | 2026-10-13 | - | Release R8 `packageScope` limited to `androidx.**` (with `android.r8.gradual.support=true`) so Kotlin stdlib is not repackaged in a way that crashes WorkManager at launch. |
+| 2026-10-14 | - | `ProfilePage.ExcludeFolders`; splash/in-app logos from `logos/mp3-studio-logo-v3.png`; `SongRepository` reads `libraryPreferences.excludedFolders`. |
