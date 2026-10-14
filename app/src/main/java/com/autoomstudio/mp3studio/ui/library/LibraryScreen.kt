@@ -5,6 +5,8 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
@@ -16,6 +18,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -32,6 +36,7 @@ import com.autoomstudio.mp3studio.ui.components.LoadingIndicator
 import com.autoomstudio.mp3studio.ui.theme.fadeThrough
 import com.autoomstudio.mp3studio.ui.theme.sharedAxisX
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
 
 private enum class LibraryTab(@StringRes val label: Int) {
     Songs(R.string.tab_songs),
@@ -237,6 +242,16 @@ private fun LibraryTabs(
     onArtistClick: (Artist) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val pagerState = rememberPagerState(initialPage = selectedIndex) { LibraryTab.entries.size }
+    val scope = rememberCoroutineScope()
+    val currentSelected by rememberUpdatedState(selectedIndex)
+    val currentOnSelect by rememberUpdatedState(onSelect)
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }.collect { page ->
+            if (page != currentSelected) currentOnSelect(page)
+        }
+    }
+
     Column(modifier = modifier) {
         PrimaryTabRow(
             selectedTabIndex = selectedIndex,
@@ -247,7 +262,10 @@ private fun LibraryTabs(
             LibraryTab.entries.forEachIndexed { index, tab ->
                 Tab(
                     selected = index == selectedIndex,
-                    onClick = { onSelect(index) },
+                    onClick = {
+                        onSelect(index)
+                        scope.launch { pagerState.animateScrollToPage(index) }
+                    },
                     text = {
                         Text(
                             text = stringResource(tab.label),
@@ -261,10 +279,9 @@ private fun LibraryTabs(
         }
 
         val contentModifier = Modifier.fillMaxSize()
-        AnimatedContent(
-            targetState = selectedIndex,
-            transitionSpec = { sharedAxisX(forward = targetState > initialState) },
-            label = "libraryTab",
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
         ) { index ->
             when (LibraryTab.entries[index]) {
                 LibraryTab.Songs -> SongsTab(

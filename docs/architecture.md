@@ -82,9 +82,9 @@ ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `Sepa
 No Navigation-Compose. [`ui/main/MainScreen.kt`](../app/src/main/java/com/autoomstudio/mp3studio/ui/main/MainScreen.kt) holds state in `rememberSaveable` and swaps screens with `AnimatedContent` + `fadeThrough()`.
 
 - Bottom bar (`Destination`): `Library`, `Playlists`, `Metronome`, `Profile` (its icon is the account photo, from `AccountViewModel`).
-- Profile sub-pages (`ProfilePage`): `Main` (the Profile screen; `MPlayTopBar` is hidden here), `EditProfile`, `Appearance`, `Library`, `Duplicates`, `ExcludeFolders`, `Separation` (settings), `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `PaymentHistory` (from Plans), `Admin` (shown to admins; it keeps its own page stack in `AdminViewModel`). See [settings](features/settings-and-about.md). `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`. The Now Playing Equalizer chip also collapses the player and opens `Equalizer`.
+- Profile sub-pages (`ProfilePage`): `Main` (the Profile screen; `MPlayTopBar` is hidden here), `EditProfile`, `Appearance`, `Library`, `Duplicates`, `ExcludeFolders`, `Separation` (settings), `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `PaymentHistory` (from Plans), `Admin` (shown to admins; it keeps its own page stack in `AdminViewModel`). See [settings](features/settings-and-about.md). Selecting Profile in the bottom bar resets to `Main`; deep links still open a specific page after `openProfile()`. `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`. The Now Playing Equalizer chip also collapses the player and opens `Equalizer`.
 - The trial banner (last 3 days of the trial) sits above the screen content inside the scaffold.
-- Library back stack: route strings `album:<id>` / `artist:<name>`.
+- Library: Songs/Albums/Artists via `HorizontalPager`; back stack route strings `album:<id>` / `artist:<name>`.
 - `ExpandablePlayer` is a draggable sheet from the mini player to Now Playing.
 - Overlays: `AddToPlaylistSheet`, `PlaylistNameDialog`, `DeleteSongsHost`, `SongInfoHost`, `SeparationNoticeDialog`, `ModelMissingDialog`, `SeparationProgressPill`, `SingAlongOverlay`, `UpgradeSheet` (from Now Playing and the metronome sheet), snackbars.
 - `TrimEditorActivity` is a separate activity.
@@ -193,3 +193,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-13 | - | `coverArtEmbedder` in `AppContainer`; app-logo album-art fallback and embed-on-save for clips/sing-along. |
 | 2026-10-13 | - | Release R8 `packageScope` limited to `androidx.**` (with `android.r8.gradual.support=true`) so Kotlin stdlib is not repackaged in a way that crashes WorkManager at launch. |
 | 2026-10-14 | - | `ProfilePage.ExcludeFolders`; splash/in-app logos from `logos/mp3-studio-logo-v3.png`; `SongRepository` reads `libraryPreferences.excludedFolders`. |
+| 2026-10-14 | - | Bottom-bar Profile tap resets `profilePage` to `Main`; Library Songs/Albums/Artists use `HorizontalPager`. |

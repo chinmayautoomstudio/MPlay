@@ -488,6 +488,9 @@ fun MainScreen(
                                 selection.clear()
                                 previousDestination = destination
                             }
+                            if (it == Destination.Profile) {
+                                profilePage = ProfilePage.Main
+                            }
                             destination = it
                         },
                         modifier = Modifier.graphicsLayer {

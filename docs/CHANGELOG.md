@@ -8,9 +8,13 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ### Added
 - Profile → Library → Exclude folders: hide songs under chosen MediaStore folders from the library (files stay on the device). Paths stored in DataStore `library_prefs` key `excluded_folders`; applied in `MediaStoreSongSource.querySongs`. ([library](features/library.md))
+- Swipe between Library Songs, Albums and Artists tabs (`HorizontalPager` in `LibraryScreen`). ([library](features/library.md))
 
 ### Changed
 - Splash and in-app logos regenerated from `logos/mp3-studio-logo-v3.png` (`tools/generate_logo_assets.py` → `splash_logo`, `ic_mp3studio_logo`). ([settings](features/settings-and-about.md), [accounts](features/accounts.md), [architecture](architecture.md))
+
+### Fixed
+- Tapping Profile in the bottom bar always opens the main Profile menu, instead of restoring the last Profile sub-page (e.g. Vocal Separation). ([settings](features/settings-and-about.md), [architecture](architecture.md))
 
 ## [1.0.0] - 2026-10-13
 

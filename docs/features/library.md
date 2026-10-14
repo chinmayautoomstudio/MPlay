@@ -4,7 +4,7 @@
 
 ## Summary
 
-The library reads every music file from Android's MediaStore and shows it in Songs, Albums and Artists tabs, with search, sort, album/artist pages, multi-select and deletion. It refreshes itself when files change, and pull-to-refresh asks Android to re-index the music folders.
+The library reads every music file from Android's MediaStore and shows it in Songs, Albums and Artists tabs (swipe or tap to switch), with search, sort, album/artist pages, multi-select and deletion. It refreshes itself when files change, and pull-to-refresh asks Android to re-index the music folders.
 
 ## Key files
 
@@ -31,7 +31,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `data/library/SongDeleter.kt` | Deletes files through MediaStore. |
 | `data/model/Song.kt`, `Album.kt`, `Artist.kt` | Models. |
 | `ui/library/LibraryViewModel.kt` | `LibraryUiState` (`Loading`, `NoPermission`, `Empty`, `Content`) pipeline. |
-| `ui/library/LibraryScreen.kt` | Tabs and album/artist back stack. |
+| `ui/library/LibraryScreen.kt` | Songs/Albums/Artists tabs (`HorizontalPager` + `PrimaryTabRow`) and album/artist back stack. |
 | `ui/library/SongsTab.kt`, `AlbumsTab.kt`, `ArtistsTab.kt` | Tab contents. |
 | `ui/library/AlbumDetailScreen.kt`, `ArtistDetailScreen.kt` | Detail pages with Play all / Shuffle. |
 | `ui/library/SongList.kt` | Song rows, song menu, `LocalSeparatedSongIds`. |
@@ -69,6 +69,10 @@ MediaProvider refuses album-art thumbnails for files in `Download/` (`FileNotFou
 ### ViewModel
 
 Combines songs (also feeding `stemRepository.onLibraryChanged` and the duplicate index), the search query (250 ms debounce), sort order and `hide_duplicates` on `Dispatchers.Default`. Hidden duplicates are removed, then filtering and sorting run. `allSongs` stays unfiltered so detail pages stay complete during a search. `onAppForeground()` rescans if the last scan is older than 2 s.
+
+### Tabs
+
+`LibraryScreen` shows Songs, Albums and Artists in a `HorizontalPager` under a `PrimaryTabRow`. Swipe left/right or tap a tab to switch; the selected tab index is `rememberSaveable`. Album and artist detail pages stack on top of the tabs and are not part of the pager.
 
 ### Sorting
 
@@ -125,3 +129,4 @@ Long-press starts selection; taps toggle. Bulk actions: add to playlist, play ne
 | 2026-10-10 | - | `AlbumArtLoader` and `AlbumArtFetcher`: embedded-picture fallback for songs in `Download/`. |
 | 2026-10-13 | - | Missing album art shows `ic_mp3studio_logo` in `ArtworkImage`; `AppLogoArtwork` / `CoverArtEmbedder` for clip and sing-along cover embedding. |
 | 2026-10-14 | - | Exclude folders: `excluded_folders` in `library_prefs`, SQL filter in `MediaStoreSongSource`, Profile → Library → Exclude folders UI. |
+| 2026-10-14 | - | Swipe between Songs / Albums / Artists via `HorizontalPager` in `LibraryTabs`. |
