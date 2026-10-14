@@ -15,6 +15,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ### Fixed
 - Tapping Profile in the bottom bar always opens the main Profile menu, instead of restoring the last Profile sub-page (e.g. Vocal Separation). ([settings](features/settings-and-about.md), [architecture](architecture.md))
+- Samsung/system call recordings under `Recordings/Call/` (and other `Recordings/` voice files) show in Profile → Library → Exclude folders so they can be hidden. Library query now treats `IS_RECORDING` and the `Recordings/` path as eligible alongside music. ([library](features/library.md))
 
 ## [1.0.0] - 2026-10-13
 

@@ -13,6 +13,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | File | Role |
 |---|---|
 | `data/library/MediaStoreSongSource.kt` | MediaStore audio query that builds `Song`s. |
+| `data/library/LibraryAudioSelection.kt` | Type-eligibility SQL (music, `IS_RECORDING`, `Recordings/` path). |
 | `data/library/AlbumArtLoader.kt` | Album-art bytes, with an embedded-picture fallback for songs in `Download/`. |
 | `data/library/AppLogoArtwork.kt` | Decodes `ic_mp3studio_logo` to square JPEG/bitmap for placeholders and embedding. |
 | `data/library/CoverArtEmbedder.kt` | Writes the logo as MP4 `covr` (jaudiotagger) into clip/sing-along M4As. |
@@ -46,8 +47,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 ### Query
 
 - Collection: `getContentUri(VOLUME_EXTERNAL)` on Android 10+, else `EXTERNAL_CONTENT_URI`. `BITRATE` only on Android 11+.
-- Filter: `IS_MUSIC != 0 OR NULL`, and duration at least 30 s (`MIN_DURATION_MS`) or NULL. Files in `Music/MP3 Studio Clips/`, `Music/MP3 Studio Recordings/` and the pre-rename `Music/MPlay Clips/` and `Music/MPlay Recordings/` skip the length check (`SavedFolders.likePatterns`, tested in `data/library/SavedFoldersTest.kt`).
-- Excluded folders: relative paths from DataStore `excluded_folders` become `AND NOT (path LIKE ? OR …)` via `SavedFolders.likePatterns` (scoped `RELATIVE_PATH` on Android 10+, else absolute `DATA`). Applied in `querySongs` so library UI and playback restore stay consistent. Profile → Library → Exclude folders lists distinct folders from `queryAudioFolders()` (same music rules, without exclusions) with per-folder switches.
+- Filter: music (`IS_MUSIC != 0 OR NULL`), voice recordings on Android 12+ (`IS_RECORDING != 0`), or anything under the public `Recordings/` tree (so Samsung call folders like `Recordings/Call/` count). Duration at least 30 s (`MIN_DURATION_MS`) or NULL. Files in `Music/MP3 Studio Clips/`, `Music/MP3 Studio Recordings/` and the pre-rename `Music/MPlay Clips/` and `Music/MPlay Recordings/` skip the length check (`SavedFolders.likePatterns`, tested in `data/library/SavedFoldersTest.kt`). Type clause built by `LibraryAudioSelection` (tested in `LibraryAudioSelectionTest.kt`).
+- Excluded folders: relative paths from DataStore `excluded_folders` become `AND NOT (path LIKE ? OR …)` via `SavedFolders.likePatterns` (scoped `RELATIVE_PATH` on Android 10+, else absolute `DATA`). Applied in `querySongs` so library UI and playback restore stay consistent. Profile → Library → Exclude folders lists distinct folders from `queryAudioFolders()` (same eligibility rules, without exclusions) with per-folder switches. On Android 10+, if `RELATIVE_PATH` is missing, the folder key falls back to the parent of `DATA`.
 - Sorted by title (case-insensitive). Track number is `TRACK % 1000`.
 - Album art: `content://media/external/audio/albumart/<albumId>` (`AlbumArtLoader.ALBUM_ART_URI`). See [Album art](#album-art).
 - Missing title falls back to the file name; missing artist/album become "Unknown Artist"/"Unknown Album". Bitrate is estimated from size and duration when MediaStore has none.
@@ -102,6 +103,7 @@ Long-press starts selection; taps toggle. Bulk actions: add to playlist, play ne
 
 - `data/library/LibraryQueriesTest.kt`: filtering, every sort order, grouping, Various Artists, Unknown Artist last.
 - `data/library/FolderPathsTest.kt`: path normalize, absolute→relative, exclusion LIKE patterns.
+- `data/library/LibraryAudioSelectionTest.kt`: `Recordings/` LIKE patterns; music / `IS_RECORDING` eligibility SQL.
 - `data/library/SongMapperTest.kt`: bitrate and fallbacks.
 - `data/library/AlbumArtLoaderTest.kt`: `albumIdOf` parsing of album-art URIs.
 - `androidTest` `data/library/CoverArtEmbedderTest.kt`: embeds logo JPEG into a silent M4A; jaudiotagger and `MediaMetadataRetriever` both see cover art.
@@ -130,3 +132,4 @@ Long-press starts selection; taps toggle. Bulk actions: add to playlist, play ne
 | 2026-10-13 | - | Missing album art shows `ic_mp3studio_logo` in `ArtworkImage`; `AppLogoArtwork` / `CoverArtEmbedder` for clip and sing-along cover embedding. |
 | 2026-10-14 | - | Exclude folders: `excluded_folders` in `library_prefs`, SQL filter in `MediaStoreSongSource`, Profile → Library → Exclude folders UI. |
 | 2026-10-14 | - | Swipe between Songs / Albums / Artists via `HorizontalPager` in `LibraryTabs`. |
+| 2026-10-14 | - | Library eligibility includes `IS_RECORDING` and `Recordings/` so call/voice folders (e.g. `Recordings/Call/`) appear in Exclude folders. |

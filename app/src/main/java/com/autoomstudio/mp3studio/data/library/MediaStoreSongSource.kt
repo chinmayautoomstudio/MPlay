@@ -98,18 +98,31 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
     suspend fun queryAudioFolders(): List<AudioFolder> = withContext(Dispatchers.IO) {
         val scoped = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
         @Suppress("DEPRECATION")
-        val pathColumn = if (scoped) MediaStore.Audio.Media.RELATIVE_PATH else MediaStore.Audio.Media.DATA
+        val dataColumn = MediaStore.Audio.Media.DATA
+        val relativePathColumn = MediaStore.Audio.Media.RELATIVE_PATH
         val (selection, selectionArgs) = musicSelection(excludedRelativePaths = emptyList())
+        val projection = if (scoped) {
+            arrayOf(relativePathColumn, dataColumn)
+        } else {
+            arrayOf(dataColumn)
+        }
         val counts = linkedMapOf<String, Int>()
-        contentResolver.query(collectionUri, arrayOf(pathColumn), selection, selectionArgs, null)
+        contentResolver.query(collectionUri, projection, selection, selectionArgs, null)
             ?.use { cursor ->
-                val col = cursor.getColumnIndexOrThrow(pathColumn)
+                val relativeCol = if (scoped) cursor.getColumnIndexOrThrow(relativePathColumn) else -1
+                val dataCol = cursor.getColumnIndexOrThrow(dataColumn)
                 while (cursor.moveToNext()) {
-                    val raw = cursor.getString(col) ?: continue
                     val folder = if (scoped) {
-                        FolderPaths.normalize(raw)
+                        val relative = cursor.getString(relativeCol)
+                        if (!relative.isNullOrBlank()) {
+                            FolderPaths.normalize(relative)
+                        } else {
+                            FolderPaths.fromAbsoluteDataPath(cursor.getString(dataCol) ?: continue)
+                                ?: continue
+                        }
                     } else {
-                        FolderPaths.fromAbsoluteDataPath(raw) ?: continue
+                        FolderPaths.fromAbsoluteDataPath(cursor.getString(dataCol) ?: continue)
+                            ?: continue
                     }
                     if (folder.isEmpty()) continue
                     counts[folder] = (counts[folder] ?: 0) + 1
@@ -126,15 +139,24 @@ class MediaStoreSongSource(private val contentResolver: ContentResolver) {
         val scoped = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
         @Suppress("DEPRECATION")
         val pathColumn = if (scoped) MediaStore.Audio.Media.RELATIVE_PATH else MediaStore.Audio.Media.DATA
+        val includeIsRecording = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        val (typeClause, typeArgs) = LibraryAudioSelection.typeEligibilitySql(
+            pathColumn = pathColumn,
+            scoped = scoped,
+            includeIsRecording = includeIsRecording,
+            isMusicColumn = MediaStore.Audio.Media.IS_MUSIC,
+            isRecordingColumn = MediaStore.Audio.Media.IS_RECORDING,
+        )
         // Saved clips and sing-alongs can be shorter than the minimum, so their folders skip the length check.
         val folderPatterns = SavedFolders.likePatterns(scoped = scoped)
         val folderClauses = folderPatterns.joinToString(" OR ") { "$pathColumn LIKE ?" }
-        // NULL means the scanner has not extracted metadata yet; show those rows rather than hide them.
+        // NULL duration means the scanner has not extracted metadata yet; show those rows.
         var selection =
-            "(${MediaStore.Audio.Media.IS_MUSIC} != 0 OR ${MediaStore.Audio.Media.IS_MUSIC} IS NULL)" +
-                " AND (${MediaStore.Audio.Media.DURATION} >= ? OR ${MediaStore.Audio.Media.DURATION} IS NULL" +
+            "$typeClause AND (${MediaStore.Audio.Media.DURATION} >= ? OR ${MediaStore.Audio.Media.DURATION} IS NULL" +
                 " OR $folderClauses)"
-        val args = mutableListOf(MIN_DURATION_MS.toString())
+        val args = mutableListOf<String>()
+        args += typeArgs
+        args += MIN_DURATION_MS.toString()
         args += folderPatterns
 
         val excluded = excludedRelativePaths
