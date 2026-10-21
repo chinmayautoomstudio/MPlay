@@ -1,4 +1,5 @@
 import { assertEquals, assertNotEquals } from "jsr:@std/assert@1";
+import { pickSecret } from "./secrets.ts";
 import { normalizeEmail, pepperedHash, validDeviceId } from "./trial.ts";
 
 Deno.test("Gmail dots, plus aliases and case collapse to one address", () => {
@@ -25,6 +26,14 @@ Deno.test("Only a 64-character lowercase hex device ID is accepted", () => {
   assertEquals(validDeviceId("abc"), null);
   assertEquals(validDeviceId(42), null);
   assertEquals(validDeviceId(undefined), null);
+});
+
+Deno.test("Env secrets win; Vault is used when the env var is empty", () => {
+  assertEquals(pickSecret("from-env", "from-vault"), "from-env");
+  assertEquals(pickSecret("", "from-vault"), "from-vault");
+  assertEquals(pickSecret("  ", "from-vault"), "from-vault");
+  assertEquals(pickSecret(undefined, "from-vault"), "from-vault");
+  assertEquals(pickSecret(undefined, ""), undefined);
 });
 
 Deno.test("Hashes depend on the pepper and are stable", async () => {

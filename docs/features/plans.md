@@ -108,14 +108,14 @@ None. Uses the existing `INTERNET` permission.
 - The plan shown on screens is recomputed when the cache changes, not as time passes; the next foreground refresh catches up.
 - Payments are built ([payments](payments.md)) but stay unavailable until the PayU secrets are set on the server.
 - A user granted Pro by an Admin sees it after their next refresh (app start, foreground or the Plans screen).
-- If `TRIAL_HASH_PEPPER` is missing on the functions container, `claim_trial` returns `unavailable` and the user stays Free. Accounts created in that window get the trial on their next entitlements refresh after the pepper is restored. See [backend](../backend.md#edge-functions).
+- If both `TRIAL_HASH_PEPPER` and Vault `trial_hash_pepper` are missing, `claim_trial` returns `unavailable` and the user stays Free. Coolify rewriting `.env` is not enough to break claims once the Vault secret is set. See [backend](../backend.md#edge-functions).
 
 ## Change history
 
 | Date | Commit | Change |
 |---|---|---|
 | 2026-10-21 | - | India / International price toggle on Plans; prices come from `entitlements` (`detectedRegion`, `pricesIn`, `pricesIntl`). See [payments](payments.md). |
-| 2026-10-21 | - | Live `TRIAL_HASH_PEPPER` restored after a Coolify save dropped it on 2026-10-13; six accounts stuck on Free were granted a 30-day trial through `claim_trial()`. |
+| 2026-10-21 | - | Live `TRIAL_HASH_PEPPER` dropped twice more by Coolify saves (13 Oct and 21 Oct 10:54 UTC). Restored each time; `ashisghosh.ori@gmail.com` and `noahsummers.62475@gmail.com` granted a 30-day trial. Vault fallback so a later Coolify save does not block new trials. |
 | 2026-10-10 | - | Plans screen redesign: "Your subscription" section at the top, Monthly/Yearly toggle, Free and Pro cards whose Pro button follows the toggle (Current Plan or Switch for subscribers), icon-based Compare Plans table. |
 | 2026-10-10 | - | Yearly Pro at ₹999 next to monthly; the plan label shows the interval. |
 | 2026-10-08 | - | Plans and gating (M2): entitlements functions, trial with abuse checks, cache with 7-day grace, BPM and Sing Along gates, upgrade sheet, Plans screen, Account plan row, trial banner. |

@@ -8,6 +8,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ### Database
 - Applied live: yearly Pro (`20261017000000_yearly_plan`) and international USD (`20261021000000_intl_usd`). Existing `begin_checkout(user, phone, mode)` still maps to monthly INR. ([backend](backend.md#migrations))
+- Supabase migration `20261021180000_app_secrets`: `app_secret(name)` (service_role only) reads Vault `trial_hash_pepper` and `billing_jobs_secret`. ([backend](backend.md#migrations))
 
 ### Added
 - International Pro at $1.99 a month or $19.99 a year, next to India at ₹99 / ₹999. The Plans screen detects the country from the request IP and shows an India / International toggle; checkout sends `region` and the server sets the PayU amount. USD is a one-off Payment Link (no autopay). DataStore `billing_region_override`. ([payments](features/payments.md), [plans](features/plans.md))
@@ -24,7 +25,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 - Website Google login no longer lands on `securedbmp3.autoomstudio.com`. Coolify Auth now uses `GOTRUE_SITE_URL=https://mp3studio.in` and an allow-list for localhost, `mp3studio.in` and `mp3studio://auth-callback`. ([backend](backend.md#auth-settings), [accounts](features/accounts.md))
 - Tapping Profile in the bottom bar always opens the main Profile menu, instead of restoring the last Profile sub-page (e.g. Vocal Separation). ([settings](features/settings-and-about.md), [architecture](architecture.md))
 - Samsung/system call recordings under `Recordings/Call/` (and other `Recordings/` voice files) show in Profile → Library → Exclude folders so they can be hidden. Library query now treats `IS_RECORDING` and the `Recordings/` path as eligible alongside music. ([library](features/library.md))
-- Trial claims work again on the live server. A Coolify UI save on 2026-10-13 dropped `TRIAL_HASH_PEPPER` (and `BILLING_JOBS_SECRET`) from `.env`, so every new sign-in after that stayed on Free with `unavailable`. A new pepper was generated, `BILLING_JOBS_SECRET` was copied back from Vault, and the functions container was recreated. Those two keys must also be set in the Coolify UI, or the next save will drop them again. Six accounts created while the pepper was missing were granted a 30-day trial through `claim_trial()` (ends 2026-11-20). ([plans](features/plans.md), [backend](backend.md#edge-functions))
+- Trial claims work again on the live server. Coolify UI saves keep dropping `TRIAL_HASH_PEPPER` and `BILLING_JOBS_SECRET` from `.env` (2026-10-13, and again 2026-10-21 10:54 UTC after a GoTrue save). Each time new sign-ins stay on Free with `unavailable`. The keys were restored again and `ashisghosh.ori@gmail.com` and `noahsummers.62475@gmail.com` were granted a 30-day trial through `claim_trial()` (ends 2026-11-20). Claims and billing jobs now fall back to Vault (`app_secret()` / `trial_hash_pepper`) when those env vars are missing, so a later Coolify save no longer blocks new trials. ([plans](features/plans.md), [backend](backend.md#edge-functions))
 
 ### Docs
 - Web Admin Dashboard PRD: website at `mp3studio.in/admin` replaces the in-app Admin and adds billing recovery, support inbox (site forms + Gmail), receipts / GST, and site CMS. ([PRD](../MP3-Studio-PRD-Web-Admin-Dashboard.md), [admin](features/admin.md))

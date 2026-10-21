@@ -1,5 +1,5 @@
 // Scheduled billing work (payments PRD 6.11), called by pg_cron through pg_net with the `x-billing-job-secret`
-// header (the secret lives in Supabase Vault and in BILLING_JOBS_SECRET). POST { action }:
+// header (Vault `billing_jobs_secret`, or `BILLING_JOBS_SECRET` when Coolify still has it). POST { action }:
 //   webhooks  every 5 minutes: webhooks not processed yet, retried with backoff and flagged after 5 tries (SV7)
 //   sweep     every 15 minutes: expired links and pending payments checked with PayU (CK9), pending refunds (RF4)
 //   renewals  hourly: unconfirmed mandate cancellations (CN4), pre-debit notices (RN2), due debits (RN1, RN4)
@@ -10,6 +10,7 @@ import { confirmRevoked, payuFromEnv, processWebhook, resolveAll, resolveRefund,
 import { jobAuthorized, type JobAction, parseJobAction } from "../_shared/jobs.ts";
 import { LogNotifier, type Notice } from "../_shared/notifier.ts";
 import type { PayuClient } from "../_shared/payu.ts";
+import { pickSecret, vaultSecret } from "../_shared/secrets.ts";
 import { adminClient, json, readJson } from "../_shared/server.ts";
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
@@ -121,13 +122,17 @@ async function run(action: JobAction, admin: SupabaseClient): Promise<Counts> {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
-  if (!jobAuthorized(req.headers.get("x-billing-job-secret"), Deno.env.get("BILLING_JOBS_SECRET"))) {
+  const admin = adminClient();
+  const jobSecret = pickSecret(
+    Deno.env.get("BILLING_JOBS_SECRET"),
+    await vaultSecret(admin, "billing_jobs_secret"),
+  );
+  if (!jobAuthorized(req.headers.get("x-billing-job-secret"), jobSecret)) {
     return json({ error: "unauthorized" }, 401);
   }
   const action = parseJobAction(await readJson(req));
   if (!action) return json({ error: "bad_request" }, 400);
 
-  const admin = adminClient();
   const started = new Date().toISOString();
   try {
     const counts = await run(action, admin);

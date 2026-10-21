@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient, type User } from "jsr:@supabase/supabase-js@2";
+import { pickSecret, vaultSecret } from "./secrets.ts";
 import { normalizeEmail, pepperedHash, validDeviceId } from "./trial.ts";
 import type { Outcome, ReserveJob } from "./usage.ts";
 
@@ -41,7 +42,7 @@ export async function claimTrial(
   user: User,
   deviceId: string | null,
 ): Promise<ClaimResult> {
-  const pepper = Deno.env.get("TRIAL_HASH_PEPPER");
+  const pepper = pickSecret(Deno.env.get("TRIAL_HASH_PEPPER"), await vaultSecret(admin, "trial_hash_pepper"));
   if (!pepper || !user.email) {
     console.error(pepper ? "User has no email" : "TRIAL_HASH_PEPPER is not set");
     return { result: "unavailable" };
