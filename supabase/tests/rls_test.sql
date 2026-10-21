@@ -3,7 +3,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(21);
+select plan(23);
 
 -- Two users; the trigger creates their profiles from the Google metadata.
 insert into auth.users (id, email, raw_user_meta_data)
@@ -15,6 +15,13 @@ values
 insert into public.payments (txn_id, user_id, kind, amount_paise)
 values ('RLSALICE1', '11111111-1111-1111-1111-111111111111', 'first', 9900),
        ('RLSBOB1', '22222222-2222-2222-2222-222222222222', 'first', 9900);
+
+insert into public.user_devices (user_id, device_id, device_name)
+values
+    ('11111111-1111-1111-1111-111111111111',
+     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'Alice Phone'),
+    ('22222222-2222-2222-2222-222222222222',
+     'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'Bob Phone');
 
 select is(
     (select display_name from public.profiles where id = '11111111-1111-1111-1111-111111111111'),
@@ -139,6 +146,21 @@ select throws_ok(
     '42501',
     null,
     'A user cannot set their mobile number directly'
+);
+
+select results_eq(
+    'select device_name from public.user_devices',
+    $$ values ('Alice Phone'::text) $$,
+    'A user sees only their own devices'
+);
+
+select throws_ok(
+    $$ insert into public.user_devices (user_id, device_id, device_name)
+       values ('11111111-1111-1111-1111-111111111111',
+               'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc', 'Extra') $$,
+    '42501',
+    null,
+    'A user cannot write devices'
 );
 
 -- Signed-out (anon) requests get nothing.

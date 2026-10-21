@@ -69,6 +69,16 @@ Deno.test("Billing actions", () => {
   assertEquals(parseAdminRequest({ action: "revokeSubscription", userId: "1" }), null);
 });
 
+Deno.test("removeDevice maps to admin_remove_device", () => {
+  const deviceId = "a".repeat(64);
+  assertEquals(parseAdminRequest({ action: "removeDevice", userId: id, deviceId }), {
+    fn: "admin_remove_device",
+    args: { p_user: id, p_device_id: deviceId },
+  });
+  assertEquals(parseAdminRequest({ action: "removeDevice", userId: id, deviceId: "nope" }), null);
+  assertEquals(parseAdminRequest({ action: "removeDevice", userId: "1", deviceId }), null);
+});
+
 Deno.test("Malformed requests are rejected", () => {
   assertEquals(parseAdminRequest(null), null);
   assertEquals(parseAdminRequest({ action: "dropTables" }), null);

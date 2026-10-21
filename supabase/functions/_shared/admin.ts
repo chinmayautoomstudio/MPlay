@@ -1,3 +1,5 @@
+import { validDeviceId } from "./trial.ts";
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const FILTERS = ["all", "pro", "trial", "free", "disabled", "admin"];
 const PAYMENT_FILTERS = ["all", "success", "failed", "pending", "refunded", "disputed", "past_due", "cancelled"];
@@ -125,6 +127,11 @@ export function parseAdminRequest(body: unknown): AdminCall | null {
       const id = userId(b.userId);
       const step: PayuStep = b.action === "revokeSubscription" ? "revoke_subscription" : "cancel_subscription";
       return id ? { fn: "admin_billing_action", args: { p_action: step, p_user: id, p_txn: null }, payu: step } : null;
+    }
+    case "removeDevice": {
+      const id = userId(b.userId);
+      const deviceId = validDeviceId(b.deviceId);
+      return id && deviceId ? { fn: "admin_remove_device", args: { p_user: id, p_device_id: deviceId } } : null;
     }
     case "audit": {
       const limit = count(b.limit, 50, PAGE_MAX);

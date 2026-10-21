@@ -11,6 +11,7 @@ import com.autoomstudio.mp3studio.MPlayApp
 import com.autoomstudio.mp3studio.data.account.AuthError
 import com.autoomstudio.mp3studio.data.account.AuthErrors
 import com.autoomstudio.mp3studio.data.account.AuthState
+import com.autoomstudio.mp3studio.data.account.LoggedInDevice
 import com.autoomstudio.mp3studio.data.account.Nonce
 import com.autoomstudio.mp3studio.di.AppContainer
 import kotlinx.coroutines.CancellationException
@@ -26,8 +27,13 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
 
     val state: StateFlow<AuthState> = container.authRepository.state
 
+    val pendingDeviceLimit: StateFlow<List<LoggedInDevice>?> = container.authRepository.pendingDeviceLimit
+
     private val _signingIn = MutableStateFlow(false)
     val signingIn: StateFlow<Boolean> = _signingIn.asStateFlow()
+
+    private val _replacingDevice = MutableStateFlow(false)
+    val replacingDevice: StateFlow<Boolean> = _replacingDevice.asStateFlow()
 
     private val _errors = Channel<AuthError>(Channel.BUFFERED)
     val errors: Flow<AuthError> = _errors.receiveAsFlow()
@@ -41,6 +47,7 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
                 val rawNonce = Nonce.generate()
                 val idToken = container.googleSignIn.requestIdToken(activityContext, Nonce.sha256Hex(rawNonce))
                 container.authRepository.signInWithGoogleIdToken(idToken, rawNonce)
+                if (container.authRepository.pendingDeviceLimit.value != null) return@launch
                 container.authRepository.verifyAccount()?.let { _errors.send(it) }
             } catch (e: CancellationException) {
                 throw e
@@ -51,6 +58,30 @@ class AuthViewModel(private val container: AppContainer) : ViewModel() {
             } finally {
                 _signingIn.value = false
             }
+        }
+    }
+
+    fun replaceDevice(deviceId: String) {
+        if (_replacingDevice.value) return
+        _replacingDevice.value = true
+        viewModelScope.launch {
+            try {
+                container.authRepository.completeSignInByReplacingDevice(deviceId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not replace a signed-in device", e)
+                val error = AuthErrors.classify(e)
+                if (error != AuthError.Cancelled) _errors.send(error)
+            } finally {
+                _replacingDevice.value = false
+            }
+        }
+    }
+
+    fun cancelDevicePrompt() {
+        container.applicationScope.launch {
+            container.authRepository.cancelPendingSignIn()
         }
     }
 

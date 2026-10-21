@@ -4,7 +4,7 @@
 
 ## Summary
 
-The last bottom tab is Profile, and its icon is the account photo. The Profile screen shows the photo, name, email and an Edit button ([accounts](accounts.md)), a subscription card, then cards for Appearance (System/Light/Dark, dynamic colour on Android 12+), Library (hide and review duplicates, exclude folders), Vocal Separation, Background Playback (battery optimisation) and About, and finally Log out. Each card opens its own page. About MP3 Studio shows the version, Autoom Studio links, a privacy note, the privacy policy and terms links, and open-source licenses. The UI uses the "Neon Midnight" purple palette, or wallpaper colours.
+The last bottom tab is Profile, and its icon is the account photo. The Profile screen shows the photo, name, email and an Edit button ([accounts](accounts.md)), a subscription card, a Logged-in devices card, then cards for Appearance (System/Light/Dark, dynamic colour on Android 12+), Library (hide and review duplicates, exclude folders), Vocal Separation, Background Playback (battery optimisation) and About, and finally Log out. Each card opens its own page except Logged-in devices, which lists the account's phones here. About MP3 Studio shows the version, Autoom Studio links, a privacy note, the privacy policy and terms links, and open-source licenses. The UI uses the "Neon Midnight" purple palette, or wallpaper colours.
 
 ## Key files
 
@@ -111,3 +111,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-21 | - | DataStore `billing` key `billing_region_override` for the Plans India / International toggle ([payments](payments.md)). |
 | 2026-10-14 | - | Bottom-bar Profile tap resets to `ProfilePage.Main` instead of restoring the last sub-page. |
 | 2026-10-21 | - | Removed the Admin card, `ProfilePage.Admin` and unused Admin DataStore keys (`admin_activity_seen_at`, `admin_notifications_enabled`, `admin_activity_notified_at`). Admin lives on the website ([admin](admin.md)). |
+| 2026-10-21 | - | Profile Logged-in devices card (`1 of 2` / `2 of 2`) to log another phone out ([accounts](accounts.md)). |

@@ -1,5 +1,6 @@
 package com.autoomstudio.mp3studio.ui.settings
 
+import android.text.format.DateUtils
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,20 +22,26 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.rounded.Brightness5
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -60,6 +67,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoomstudio.mp3studio.R
+import com.autoomstudio.mp3studio.data.account.LoggedInDevice
+import com.autoomstudio.mp3studio.data.account.MAX_SIGNED_IN_DEVICES
 import com.autoomstudio.mp3studio.data.plan.Plan
 import com.autoomstudio.mp3studio.data.settings.ThemeMode
 import com.autoomstudio.mp3studio.ui.plans.PlanUiState
@@ -86,7 +95,11 @@ fun ProfileScreen(
 ) {
     val account by accountViewModel.account.collectAsStateWithLifecycle()
     val plan by plansViewModel.state.collectAsStateWithLifecycle()
+    val devices by accountViewModel.devices.collectAsStateWithLifecycle()
+    val removingDeviceId by accountViewModel.removingDeviceId.collectAsStateWithLifecycle()
     var confirmingLogOut by rememberSaveable { mutableStateOf(false) }
+    var confirmingDeviceLogOut by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { accountViewModel.refreshDevices() }
 
     Column(
         modifier = modifier
@@ -128,6 +141,12 @@ fun ProfileScreen(
         }
 
         SubscriptionCard(plan = plan, onClick = onOpenPlans)
+
+        LoggedInDevicesCard(
+            devices = devices,
+            removingDeviceId = removingDeviceId,
+            onLogOut = { confirmingDeviceLogOut = it },
+        )
 
         CategoryRow(
             icon = Icons.Rounded.Brightness5,
@@ -190,6 +209,18 @@ fun ProfileScreen(
             },
             onDismiss = { confirmingLogOut = false },
         )
+    }
+    confirmingDeviceLogOut?.let { deviceId ->
+        devices.firstOrNull { it.deviceId == deviceId }?.let { device ->
+            LogOutDeviceDialog(
+                deviceName = device.deviceName,
+                onConfirm = {
+                    confirmingDeviceLogOut = null
+                    accountViewModel.signOutDevice(device.deviceId)
+                },
+                onDismiss = { confirmingDeviceLogOut = null },
+            )
+        }
     }
 }
 
@@ -381,6 +412,120 @@ private fun subscriptionDetail(plan: PlanUiState): String {
 }
 
 private const val DAY_MILLIS = 24 * 60 * 60 * 1000.0
+
+@Composable
+private fun LoggedInDevicesCard(
+    devices: List<LoggedInDevice>,
+    removingDeviceId: String?,
+    onLogOut: (String) -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
+                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f), RoundedCornerShape(10.dp)),
+                ) {
+                    Icon(
+                        Icons.Outlined.Devices,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Column(Modifier.padding(start = 12.dp).weight(1f)) {
+                    Text(
+                        stringResource(R.string.profile_devices_title),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        stringResource(R.string.profile_devices_count, devices.size, MAX_SIGNED_IN_DEVICES),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            devices.forEach { device ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                ) {
+                    Icon(
+                        Icons.Outlined.Smartphone,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 10.dp),
+                    ) {
+                        Text(
+                            device.deviceName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            if (device.isCurrent) {
+                                stringResource(R.string.profile_devices_this)
+                            } else {
+                                stringResource(
+                                    R.string.signin_device_last_active,
+                                    DateUtils.getRelativeTimeSpanString(
+                                        device.lastSeenAt,
+                                        System.currentTimeMillis(),
+                                        DateUtils.MINUTE_IN_MILLIS,
+                                    ),
+                                )
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (!device.isCurrent) {
+                        TextButton(
+                            onClick = { onLogOut(device.deviceId) },
+                            enabled = removingDeviceId == null,
+                        ) { Text(stringResource(R.string.profile_devices_log_out)) }
+                    }
+                }
+            }
+            if (removingDeviceId != null) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LogOutDeviceDialog(deviceName: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.profile_devices_log_out_title, deviceName)) },
+        text = { Text(stringResource(R.string.profile_devices_log_out_message)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.account_log_out_confirm)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(android.R.string.cancel)) }
+        },
+    )
+}
 
 @Composable
 private fun CategoryRow(

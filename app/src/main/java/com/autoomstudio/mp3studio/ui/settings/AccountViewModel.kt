@@ -9,6 +9,7 @@ import com.autoomstudio.mp3studio.MPlayApp
 import com.autoomstudio.mp3studio.data.account.AccountDeletionException
 import com.autoomstudio.mp3studio.data.account.AuthState
 import com.autoomstudio.mp3studio.data.account.DeletionError
+import com.autoomstudio.mp3studio.data.account.LoggedInDevice
 import com.autoomstudio.mp3studio.di.AppContainer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,10 +44,32 @@ class AccountViewModel(private val container: AppContainer) : ViewModel() {
     private val _savingName = MutableStateFlow(false)
     val savingName: StateFlow<Boolean> = _savingName.asStateFlow()
 
+    val devices: StateFlow<List<LoggedInDevice>> = auth.devices
+
+    private val _removingDeviceId = MutableStateFlow<String?>(null)
+    val removingDeviceId: StateFlow<String?> = _removingDeviceId.asStateFlow()
+
     init {
         val user = (auth.state.value as? AuthState.SignedIn)?.user
         if (user != null && profiles.profile.value == null) {
             viewModelScope.launch { runCatching { profiles.refresh(user.id) } }
+        }
+        refreshDevices()
+    }
+
+    fun refreshDevices() {
+        viewModelScope.launch { auth.refreshDevices() }
+    }
+
+    fun signOutDevice(deviceId: String) {
+        if (_removingDeviceId.value != null) return
+        _removingDeviceId.value = deviceId
+        viewModelScope.launch {
+            try {
+                auth.signOutDevice(deviceId)
+            } finally {
+                _removingDeviceId.value = null
+            }
         }
     }
 

@@ -21,6 +21,20 @@ interface AuthBackend {
 
     /** Whether an Admin disabled this account, read from the user's own profile row. */
     suspend fun isDisabled(userId: String): Boolean
+
+    /** Registers this phone, or lists the two that already occupy the slots. */
+    suspend fun registerDevice(replaceDeviceId: String? = null): DeviceRegistrationResult
+
+    /** Confirms this phone is still one of the account's logged-in devices. */
+    suspend fun verifyDevice(): DeviceVerificationResult
+
+    suspend fun listDevices(): List<LoggedInDevice>
+
+    /** Drops [deviceId] on the server and revokes that phone's session. */
+    suspend fun removeDevice(deviceId: String): List<LoggedInDevice>
+
+    /** The user on the current session, if one exists. */
+    suspend fun currentUser(): AccountUser?
 }
 
 sealed interface BackendStatus {

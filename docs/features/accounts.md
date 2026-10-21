@@ -4,7 +4,7 @@
 
 ## Summary
 
-MP3 Studio requires a Google account (PRD v3.2, AU1-AU11). On first launch, and after logging out, the app shows only the sign-in screen with "Continue with Google"; there is no guest mode and no email or password. While signed out, nothing plays: the widget, the media notification, Bluetooth and headset buttons do nothing. The Profile tab, whose icon is the account photo, shows the photo, name and email. Its Edit page has the name field and Delete account, and Log out is at the bottom of the Profile screen.
+MP3 Studio requires a Google account (PRD v3.2, AU1-AU11). On first launch, and after logging out, the app shows only the sign-in screen with "Continue with Google"; there is no guest mode and no email or password. An account may stay signed in on at most two phones. A third sign-in asks which of the two to log out of before this phone can continue. While signed out, nothing plays: the widget, the media notification, Bluetooth and headset buttons do nothing. The Profile tab, whose icon is the account photo, shows the photo, name and email, a Logged-in devices card, and Log out at the bottom. Its Edit page has the name field and Delete account.
 
 ## Key files
 
@@ -12,10 +12,12 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 | File | Role |
 |---|---|
-| `data/account/AuthRepository.kt` | Single source of truth: `state: StateFlow<AuthState>`, `awaitReady()`, sign-in, `signOut()`, `deleteAccount()`, `verifyAccount()`, `reduce()`. |
+| `data/account/AuthRepository.kt` | Single source of truth: `state: StateFlow<AuthState>`, `devices`, `pendingDeviceLimit`, `awaitReady()`, sign-in, `signOut()`, `deleteAccount()`, `verifyAccount()`, `reduce()`. |
+| `data/account/DeviceSession.kt` | `LoggedInDevice`, `DeviceRegistrationResult`, `DeviceVerificationResult`, `MAX_SIGNED_IN_DEVICES` (2). |
 | `data/account/AccountDeletion.kt` | `AccountDeletionBackend` and `SupabaseAccountDeletionBackend` (calls the `delete-account` Edge Function), `DeletionError`, `deletionErrorOf()`. |
 | `data/account/AuthState.kt` | `AuthState` (`Loading`, `SignedOut`, `SignedIn`) and `AccountUser`. |
-| `data/account/AuthBackend.kt`, `SupabaseAuthBackend.kt` | What the repository needs from the server, and the supabase-kt implementation (`SessionStatus` mapping, `IDToken` sign-in, `profiles.disabled` check). |
+| `data/account/AuthBackend.kt`, `SupabaseAuthBackend.kt` | What the repository needs from the server, and the supabase-kt implementation (`SessionStatus` mapping, `IDToken` sign-in, `profiles.disabled` check, `devices` Edge Function). |
+| `data/plan/DeviceId.kt` | SHA-256 of `ANDROID_ID` and `formatName()` for the phone label sent with device registration. |
 | `data/account/SecureSessionStore.kt` | supabase-kt `SessionManager` that stores the session in DataStore `auth_session`, encrypted with Tink AES-256-GCM under an Android Keystore key. |
 | `data/account/GoogleSignIn.kt` | Credential Manager `GetSignInWithGoogleOption` with the hashed nonce; returns the Google ID token. |
 | `data/account/Nonce.kt` | Raw nonce (32 random bytes, URL-safe Base64) and its SHA-256 hex. |
@@ -33,8 +35,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 ### Startup gate
 
-1. `MPlayApp.onCreate` (main process) calls `authRepository.start()`, which collects the supabase-kt session status. The state is `Loading` until the saved session has been read.
-2. `MainActivity` keeps the splash screen until the theme is loaded and the state isn't `Loading`.
+1. `MPlayApp.onCreate` (main process) calls `authRepository.start()`, which collects the supabase-kt session status. The state is `Loading` until the saved session has been read. A later `Initializing` does not put the UI back on `Loading`.
+2. `MainActivity` keeps the splash screen until the theme is loaded and the state isn't `Loading`. If the session store never finishes, `AuthRepository` leaves `Loading` after 8 seconds so the splash can dismiss and `SignInScreen` can show.
 3. `SignedOut` shows `SignInScreen`. `SignedIn` provides a `ViewModelStoreOwner` from `SignedInViewModelScope.storeFor(userId)` as `LocalViewModelStoreOwner` around `MPlayRoot`, so the playback, library and other screen ViewModels belong to that user. Signing out (or another user signing in) clears the store; rotation keeps it.
 
 ### Sign-in screen
@@ -56,14 +58,15 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 1. `Nonce.generate()`; Google gets `Nonce.sha256Hex(raw)`, Supabase gets the raw value.
 2. `GoogleSignIn.requestIdToken()` shows the Google account sheet (`GetSignInWithGoogleOption` with `GOOGLE_WEB_CLIENT_ID`).
 3. `auth.signInWith(IDToken) { provider = Google; nonce = raw }`. On the server, the `handle_new_user` trigger creates the profile on first sign-in (see [backend](../backend.md)). If an Admin invited that email (`admin_invites`), the new account starts as Admin and the invite is used up ([admin](admin.md)).
-4. `verifyAccount()` signs out again if the profile is disabled.
+4. `AuthRepository` holds `state` at `SignedOut` until `registerDevice` succeeds on the `devices` Edge Function. A first or second phone, or this same phone again, returns `registered` and `state` becomes `SignedIn`. A third phone returns `limit_reached` and `SignInScreen` shows `DeviceLimitDialog`: pick one of the two to log out, or Cancel (which signs out the temporary session). Replacing calls `registerDevice(replaceDeviceId)` and then signs in.
+5. `verifyAccount()` signs out again if the profile is disabled.
 
 Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `AuthViewModel` also logs the exception (`Log.w`, tag `AuthViewModel`). A cancelled sheet shows nothing. Play services reports a failed account check as a cancellation with the message `[16] Account reauth failed.`; `AuthErrors.classify` turns that into `AuthError.AccountUnavailable` ("Google couldn't confirm this account on this phone...") so it isn't silent. Typical causes: no Android OAuth client for this package and signing key, the account isn't a test user while the consent screen is in Testing, or a work account that still needs setup on the device.
 
 ### Staying signed in
 
 - supabase-kt refreshes the token automatically (`alwaysAutoRefresh`). A refresh that fails while offline keeps the user signed in with the stored session's user (`AuthRepository.reduce`), so the app works offline.
-- `MainActivity.onStart` calls `AuthViewModel.verifyAccount()`: it refreshes the session and reads `profiles.disabled`. Codes `user_banned` (disabled) and `session_not_found`, `session_expired`, `refresh_token_not_found`, `refresh_token_already_used`, `user_not_found` (revoked) sign the user out with a message. Network errors are ignored. It then refreshes the profile and the plan ([plans](plans.md)).
+- `MainActivity.onStart` calls `AuthViewModel.verifyAccount()`: it refreshes the session, calls `verifyDevice()`, and reads `profiles.disabled`. Codes `user_banned` (disabled) and `session_not_found`, `session_expired`, `refresh_token_not_found`, `refresh_token_already_used`, `user_not_found` (revoked) sign the user out with a message, as does an explicit `device_revoked` body when this phone was logged out from another device or by an Admin. A generic 401 or a missing `devices` function is ignored so a returning user is not signed out. A signed-in install that has no `user_devices` row yet (upgrade) is registered as the first phone. Network errors are ignored. It then refreshes the profile and the plan ([plans](plans.md)).
 
 ### Signed out (PRD AU4)
 
@@ -75,7 +78,7 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `Auth
 
 ### Profile, edit, log out and delete
 
-The Profile tab icon (`ProfileTabIcon`) and the `ProfileScreen` header show the photo (`Avatar`: Coil, with a person icon as placeholder), name and email. Below them, the subscription card opens Profile > Plans ([plans](plans.md)). The profile row wins; the Google account details cover it until it loads. Edit opens `EditProfileScreen`, where Save updates `profiles.display_name` (max 80 characters, trimmed) and shows an error under the field if it fails. Log out (the last card on the Profile screen) asks for confirmation, then runs `AuthRepository.signOut()` on the application scope (local sign-out falls back to clearing the session if the server can't be reached).
+The Profile tab icon (`ProfileTabIcon`) and the `ProfileScreen` header show the photo (`Avatar`: Coil, with a person icon as placeholder), name and email. Below them, the subscription card opens Profile > Plans ([plans](plans.md)), then a Logged-in devices card (`"1 of 2"` / `"2 of 2"`) lists the account's phones. This phone is marked "This device"; another phone has Log out, which asks for confirmation and calls `removeDevice` (the other phone is signed out on its next foreground check). The profile row wins; the Google account details cover it until it loads. Edit opens `EditProfileScreen`, where Save updates `profiles.display_name` (max 80 characters, trimmed) and shows an error under the field if it fails. Log out (the last card on the Profile screen) asks for confirmation, then runs `AuthRepository.signOut()` on the application scope, which also removes this phone from `user_devices` so the slot is freed at once (local sign-out falls back to clearing the session if the server can't be reached).
 
 ### Delete account (PRD AU9, PR4)
 
@@ -121,8 +124,10 @@ The Android app signs in with a Google ID token (no browser redirect). The websi
 
 - `data/account/AuthErrorsTest.kt`: GoTrue code mapping, exception classification (including wrapped causes and `[16]` reauth failures versus real cancels), which errors end the session.
 - `data/account/NonceTest.kt`: SHA-256 hex, nonce length and alphabet.
-- `data/account/AuthRepositoryTest.kt`: `reduce()` (offline refresh keeps the user), `verifyAccount()` with a fake backend (disabled, revoked, offline, active), `deleteAccount()` (local sign-out only on success, refusal keeps the user).
+- `data/account/AuthRepositoryTest.kt`: `reduce()` (offline refresh keeps the user), `verifyAccount()` with a fake backend (disabled, revoked, offline, active), `deleteAccount()` (local sign-out only on success, refusal keeps the user), the two-device gate, replacing a device, cancelling the prompt, remote revocation, signing out another device.
+- `data/plan/DeviceIdTest.kt`: `formatName()` and `DeviceDto` JSON mapping.
 - `data/account/AccountDeletionTest.kt`: refusal codes from 409 bodies, other statuses, network failures.
+- `supabase/tests/devices_test.sql`: two-device limit, re-login, replacement, verify, legacy auto-register, remove.
 - `supabase/tests/abuse_test.sql`: `delete_account()` removes the user's rows, keeps trial claims and payments, refuses the last Admin and an account whose autopay is still on; no second trial after deleting.
 - Checked live on 2026-10-08: the last-admin refusal in the app, and a full deletion through the Edge Function with a throwaway user.
 - `supabase/tests/rls_test.sql`: server-side access rules ([backend](../backend.md#testing-rls)).
@@ -136,6 +141,7 @@ The Android app signs in with a Google ID token (no browser redirect). The websi
 - An account disabled by an Admin (website dashboard, [admin](admin.md)) is noticed on the next foreground check, not instantly.
 - Deleting doesn't revoke the Google grant; signing in again with the same Google account creates a new, empty account (without a trial).
 - A deleted account's access token stays valid until it expires (up to an hour) but every call fails, because the user no longer exists.
+- The device check trusts the `ANDROID_ID` hash the app sends; it changes after a factory reset and differs per Android user. A revoked phone is signed out on the next foreground check, not instantly (its access token stays valid until it expires).
 - MP3 Studio uses a new application ID (`com.autoomstudio.mp3studio`), so old MPlay (`com.autoomstudio.mplay`) installs don't upgrade in place and their data isn't migrated (decided in M6; see [architecture](../architecture.md)).
 
 ## Change history
@@ -156,3 +162,5 @@ The Android app signs in with a Google ID token (no browser redirect). The websi
 | 2026-10-14 | - | Sign-in logo regenerated from `logos/mp3-studio-logo-v3.png` (`ic_mp3studio_logo`). |
 | 2026-10-21 | - | Live GoTrue site URL is `https://mp3studio.in` with an allow-list for the website and `mp3studio://auth-callback`. Android ID-token sign-in is unchanged. |
 | 2026-10-21 | - | Profile no longer shows an Admin card; invited emails still become Admin on first sign-in for the website dashboard ([admin](admin.md)). |
+| 2026-10-21 | - | Two-device limit: a third sign-in asks which phone to log out of; Profile lists logged-in devices; `user_devices` and the `devices` Edge Function; Admins can remove a device from the user page. |
+| 2026-10-21 | - | Device-limit hold and a stuck session load now leave `SignedOut` so the splash can dismiss; `verifyDevice` only treats an explicit `device_revoked` as a revoke. |

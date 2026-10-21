@@ -11,12 +11,16 @@ import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
 
 class AuthRepositoryTest {
 
     private val user = AccountUser(id = "u1", email = "a@example.com", name = "A", avatarUrl = null)
+    private val phoneA = LoggedInDevice("a".repeat(64), "Pixel 8", 1L, 2L, isCurrent = false)
+    private val phoneB = LoggedInDevice("b".repeat(64), "Pixel 9", 1L, 3L, isCurrent = false)
+    private val thisPhone = LoggedInDevice("c".repeat(64), "Pixel 10", 4L, 4L, isCurrent = true)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     @After
@@ -25,6 +29,7 @@ class AuthRepositoryTest {
     @Test
     fun reduceMapsBackendStatus() {
         assertEquals(AuthState.Loading, AuthRepository.reduce(AuthState.Loading, BackendStatus.Initializing))
+        assertEquals(AuthState.SignedOut, AuthRepository.reduce(AuthState.SignedOut, BackendStatus.Initializing))
         assertEquals(AuthState.SignedIn(user), AuthRepository.reduce(AuthState.Loading, BackendStatus.Authenticated(user)))
         assertEquals(AuthState.SignedOut, AuthRepository.reduce(AuthState.SignedIn(user), BackendStatus.NotAuthenticated))
     }
@@ -93,6 +98,89 @@ class AuthRepositoryTest {
         assertEquals(0, backend.localSignOuts)
     }
 
+    @Test
+    fun aThirdDeviceFromLoadingShowsThePickerNotABlankScreen() = runBlocking {
+        val backend = FakeBackend(
+            registration = DeviceRegistrationResult.LimitReached(listOf(phoneA, phoneB)),
+            current = user,
+        )
+        val repository = AuthRepository(backend, scope, AccountDeletionBackend {})
+        repository.start()
+        repository.signInWithGoogleIdToken("token", "nonce")
+        assertEquals(AuthState.SignedOut, repository.state.value)
+        assertEquals(listOf(phoneA, phoneB), repository.pendingDeviceLimit.value)
+    }
+
+    @Test
+    fun aStuckSessionLoadLeavesLoadingSoTheSplashCanDismiss() = runBlocking {
+        val repository = AuthRepository(FakeBackend(), scope, AccountDeletionBackend {}, loadingTimeoutMs = 40)
+        repository.start()
+        withTimeout(1_000) { repository.state.first { it is AuthState.SignedOut } }
+        assertEquals(AuthState.SignedOut, repository.state.value)
+    }
+
+    @Test
+    fun aThirdDeviceHoldsSignInUntilOneIsReplaced() = runBlocking {
+        val backend = FakeBackend(
+            registration = DeviceRegistrationResult.LimitReached(listOf(phoneA, phoneB)),
+            current = user,
+        )
+        val repository = signedOutRepository(backend)
+        repository.signInWithGoogleIdToken("token", "nonce")
+        assertEquals(AuthState.SignedOut, repository.state.value)
+        assertEquals(listOf(phoneA, phoneB), repository.pendingDeviceLimit.value)
+        assertEquals(0, backend.signOuts)
+
+        backend.registration = DeviceRegistrationResult.Registered(listOf(phoneA, thisPhone))
+        repository.completeSignInByReplacingDevice(phoneB.deviceId)
+        assertEquals(AuthState.SignedIn(user), repository.state.value)
+        assertNull(repository.pendingDeviceLimit.value)
+        assertEquals(listOf(phoneA, thisPhone), repository.devices.value)
+        assertEquals(phoneB.deviceId, backend.lastReplaceId)
+    }
+
+    @Test
+    fun cancellingTheDevicePromptSignsOutTheTemporarySession() = runBlocking {
+        val backend = FakeBackend(
+            registration = DeviceRegistrationResult.LimitReached(listOf(phoneA, phoneB)),
+            current = user,
+        )
+        val repository = signedOutRepository(backend)
+        repository.signInWithGoogleIdToken("token", "nonce")
+        repository.cancelPendingSignIn()
+        assertEquals(AuthState.SignedOut, repository.state.value)
+        assertNull(repository.pendingDeviceLimit.value)
+        assertEquals(1, backend.signOuts)
+    }
+
+    @Test
+    fun aRemoteDeviceRevocationSignsOut() = runBlocking {
+        val backend = FakeBackend(verification = DeviceVerificationResult.Revoked)
+        val repository = signedInRepository(backend)
+        assertEquals(AuthError.SessionRevoked, repository.verifyAccount())
+        assertEquals(AuthState.SignedOut, repository.state.value)
+    }
+
+    @Test
+    fun signingOutAnotherDeviceUpdatesTheList() = runBlocking {
+        val backend = FakeBackend(listed = listOf(phoneA, thisPhone))
+        val repository = signedInRepository(backend)
+        repository.refreshDevices()
+        assertEquals(listOf(phoneA, thisPhone), repository.devices.value)
+        backend.listed = listOf(thisPhone)
+        repository.signOutDevice(phoneA.deviceId)
+        assertEquals(listOf(thisPhone), repository.devices.value)
+        assertEquals(listOf(phoneA.deviceId), backend.removed)
+    }
+
+    private suspend fun signedOutRepository(backend: FakeBackend): AuthRepository {
+        backend.status.value = BackendStatus.NotAuthenticated
+        return AuthRepository(backend, scope, AccountDeletionBackend {}).also {
+            it.start()
+            withTimeout(5_000) { it.state.first { state -> state is AuthState.SignedOut } }
+        }
+    }
+
     private suspend fun signedInRepository(
         backend: FakeBackend,
         deletion: AccountDeletionBackend = AccountDeletionBackend {},
@@ -104,15 +192,23 @@ class AuthRepositoryTest {
         }
     }
 
-    private class FakeBackend(
+    private inner class FakeBackend(
         private val disabled: Boolean = false,
         private val refreshError: Exception? = null,
+        var registration: DeviceRegistrationResult = DeviceRegistrationResult.Registered(emptyList()),
+        var verification: DeviceVerificationResult = DeviceVerificationResult.Ok(emptyList()),
+        var listed: List<LoggedInDevice> = emptyList(),
+        private val current: AccountUser? = null,
     ) : AuthBackend {
         override val status = MutableStateFlow<BackendStatus>(BackendStatus.Initializing)
         var signOuts = 0
         var localSignOuts = 0
+        var lastReplaceId: String? = null
+        val removed = mutableListOf<String>()
 
-        override suspend fun signInWithGoogleIdToken(idToken: String, rawNonce: String) = Unit
+        override suspend fun signInWithGoogleIdToken(idToken: String, rawNonce: String) {
+            status.value = BackendStatus.Authenticated(current ?: user)
+        }
 
         override suspend fun signOut() {
             signOuts++
@@ -128,5 +224,21 @@ class AuthRepositoryTest {
         }
 
         override suspend fun isDisabled(userId: String) = disabled
+
+        override suspend fun registerDevice(replaceDeviceId: String?): DeviceRegistrationResult {
+            lastReplaceId = replaceDeviceId
+            return registration
+        }
+
+        override suspend fun verifyDevice() = verification
+
+        override suspend fun listDevices() = listed
+
+        override suspend fun removeDevice(deviceId: String): List<LoggedInDevice> {
+            removed += deviceId
+            return listed
+        }
+
+        override suspend fun currentUser() = current
     }
 }

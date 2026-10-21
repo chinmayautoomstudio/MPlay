@@ -16,6 +16,16 @@
     <string name="auth_error_session">Your session ended. Please sign in again.</string>
     <string name="auth_error_not_configured">Sign-in isn\'t set up in this build of MP3 Studio.</string>
     <string name="auth_error_unknown">Couldn\'t sign in. Please try again.</string>
+    <string name="signin_device_limit_title">Too many devices</string>
+    <string name="signin_device_limit_message">This account is already signed in on two devices. Choose one to log out of so you can continue here.</string>
+    <string name="signin_device_limit_continue">Log out &amp; continue</string>
+    <string name="signin_device_last_active">Last active: %1$s</string>
+    <string name="profile_devices_title">Logged-in devices</string>
+    <string name="profile_devices_count">%1$d of %2$d</string>
+    <string name="profile_devices_this">This device</string>
+    <string name="profile_devices_log_out">Log out</string>
+    <string name="profile_devices_log_out_title">Log out of %1$s?</string>
+    <string name="profile_devices_log_out_message">That phone will be signed out of MP3 Studio. You can sign in again there later.</string>
     <string name="widget_signed_out">Sign in to MP3 Studio</string>
 
     <string name="profile_title">Profile</string>

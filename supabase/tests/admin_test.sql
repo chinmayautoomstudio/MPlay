@@ -3,7 +3,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(31);
+select plan(35);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -113,6 +113,49 @@ select is(
             with ordinality as t(e, n)
     ) x where prev < at),
     0, 'The feed is newest first');
+
+-- Devices --------------------------------------------------------------------------------------------------
+
+insert into public.user_devices (user_id, device_id, device_name)
+values (
+    'aaaaaaaa-0000-0000-0000-000000000002',
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    'Pixel'
+);
+select ok(exists (
+    select 1 from jsonb_array_elements(
+        public.admin_user_detail('aaaaaaaa-0000-0000-0000-000000000001', 'aaaaaaaa-0000-0000-0000-000000000002')
+        -> 'devices'
+    ) d where d ->> 'deviceName' = 'Pixel'
+), 'Admin user detail lists devices');
+select is(
+    public.admin_remove_device(
+        'aaaaaaaa-0000-0000-0000-000000000001',
+        'aaaaaaaa-0000-0000-0000-000000000002',
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    ) ->> 'result',
+    'removed',
+    'An Admin can remove a device'
+);
+select throws_ok(
+    $$ select public.admin_remove_device(
+        'aaaaaaaa-0000-0000-0000-000000000002',
+        'aaaaaaaa-0000-0000-0000-000000000001',
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    ) $$,
+    '42501',
+    null,
+    'A normal user cannot remove someone else''s device'
+);
+select is(
+    public.admin_remove_device(
+        'aaaaaaaa-0000-0000-0000-000000000001',
+        'aaaaaaaa-0000-0000-0000-000000000099',
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    ) ->> 'error',
+    'not_found',
+    'Removing a device from an unknown user is not_found'
+);
 
 -- Access ---------------------------------------------------------------------------------------------------
 

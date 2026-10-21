@@ -37,10 +37,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
+import android.text.format.DateUtils
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -84,6 +92,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.account.AuthError
+import com.autoomstudio.mp3studio.data.account.LoggedInDevice
 import com.autoomstudio.mp3studio.ui.components.pressBounce
 import com.autoomstudio.mp3studio.ui.components.rememberAnimationsEnabled
 import com.autoomstudio.mp3studio.ui.theme.EmphasizedDecelerateEasing
@@ -97,6 +106,8 @@ private val StudioBrush = Brush.linearGradient(listOf(SignInColors.Blue, SignInC
 fun SignInScreen(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val signingIn by viewModel.signingIn.collectAsStateWithLifecycle()
+    val pendingDevices by viewModel.pendingDeviceLimit.collectAsStateWithLifecycle()
+    val replacingDevice by viewModel.replacingDevice.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(viewModel) {
         viewModel.errors.collect { snackbar.showSnackbar(context.getString(it.messageRes())) }
@@ -115,6 +126,14 @@ fun SignInScreen(viewModel: AuthViewModel, modifier: Modifier = Modifier) {
                 .align(Alignment.BottomCenter)
                 .safeDrawingPadding()
                 .semantics { liveRegion = LiveRegionMode.Polite },
+        )
+    }
+    pendingDevices?.let { devices ->
+        DeviceLimitDialog(
+            devices = devices,
+            replacing = replacingDevice,
+            onReplace = viewModel::replaceDevice,
+            onDismiss = viewModel::cancelDevicePrompt,
         )
     }
 }
@@ -354,6 +373,72 @@ private fun LegalText(onOpenTerms: () -> Unit, onOpenPrivacy: () -> Unit, modifi
         Text(stringResource(R.string.signin_legal_prefix), style = style, color = SignInColors.Lavender.copy(alpha = 0.8f))
         Text(text, style = style, color = SignInColors.Lavender.copy(alpha = 0.8f))
     }
+}
+
+@Composable
+internal fun DeviceLimitDialog(
+    devices: List<LoggedInDevice>,
+    replacing: Boolean,
+    onReplace: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selectedId by remember(devices) { mutableStateOf(devices.firstOrNull()?.deviceId) }
+    AlertDialog(
+        onDismissRequest = { if (!replacing) onDismiss() },
+        title = { Text(stringResource(R.string.signin_device_limit_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(stringResource(R.string.signin_device_limit_message))
+                Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    devices.forEach { device ->
+                        val selected = device.deviceId == selectedId
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = selected,
+                                    enabled = !replacing,
+                                    role = Role.RadioButton,
+                                    onClick = { selectedId = device.deviceId },
+                                )
+                                .padding(vertical = 4.dp),
+                        ) {
+                            RadioButton(selected = selected, onClick = null, enabled = !replacing)
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(device.deviceName, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    stringResource(
+                                        R.string.signin_device_last_active,
+                                        DateUtils.getRelativeTimeSpanString(
+                                            device.lastSeenAt,
+                                            System.currentTimeMillis(),
+                                            DateUtils.MINUTE_IN_MILLIS,
+                                        ),
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+                if (replacing) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { selectedId?.let(onReplace) },
+                enabled = !replacing && selectedId != null,
+            ) { Text(stringResource(R.string.signin_device_limit_continue)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !replacing) {
+                Text(stringResource(android.R.string.cancel))
+            }
+        },
+    )
 }
 
 @StringRes

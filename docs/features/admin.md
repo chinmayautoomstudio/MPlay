@@ -6,7 +6,7 @@
 
 Admin operations run on the server and are meant for the website dashboard ([web Admin PRD](../../MP3-Studio-PRD-Web-Admin-Dashboard.md)). The Android app has no Admin screens, no Admin card on Profile, and no Admin background worker or notifications. An Admin Google account in the app is a normal user: playback, plans and gates work the same. Privileged actions still go through `assert_admin()` and the `admin` Edge Function.
 
-The server still lets an enabled Admin look up users, change roles, disable accounts, grant or remove Pro, add other admins (by email, as an invite if they have not signed in yet), read the audit log and activity feed, list PayU payments, re-check a payment, refund it, cancel or revoke a subscription. Every change is checked and logged in Postgres.
+The server still lets an enabled Admin look up users, change roles, disable accounts, grant or remove Pro, add other admins (by email, as an invite if they have not signed in yet), read the audit log and activity feed, list PayU payments, re-check a payment, refund it, cancel or revoke a subscription, and remove a logged-in device. Every change is checked and logged in Postgres.
 
 ## Key files
 
@@ -19,6 +19,7 @@ Paths are relative to `supabase/` unless they start with `app/`.
 | `migrations/20261012000000_admin_activity.sql` | `admin_activity()` for the Activity feed. |
 | `migrations/20261015000000_billing_admin.sql` | `admin_list_payments()`, `admin_billing_health()`, `admin_billing_action()`, payments in `admin_user_detail()`. |
 | `migrations/20261016000000_admin_revoke_subscription.sql` | `revoke_subscription` admin action. |
+| `migrations/20261022000000_user_devices.sql` | `user_devices`, `admin_remove_device()`, devices on `admin_user_detail()`. |
 | `seed/first_admin.sql` | First Admin, run by hand. |
 | `app/src/main/java/com/autoomstudio/mp3studio/di/AuthEffects.kt` | On startup, cancels leftover WorkManager work named `"admin-activity"` from older installs. |
 
@@ -37,7 +38,7 @@ The Android packages `data/admin/` and `ui/admin/` are gone.
 ## Data and persistence
 
 - On the phone: no Admin DataStore keys. Older installs may still have unused `admin_activity_seen_at`, `admin_notifications_enabled` and `admin_activity_notified_at` in `app_settings`; they are ignored.
-- Server: `admin_invites`, `admin_audit_log` (actions `set_role`, `disable`, `enable`, `invite_admin`, `revoke_invite`, `invite_accepted`, `grant_pro`, `revoke_pro`, `reverify_payment`, `refund_requested`, `cancel_subscription`, `revoke_subscription`, and `account_deleted` written by `delete_account()`), `subscriptions` rows with provider `admin`, and the billing tables (`payments`, `webhook_log`, `job_runs`). See [backend.md](../backend.md).
+- Server: `admin_invites`, `admin_audit_log` (actions `set_role`, `disable`, `enable`, `invite_admin`, `revoke_invite`, `invite_accepted`, `grant_pro`, `revoke_pro`, `reverify_payment`, `refund_requested`, `cancel_subscription`, `revoke_subscription`, `remove_device`, and `account_deleted` written by `delete_account()`), `subscriptions` rows with provider `admin`, `user_devices`, and the billing tables (`payments`, `webhook_log`, `job_runs`). See [backend.md](../backend.md).
 
 ## Manifest, permissions and notifications
 
@@ -45,7 +46,7 @@ No Admin notification channel. `POST_NOTIFICATIONS` remains for playback, separa
 
 ## Tests
 
-- `supabase/tests/admin_test.sql` (pgTAP): non-admin and disabled-admin refusals, last admin and self rules, promote and step down, invites and the sign-up trigger, Pro grant and removal, search, audit rows, `admin_activity`, no access for `authenticated`.
+- `supabase/tests/admin_test.sql` (pgTAP): non-admin and disabled-admin refusals, last admin and self rules, promote and step down, invites and the sign-up trigger, Pro grant and removal, search, audit rows, `admin_activity`, devices on `admin_user_detail`, `admin_remove_device`, no access for `authenticated`.
 - `supabase/tests/billing_flow_test.sql` (pgTAP): admin payment list, billing health and billing action refusals; revoke.
 - `supabase/functions/_shared/admin_test.ts` (Deno): request parsing and validation.
 - Android `AdminViewModelTest` and `AdminActivityCheckTest` were removed with the in-app screens.
@@ -62,6 +63,7 @@ No Admin notification channel. `POST_NOTIFICATIONS` remains for playback, separa
 | Date | Commit | Change |
 |---|---|---|
 | 2026-10-21 | | Removed the in-app Admin screens, `data/admin/`, `ui/admin/`, Admin DataStore keys, `AdminActivityWorker` and phone notifications. Server `admin` functions stay for the website dashboard. `AuthEffects` cancels leftover `"admin-activity"` work. |
+| 2026-10-21 | | `admin_user_detail` includes `devices`; `removeDevice` / `admin_remove_device` logs a user out of a chosen phone. |
 | 2026-10-10 | | The plan card shows whether a PayU subscription is monthly or yearly. |
 | 2026-10-08 | | Admin screens, invites, Pro grants and audit log (PRD v3.2 M5). |
 | 2026-10-08 | | M6: `account_deleted` audit entries; the store review account gets Pro from the Admin screens ([store review](../store-review.md)). |

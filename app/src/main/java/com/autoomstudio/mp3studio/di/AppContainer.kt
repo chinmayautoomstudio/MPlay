@@ -199,7 +199,12 @@ class AppContainer(context: Context) {
 
     val authRepository: AuthRepository by lazy {
         AuthRepository(
-            SupabaseAuthBackend(supabase, sessionStore),
+            SupabaseAuthBackend(
+                supabase,
+                sessionStore,
+                deviceId = { DeviceId.of(appContext) },
+                deviceName = { DeviceId.name() },
+            ),
             applicationScope,
             SupabaseAccountDeletionBackend(supabase),
         )

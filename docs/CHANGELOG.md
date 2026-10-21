@@ -9,8 +9,10 @@ Each entry should say what changed and link to the feature doc. Use these groups
 ### Database
 - Applied live: yearly Pro (`20261017000000_yearly_plan`) and international USD (`20261021000000_intl_usd`). Existing `begin_checkout(user, phone, mode)` still maps to monthly INR. ([backend](backend.md#migrations))
 - Supabase migration `20261021180000_app_secrets`: `app_secret(name)` (service_role only) reads Vault `trial_hash_pepper` and `billing_jobs_secret`. ([backend](backend.md#migrations))
+- Supabase migration `20261022000000_user_devices`: `user_devices` (two phones per account), `register_device()`, `verify_device()`, `remove_device()`, `admin_remove_device()`. No Room changes. ([backend](backend.md#migrations), [accounts](features/accounts.md))
 
 ### Added
+- Each account can stay signed in on at most two phones. A third Google sign-in shows a prompt to log out of one of the two before this phone can continue. Profile has a Logged-in devices card (`1 of 2` / `2 of 2`) to log the other phone out. New `user_devices` table, `devices` Edge Function, and Admin `removeDevice`. ([accounts](features/accounts.md), [backend](backend.md), [admin](features/admin.md))
 - International Pro at $1.99 a month or $19.99 a year, next to India at ₹99 / ₹999. The Plans screen detects the country from the request IP and shows an India / International toggle; checkout sends `region` and the server sets the PayU amount. USD is a one-off Payment Link (no autopay). DataStore `billing_region_override`. ([payments](features/payments.md), [plans](features/plans.md))
 - Profile → Library → Exclude folders: hide songs under chosen MediaStore folders from the library (files stay on the device). Paths stored in DataStore `library_prefs` key `excluded_folders`; applied in `MediaStoreSongSource.querySongs`. ([library](features/library.md))
 - Swipe between Library Songs, Albums and Artists tabs (`HorizontalPager` in `LibraryScreen`). ([library](features/library.md))
@@ -22,6 +24,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 - Splash and in-app logos regenerated from `logos/mp3-studio-logo-v3.png` (`tools/generate_logo_assets.py` → `splash_logo`, `ic_mp3studio_logo`). ([settings](features/settings-and-about.md), [accounts](features/accounts.md), [architecture](architecture.md))
 
 ### Fixed
+- Splash no longer stays on a black window when a third-device sign-in is held or the saved session never finishes loading. `verifyDevice` only signs out on an explicit `device_revoked`, not a generic 401 from a missing `devices` function. ([accounts](features/accounts.md))
 - Website Google login no longer lands on `securedbmp3.autoomstudio.com`. Coolify Auth now uses `GOTRUE_SITE_URL=https://mp3studio.in` and an allow-list for localhost, `mp3studio.in` and `mp3studio://auth-callback`. ([backend](backend.md#auth-settings), [accounts](features/accounts.md))
 - Tapping Profile in the bottom bar always opens the main Profile menu, instead of restoring the last Profile sub-page (e.g. Vocal Separation). ([settings](features/settings-and-about.md), [architecture](architecture.md))
 - Samsung/system call recordings under `Recordings/Call/` (and other `Recordings/` voice files) show in Profile → Library → Exclude folders so they can be hidden. Library query now treats `IS_RECORDING` and the `Recordings/` path as eligible alongside music. ([library](features/library.md))
