@@ -112,3 +112,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-14 | - | Bottom-bar Profile tap resets to `ProfilePage.Main` instead of restoring the last sub-page. |
 | 2026-10-21 | - | Removed the Admin card, `ProfilePage.Admin` and unused Admin DataStore keys (`admin_activity_seen_at`, `admin_notifications_enabled`, `admin_activity_notified_at`). Admin lives on the website ([admin](admin.md)). |
 | 2026-10-21 | - | Profile Logged-in devices card (`1 of 2` / `2 of 2`) to log another phone out ([accounts](accounts.md)). |
+| 2026-10-21 | - | About version 1.0.1 (`versionCode` 12). |

@@ -6,6 +6,8 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-21
+
 ### Database
 - Applied live: yearly Pro (`20261017000000_yearly_plan`) and international USD (`20261021000000_intl_usd`). Existing `begin_checkout(user, phone, mode)` still maps to monthly INR. ([backend](backend.md#migrations))
 - Supabase migration `20261021180000_app_secrets`: `app_secret(name)` (service_role only) reads Vault `trial_hash_pepper` and `billing_jobs_secret`. ([backend](backend.md#migrations))
@@ -21,6 +23,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 - In-app Admin panel: Profile Admin card, `ui/admin/*`, `data/admin/*` (`AdminBackend`, `AdminActivityWorker`, `AdminNotifications`), DataStore keys `admin_activity_seen_at`, `admin_notifications_enabled` and `admin_activity_notified_at`, notification channel `admin_activity`, and `Entitlements.isAdmin` / `PlanUiState.isAdmin`. `AuthEffects` cancels leftover `"admin-activity"` WorkManager work on upgrade. The `admin` Edge Function and SQL stay for the website dashboard. ([admin](features/admin.md), [architecture](architecture.md), [PRD](../MP3-Studio-PRD-Web-Admin-Dashboard.md))
 
 ### Changed
+- `versionName` 1.0.0 to 1.0.1 and `versionCode` 11 to 12. ([settings](features/settings-and-about.md))
 - Splash and in-app logos regenerated from `logos/mp3-studio-logo-v3.png` (`tools/generate_logo_assets.py` → `splash_logo`, `ic_mp3studio_logo`). ([settings](features/settings-and-about.md), [accounts](features/accounts.md), [architecture](architecture.md))
 
 ### Fixed
