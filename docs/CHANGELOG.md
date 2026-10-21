@@ -16,6 +16,10 @@ Each entry should say what changed and link to the feature doc. Use these groups
 ### Fixed
 - Tapping Profile in the bottom bar always opens the main Profile menu, instead of restoring the last Profile sub-page (e.g. Vocal Separation). ([settings](features/settings-and-about.md), [architecture](architecture.md))
 - Samsung/system call recordings under `Recordings/Call/` (and other `Recordings/` voice files) show in Profile → Library → Exclude folders so they can be hidden. Library query now treats `IS_RECORDING` and the `Recordings/` path as eligible alongside music. ([library](features/library.md))
+- Trial claims work again on the live server. A Coolify UI save on 2026-10-13 dropped `TRIAL_HASH_PEPPER` (and `BILLING_JOBS_SECRET`) from `.env`, so every new sign-in after that stayed on Free with `unavailable`. A new pepper was generated, `BILLING_JOBS_SECRET` was copied back from Vault, and the functions container was recreated. Those two keys must also be set in the Coolify UI, or the next save will drop them again. Six accounts created while the pepper was missing were granted a 30-day trial through `claim_trial()` (ends 2026-11-20). ([plans](features/plans.md), [backend](backend.md#edge-functions))
+
+### Docs
+- UI/UX improvement backlog from a Compose audit (library scrubbers, Now Playing tiles / EQ path, selection, Profile chrome, trim/EQ/separation polish). ([ui-ux-improvements](ui-ux-improvements.md))
 
 ## [1.0.0] - 2026-10-13
 

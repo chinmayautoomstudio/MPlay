@@ -1,6 +1,6 @@
 # Plans, trial and feature gates
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-10
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-21
 
 ## Summary
 
@@ -106,11 +106,13 @@ None. Uses the existing `INTERNET` permission.
 - The plan shown on screens is recomputed when the cache changes, not as time passes; the next foreground refresh catches up.
 - Payments are built ([payments](payments.md)) but stay unavailable until the PayU secrets are set on the server.
 - A user granted Pro by an Admin sees it after their next refresh (app start, foreground or the Plans screen).
+- If `TRIAL_HASH_PEPPER` is missing on the functions container, `claim_trial` returns `unavailable` and the user stays Free. Accounts created in that window get the trial on their next entitlements refresh after the pepper is restored. See [backend](../backend.md#edge-functions).
 
 ## Change history
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-21 | - | Live `TRIAL_HASH_PEPPER` restored after a Coolify save dropped it on 2026-10-13; six accounts stuck on Free were granted a 30-day trial through `claim_trial()`. |
 | 2026-10-10 | - | Plans screen redesign: "Your subscription" section at the top, Monthly/Yearly toggle, Free and Pro cards whose Pro button follows the toggle (Current Plan or Switch for subscribers), icon-based Compare Plans table. |
 | 2026-10-10 | - | Yearly Pro at ₹999 next to monthly; the plan label shows the interval. |
 | 2026-10-08 | - | Plans and gating (M2): entitlements functions, trial with abuse checks, cache with 7-day grace, BPM and Sing Along gates, upgrade sheet, Plans screen, Account plan row, trial banner. |
