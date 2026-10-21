@@ -224,11 +224,10 @@ begin
 end;
 $$;
 
--- User page: include the active devices next to entitlements and payments.
+-- User page: keep the live web-admin fields and add the active devices.
 create or replace function public.admin_user_detail(p_actor uuid, p_user uuid)
 returns jsonb
 language plpgsql
-stable
 security definer
 set search_path = ''
 as $$
@@ -248,6 +247,7 @@ begin
             'email', v_profile.email,
             'name', v_profile.display_name,
             'avatarUrl', v_profile.avatar_url,
+            'phone', v_profile.phone,
             'role', v_profile.role,
             'disabled', v_profile.disabled,
             'createdAt', v_profile.created_at
@@ -255,6 +255,13 @@ begin
         'entitlements', public.compute_entitlements(p_user),
         'usage', public.usage_summary(p_user),
         'devices', public.device_list(p_user, null),
+        'trialClaim', (
+            select jsonb_build_object('claimedAt', c.claimed_at, 'result', 'claimed')
+            from public.trial_claims c
+            where c.user_id = p_user
+            order by c.claimed_at desc
+            limit 1
+        ),
         'weeks', coalesce((
             select jsonb_agg(jsonb_build_object(
                 'weekStart', w.week,
@@ -279,6 +286,7 @@ begin
         ), '[]'::jsonb),
         'subscriptions', coalesce((
             select jsonb_agg(jsonb_build_object(
+                'id', s.id,
                 'provider', s.provider,
                 'status', s.status,
                 'interval', s.billing_interval,
@@ -291,6 +299,8 @@ begin
                 'cancelAtPeriodEnd', s.cancel_at_period_end,
                 'autopayStatus', s.autopay_status,
                 'graceEnd', s.grace_end,
+                'mandateRef', s.mandate_ref,
+                'mandateStart', s.mandate_start,
                 'mandateEnd', s.mandate_end,
                 'cancelPending', s.mandate_cancel_requested_at is not null and s.autopay_status = 'on'
             ) order by s.created_at desc)
@@ -306,8 +316,11 @@ begin
                 'currency', p.currency,
                 'refundedPaise', p.refunded_paise,
                 'payuRef', p.payu_ref,
+                'mandateRef', p.mandate_ref,
                 'method', p.method,
                 'failureReason', p.failure_reason,
+                'linkExpiresAt', p.link_expires_at,
+                'resolveUntil', p.resolve_until,
                 'refundPending', p.refund_request_id is not null and p.status = 'success',
                 'createdAt', p.created_at,
                 'completedAt', p.completed_at

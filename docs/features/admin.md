@@ -64,6 +64,7 @@ No Admin notification channel. `POST_NOTIFICATIONS` remains for playback, separa
 |---|---|---|
 | 2026-10-21 | | Removed the in-app Admin screens, `data/admin/`, `ui/admin/`, Admin DataStore keys, `AdminActivityWorker` and phone notifications. Server `admin` functions stay for the website dashboard. `AuthEffects` cancels leftover `"admin-activity"` work. |
 | 2026-10-21 | | `admin_user_detail` includes `devices`; `removeDevice` / `admin_remove_device` logs a user out of a chosen phone. |
+| 2026-10-21 | | `user_devices` and `devices` deployed live. `admin_user_detail` keeps web-admin `phone`, `trialClaim` and mandate fields. |
 | 2026-10-10 | | The plan card shows whether a PayU subscription is monthly or yearly. |
 | 2026-10-08 | | Admin screens, invites, Pro grants and audit log (PRD v3.2 M5). |
 | 2026-10-08 | | M6: `account_deleted` audit entries; the store review account gets Pro from the Admin screens ([store review](../store-review.md)). |

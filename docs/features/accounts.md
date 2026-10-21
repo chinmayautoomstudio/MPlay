@@ -164,3 +164,4 @@ The Android app signs in with a Google ID token (no browser redirect). The websi
 | 2026-10-21 | - | Profile no longer shows an Admin card; invited emails still become Admin on first sign-in for the website dashboard ([admin](admin.md)). |
 | 2026-10-21 | - | Two-device limit: a third sign-in asks which phone to log out of; Profile lists logged-in devices; `user_devices` and the `devices` Edge Function; Admins can remove a device from the user page. |
 | 2026-10-21 | - | Device-limit hold and a stuck session load now leave `SignedOut` so the splash can dismiss; `verifyDevice` only treats an explicit `device_revoked` as a revoke. |
+| 2026-10-21 | - | Live `devices` function and `user_devices` SQL deployed so Google sign-in can finish after the ID token (the missing entrypoint had been signing the new session out). |

@@ -9,7 +9,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 ### Database
 - Applied live: yearly Pro (`20261017000000_yearly_plan`) and international USD (`20261021000000_intl_usd`). Existing `begin_checkout(user, phone, mode)` still maps to monthly INR. ([backend](backend.md#migrations))
 - Supabase migration `20261021180000_app_secrets`: `app_secret(name)` (service_role only) reads Vault `trial_hash_pepper` and `billing_jobs_secret`. ([backend](backend.md#migrations))
-- Supabase migration `20261022000000_user_devices`: `user_devices` (two phones per account), `register_device()`, `verify_device()`, `remove_device()`, `admin_remove_device()`. No Room changes. ([backend](backend.md#migrations), [accounts](features/accounts.md))
+- Applied live: Supabase migration `20261022000000_user_devices` (MCP `user_devices` / `20261021125431`). `user_devices`, `register_device()`, `verify_device()`, `remove_device()`, `admin_remove_device()`. `admin_user_detail()` keeps the web-admin fields (`phone`, `trialClaim`, mandate refs) and adds `devices`. No Room changes. ([backend](backend.md#migrations), [accounts](features/accounts.md))
 
 ### Added
 - Each account can stay signed in on at most two phones. A third Google sign-in shows a prompt to log out of one of the two before this phone can continue. Profile has a Logged-in devices card (`1 of 2` / `2 of 2`) to log the other phone out. New `user_devices` table, `devices` Edge Function, and Admin `removeDevice`. ([accounts](features/accounts.md), [backend](backend.md), [admin](features/admin.md))
@@ -24,6 +24,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 - Splash and in-app logos regenerated from `logos/mp3-studio-logo-v3.png` (`tools/generate_logo_assets.py` → `splash_logo`, `ic_mp3studio_logo`). ([settings](features/settings-and-about.md), [accounts](features/accounts.md), [architecture](architecture.md))
 
 ### Fixed
+- Google sign-in no longer shows "Couldn't sign in" after a successful token exchange. The live `devices` Edge Function had no entrypoint, so `registerDevice` failed and the app signed the new session out. The function and `user_devices` SQL are now deployed. ([accounts](features/accounts.md), [backend](backend.md#edge-functions))
 - Splash no longer stays on a black window when a third-device sign-in is held or the saved session never finishes loading. `verifyDevice` only signs out on an explicit `device_revoked`, not a generic 401 from a missing `devices` function. ([accounts](features/accounts.md))
 - Website Google login no longer lands on `securedbmp3.autoomstudio.com`. Coolify Auth now uses `GOTRUE_SITE_URL=https://mp3studio.in` and an allow-list for localhost, `mp3studio.in` and `mp3studio://auth-callback`. ([backend](backend.md#auth-settings), [accounts](features/accounts.md))
 - Tapping Profile in the bottom bar always opens the main Profile menu, instead of restoring the last Profile sub-page (e.g. Vocal Separation). ([settings](features/settings-and-about.md), [architecture](architecture.md))
