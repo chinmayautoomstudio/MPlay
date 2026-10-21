@@ -1,6 +1,6 @@
 # Settings, About, theme and shared components
 
-> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-14
+> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-21
 
 ## Summary
 
@@ -66,7 +66,7 @@ All keys in DataStore `app_settings`:
 | `admin_notifications_enabled` | Boolean | `true` | [Admin](admin.md) phone notifications switch |
 | `admin_activity_notified_at` | Long | 0 (epoch ms; cleared on sign-out) | [Admin](admin.md) newest event posted as a notification |
 
-Other DataStores: `playback_session`, `library_prefs` (`sort_order`; `excluded_folders` string set — see [library](library.md)), `widget_state`, and `auth_session` (key `session`: the Supabase session, encrypted with Tink, excluded from backup; see [accounts](accounts.md)). The Tink keyset lives in SharedPreferences `auth_keyset_prefs`. DataStore `entitlements` (key `entitlements_json`: the last plan answer from the server, cleared on sign-out; see [plans](plans.md)). DataStore `billing` (keys `pending_payment_user` and `pending_payment_txn`: the PayU payment the app is waiting for, cleared when it settles and on sign-out; see [payments](payments.md)). DataStore `equalizer_settings` (equalizer on/off, bands, presets and switches; see [equalizer](equalizer.md)).
+Other DataStores: `playback_session`, `library_prefs` (`sort_order`; `excluded_folders` string set — see [library](library.md)), `widget_state`, and `auth_session` (key `session`: the Supabase session, encrypted with Tink, excluded from backup; see [accounts](accounts.md)). The Tink keyset lives in SharedPreferences `auth_keyset_prefs`. DataStore `entitlements` (key `entitlements_json`: the last plan answer from the server, cleared on sign-out; see [plans](plans.md)). DataStore `billing` (keys `pending_payment_user`, `pending_payment_txn`: the PayU payment the app is waiting for; `billing_region_override`: `in` or `intl` when the user picked a catalog on Plans; all cleared on sign-out; see [payments](payments.md)). DataStore `equalizer_settings` (equalizer on/off, bands, presets and switches; see [equalizer](equalizer.md)).
 
 Splash and About logos: `drawable-nodpi/splash_logo` and `ic_mp3studio_logo`, rebuilt by `tools/generate_logo_assets.py` from `logos/mp3-studio-logo-v3.png`.
 
@@ -111,4 +111,5 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-12 | - | About logo regenerated from `logos/mp3-studio-logo-v2.png` (`ic_mp3studio_logo`); launcher background restored to `#030013`. |
 | 2026-10-13 | - | Bundled Outfit + DM Sans typography (`Type.kt`, `res/font/`); OFL entries on Licenses. |
 | 2026-10-14 | - | Profile → Library → Exclude folders (`ProfilePage.ExcludeFolders`); splash/About logos from `logos/mp3-studio-logo-v3.png`. |
+| 2026-10-21 | - | DataStore `billing` key `billing_region_override` for the Plans India / International toggle ([payments](payments.md)). |
 | 2026-10-14 | - | Bottom-bar Profile tap resets to `ProfilePage.Main` instead of restoring the last sub-page. |

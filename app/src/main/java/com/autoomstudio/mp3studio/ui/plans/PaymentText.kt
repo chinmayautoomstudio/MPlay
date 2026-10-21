@@ -6,11 +6,29 @@ import androidx.annotation.StringRes
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.billing.BillingError
 import com.autoomstudio.mp3studio.data.billing.PaymentState
+import com.autoomstudio.mp3studio.data.plan.BillingCurrency
 import com.autoomstudio.mp3studio.data.plan.BillingInterval
+import com.autoomstudio.mp3studio.data.plan.BillingRegion
+import com.autoomstudio.mp3studio.data.plan.PriceList
 import java.util.Locale
 
-/** "₹99.00" from paise. */
-fun rupees(paise: Int): String = "₹" + String.format(Locale.US, "%.2f", paise / 100.0)
+/** "₹99.00" or "$1.99" from minor units. */
+fun formatAmount(minor: Int, currency: BillingCurrency): String {
+    val symbol = if (currency == BillingCurrency.Usd) "$" else "₹"
+    return symbol + String.format(Locale.US, "%.2f", minor / 100.0)
+}
+
+/** "₹99" or "$1.99". USD keeps cents; INR drops them when they are zero. */
+fun formatPrice(minor: Int, currency: BillingCurrency): String {
+    if (currency == BillingCurrency.Usd) return formatAmount(minor, currency)
+    return if (minor % 100 == 0) "₹${minor / 100}" else formatAmount(minor, currency)
+}
+
+fun formatPrice(interval: BillingInterval, prices: PriceList, currency: BillingCurrency): String =
+    formatPrice(prices.of(interval), currency)
+
+/** @deprecated Use [formatAmount] with a currency. Kept for history rows that are INR. */
+fun rupees(paise: Int): String = formatAmount(paise, BillingCurrency.Inr)
 
 fun billingDate(context: Context, millis: Long): String =
     DateUtils.formatDateTime(context, millis, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_YEAR)
@@ -37,6 +55,15 @@ fun billingErrorText(error: BillingError): Int = when (error) {
     BillingError.NotFound, BillingError.Other -> R.string.checkout_error_other
 }
 
+fun billingErrorText(error: BillingError, region: BillingRegion): Int =
+    if ((error == BillingError.PhoneRequired || error == BillingError.InvalidPhone) &&
+        region == BillingRegion.International
+    ) {
+        R.string.checkout_phone_invalid_intl
+    } else {
+        billingErrorText(error)
+    }
+
 @StringRes
 fun paymentStateText(state: PaymentState): Int = when (state) {
     PaymentState.Created -> R.string.payment_state_created
@@ -57,8 +84,5 @@ fun paymentKindText(kind: String, interval: BillingInterval = BillingInterval.Mo
     else -> R.string.payment_kind_first
 }
 
-/** Prices the app shows; the server charges `billing_price_paise`, which these must match. */
-fun pricePaise(interval: BillingInterval): Int = if (interval == BillingInterval.Year) 99_900 else 9_900
-
-/** "₹99" or "₹999". */
-fun wholeRupees(paise: Int): String = "₹" + (paise / 100)
+fun priceOf(interval: BillingInterval, region: BillingRegion, pricesIn: PriceList, pricesIntl: PriceList): Int =
+    (if (region == BillingRegion.International) pricesIntl else pricesIn).of(interval)

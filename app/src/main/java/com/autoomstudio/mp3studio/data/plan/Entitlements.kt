@@ -42,7 +42,7 @@ enum class AutopayStatus {
     }
 }
 
-/** How long one Pro payment lasts (`billing_interval`): ₹99 a month or ₹999 a year, priced on the server. */
+/** How long one Pro payment lasts (`billing_interval`): ₹99 / $1.99 a month or ₹999 / $19.99 a year. */
 enum class BillingInterval(val wire: String) {
     Month("month"), Year("year");
 
@@ -50,6 +50,39 @@ enum class BillingInterval(val wire: String) {
 
     companion object {
         fun of(value: String?): BillingInterval = if (value == "year") Year else Month
+    }
+}
+
+/** Catalog the Plans screen shows: India (INR) or International (USD). */
+enum class BillingRegion(val wire: String) {
+    India("in"), International("intl");
+
+    val currency: BillingCurrency get() = if (this == International) BillingCurrency.Usd else BillingCurrency.Inr
+
+    companion object {
+        fun of(value: String?): BillingRegion = if (value == "intl") International else India
+    }
+}
+
+/** `payments.currency` / `subscriptions.currency`. */
+enum class BillingCurrency(val wire: String) {
+    Inr("INR"), Usd("USD");
+
+    val region: BillingRegion get() = if (this == Usd) BillingRegion.International else BillingRegion.India
+
+    companion object {
+        fun of(value: String?): BillingCurrency = if (value == "USD") Usd else Inr
+    }
+}
+
+/** Month and year amounts in minor units (paise or cents), as the server prices them. */
+@Serializable
+data class PriceList(val month: Int, val year: Int) {
+    fun of(interval: BillingInterval): Int = if (interval == BillingInterval.Year) year else month
+
+    companion object {
+        val India = PriceList(month = 9_900, year = 99_900)
+        val International = PriceList(month = 199, year = 1_999)
     }
 }
 
@@ -89,12 +122,25 @@ data class Entitlements(
     val lastPayment: LastPayment? = null,
     /** Whether the profile has the mobile number PayU needs (payments PRD CK13). */
     val hasPhone: Boolean = false,
+    /** True when the stored number is a 10-digit Indian mobile (needed for INR checkout). */
+    val hasIndianPhone: Boolean = false,
     val billingMode: BillingMode = BillingMode.Autopay,
+    /** IP country from the last entitlements check; the user may override it on Plans. */
+    val detectedRegion: BillingRegion = BillingRegion.India,
+    val pricesIn: PriceList = PriceList.India,
+    val pricesIntl: PriceList = PriceList.International,
+    /** Currency of a paid PayU subscription; null for Admin-granted Pro. */
+    val subscriptionCurrency: BillingCurrency? = null,
     /** False until the server has PayU credentials; Go Pro stays disabled then. */
     val paymentsEnabled: Boolean = false,
     val serverTime: Long,
     val checkedAt: Long,
-)
+) {
+    fun prices(region: BillingRegion): PriceList = if (region == BillingRegion.International) pricesIntl else pricesIn
+
+    fun needsPhone(region: BillingRegion): Boolean =
+        if (region == BillingRegion.India) !hasIndianPhone else !hasPhone
+}
 
 /** The user's PayU subscription as `compute_entitlements` reports it under `billing`. */
 @Serializable
@@ -109,6 +155,7 @@ data class BillingState(
     /** Cancellation asked for but PayU hasn't confirmed the mandate is revoked yet (CN4). */
     val cancelPending: Boolean = false,
     val interval: BillingInterval = BillingInterval.Month,
+    val currency: BillingCurrency = BillingCurrency.Inr,
 )
 
 /** An unfinished payment attempt; [resolveUntil] is set while the bank hasn't answered. */
@@ -121,7 +168,13 @@ data class PendingPayment(
 )
 
 @Serializable
-data class LastPayment(val txnId: String, val status: String, val amountPaise: Int, val at: Long)
+data class LastPayment(
+    val txnId: String,
+    val status: String,
+    val amountPaise: Int,
+    val at: Long,
+    val currency: BillingCurrency = BillingCurrency.Inr,
+)
 
 /**
  * AI Vocal Separator uses this week (PRD US6), as last reported by the server. [reserved] are queued jobs holding a

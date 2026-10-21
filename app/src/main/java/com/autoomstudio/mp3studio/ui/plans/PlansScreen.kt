@@ -72,7 +72,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoomstudio.mp3studio.R
+import com.autoomstudio.mp3studio.data.plan.BillingCurrency
 import com.autoomstudio.mp3studio.data.plan.BillingInterval
+import com.autoomstudio.mp3studio.data.plan.BillingRegion
 import com.autoomstudio.mp3studio.data.plan.Plan
 import com.autoomstudio.mp3studio.data.plan.TrialClaim
 import com.autoomstudio.mp3studio.ui.library.DetailBackButton
@@ -95,6 +97,7 @@ fun PlansScreen(
     BackHandler(enabled = backEnabled, onBack = onBack)
     val state by viewModel.state.collectAsStateWithLifecycle()
     val refreshing by viewModel.refreshing.collectAsStateWithLifecycle()
+    val region by viewModel.selectedRegion.collectAsStateWithLifecycle()
     val resources = LocalResources.current
     LaunchedEffect(viewModel) { viewModel.refresh() }
     LaunchedEffect(viewModel) {
@@ -126,10 +129,12 @@ fun PlansScreen(
                 billing = billingViewModel,
                 onOpenHistory = onOpenHistory,
             )
+            RegionToggle(region = region, onChange = viewModel::setRegion)
             IntervalToggle(yearly = yearly, onChange = { yearly = it })
             PlanCards(
                 state = state,
                 selected = if (yearly) BillingInterval.Year else BillingInterval.Month,
+                region = region,
                 billing = billingViewModel,
             )
             ComparePlans()
@@ -138,6 +143,28 @@ fun PlansScreen(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+@Composable
+private fun RegionToggle(region: BillingRegion, onChange: (BillingRegion) -> Unit) {
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Row(
+            modifier = Modifier
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+                .padding(4.dp)
+                .selectableGroup(),
+        ) {
+            ToggleSegment(stringResource(R.string.plans_region_india), selected = region == BillingRegion.India) {
+                onChange(BillingRegion.India)
+            }
+            ToggleSegment(
+                stringResource(R.string.plans_region_international),
+                selected = region == BillingRegion.International,
+            ) { onChange(BillingRegion.International) }
         }
     }
 }
@@ -164,7 +191,7 @@ private fun ToggleSegment(label: String, selected: Boolean, onClick: () -> Unit)
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .width(124.dp)
+            .width(140.dp)
             .clip(CircleShape)
             .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
@@ -179,7 +206,7 @@ private fun ToggleSegment(label: String, selected: Boolean, onClick: () -> Unit)
 }
 
 @Composable
-private fun PlanCards(state: PlanUiState, selected: BillingInterval, billing: BillingViewModel) {
+private fun PlanCards(state: PlanUiState, selected: BillingInterval, region: BillingRegion, billing: BillingViewModel) {
     Row(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
@@ -188,7 +215,7 @@ private fun PlanCards(state: PlanUiState, selected: BillingInterval, billing: Bi
             .padding(top = 12.dp),
     ) {
         FreeCard(state, Modifier.weight(1f).fillMaxHeight())
-        ProCard(state, selected, billing, Modifier.weight(1f).fillMaxHeight())
+        ProCard(state, selected, region, billing, Modifier.weight(1f).fillMaxHeight())
     }
 }
 
@@ -236,9 +263,20 @@ private fun FreeCard(state: PlanUiState, modifier: Modifier) {
 }
 
 @Composable
-private fun ProCard(state: PlanUiState, selected: BillingInterval, billing: BillingViewModel, modifier: Modifier) {
+private fun ProCard(
+    state: PlanUiState,
+    selected: BillingInterval,
+    region: BillingRegion,
+    billing: BillingViewModel,
+    modifier: Modifier,
+) {
     val primary = MaterialTheme.colorScheme.primary
     val yearly = selected == BillingInterval.Year
+    val prices = state.prices(region)
+    val currency = region.currency
+    val monthPrice = formatPrice(prices.month, currency)
+    val yearPrice = formatPrice(prices.year, currency)
+    val save = formatPrice(prices.month * 12 - prices.year, currency)
     Box(modifier) {
         Surface(
             shape = CardShape,
@@ -273,7 +311,7 @@ private fun ProCard(state: PlanUiState, selected: BillingInterval, billing: Bill
                 Spacer(Modifier.height(6.dp))
                 Row {
                     Text(
-                        stringResource(if (yearly) R.string.plans_year_price else R.string.plans_month_price),
+                        if (yearly) yearPrice else monthPrice,
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = primary,
@@ -288,7 +326,11 @@ private fun ProCard(state: PlanUiState, selected: BillingInterval, billing: Bill
                     )
                 }
                 Text(
-                    stringResource(if (yearly) R.string.checkout_interval_save else R.string.plans_or_yearly),
+                    if (yearly) {
+                        stringResource(R.string.checkout_interval_save_amount, save)
+                    } else {
+                        stringResource(R.string.plans_or_yearly_amount, yearPrice)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = if (yearly) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant,
                     fontWeight = if (yearly) FontWeight.SemiBold else null,
@@ -298,7 +340,7 @@ private fun ProCard(state: PlanUiState, selected: BillingInterval, billing: Bill
                 when (val button = ProCardButton.of(state.plan, state.subscriptionInterval, state.billing, selected)) {
                     is ProCardButton.Buy -> GradientButton(
                         stringResource(if (button.action == BillingAction.GoProAgain) R.string.plans_resubscribe else R.string.plans_go_pro),
-                    ) { billing.openCheckout(CheckoutPurpose.Subscribe, preselect = selected) }
+                    ) { billing.openCheckout(CheckoutPurpose.Subscribe, preselect = selected, region = region) }
                     is ProCardButton.Switch -> GradientButton(
                         stringResource(
                             if (button.to == BillingInterval.Year) R.string.plans_switch_to_yearly else R.string.plans_switch_to_monthly,
@@ -593,7 +635,15 @@ private fun BillingDetails(
         BillingNotice.PaymentsUnavailable -> Notice(stringResource(R.string.plans_payments_unavailable))
         is BillingNotice.PaymentPending -> Notice(stringResource(R.string.plans_payment_pending))
         is BillingNotice.AutopayOn -> Notice(
-            stringResource(R.string.plans_autopay_on, date(notice.nextBillingAt), wholeRupees(pricePaise(notice.interval))),
+            stringResource(
+                R.string.plans_autopay_on,
+                date(notice.nextBillingAt),
+                formatPrice(
+                    notice.interval,
+                    state.prices(state.subscriptionCurrency?.region ?: BillingRegion.India),
+                    state.subscriptionCurrency ?: BillingCurrency.Inr,
+                ),
+            ),
         )
         is BillingNotice.AutopayNotSet -> Notice(stringResource(R.string.plans_autopay_not_set, date(notice.expiresAt)))
         is BillingNotice.RenewSoon -> Notice(stringResource(R.string.plans_renew_reminder, date(notice.expiresAt)))
@@ -605,7 +655,7 @@ private fun BillingDetails(
     }
     state.lastPayment?.let {
         Text(
-            stringResource(R.string.plans_last_payment, rupees(it.amountPaise), date(it.at)),
+            stringResource(R.string.plans_last_payment, formatAmount(it.amountPaise, it.currency), date(it.at)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

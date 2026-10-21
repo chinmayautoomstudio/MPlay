@@ -56,7 +56,14 @@ class EntitlementsRepositoryTest {
 
     @Test
     fun offlineRefreshKeepsTheCache() = runBlocking {
-        val cached = Entitlements(userId = "u1", plan = Plan.Pro, serverTime = now, checkedAt = now)
+        val cached = Entitlements(
+            userId = "u1",
+            plan = Plan.Pro,
+            detectedRegion = BillingRegion.International,
+            pricesIntl = PriceList.International,
+            serverTime = now,
+            checkedAt = now,
+        )
         val repository = EntitlementsRepository(
             backend = { throw IOException("offline") },
             cache = MemoryCache(cached),
@@ -67,6 +74,7 @@ class EntitlementsRepositoryTest {
         assertFalse(repository.refresh("u1"))
 
         assertEquals(cached, repository.entitlements.value)
+        assertEquals(BillingRegion.International, repository.entitlements.value?.detectedRegion)
         assertTrue(repository.canUse(Feature.BpmDetector, "u1"))
     }
 

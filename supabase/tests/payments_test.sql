@@ -4,7 +4,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(44);
+select plan(57);
 
 insert into auth.users (id, email, raw_user_meta_data)
 values
@@ -15,7 +15,8 @@ values
     ('cccccccc-0000-0000-0000-000000000005', 'off@example.com', '{"name": "Off"}'),
     ('cccccccc-0000-0000-0000-000000000006', 'rules@example.com', '{"name": "Rules"}'),
     ('cccccccc-0000-0000-0000-000000000007', 'yearly@example.com', '{"name": "Yearly"}'),
-    ('cccccccc-0000-0000-0000-000000000008', 'annual@example.com', '{"name": "Annual"}');
+    ('cccccccc-0000-0000-0000-000000000008', 'annual@example.com', '{"name": "Annual"}'),
+    ('cccccccc-0000-0000-0000-000000000009', 'usd@example.com', '{"name": "Usd"}');
 
 -- Billing dates (5.3) --------------------------------------------------------------------------------------
 
@@ -37,6 +38,8 @@ select is(public.billing_period_end('year', 29, '2028-02-29 10:00+05:30'), '2029
     '29 Feb renews on 28 Feb when next year has no 29th');
 select is(public.billing_price_paise('month'), 9900, '₹99 a month');
 select is(public.billing_price_paise('year'), 99900, '₹999 a year');
+select is(public.billing_price_paise('month', 'USD'), 199, '$1.99 a month');
+select is(public.billing_price_paise('year', 'USD'), 1999, '$19.99 a year');
 
 -- Constraints ----------------------------------------------------------------------------------------------
 
@@ -60,7 +63,13 @@ select lives_ok(
     'An Admin grant row sits alongside a PayU subscription');
 select throws_ok(
     $$ update public.profiles set phone = '12345' where id = 'cccccccc-0000-0000-0000-000000000006' $$,
-    '23514', null, 'Only a 10-digit Indian mobile number is stored');
+    '23514', null, 'A short number is still refused');
+select lives_ok(
+    $$ update public.profiles set phone = '+14155551212' where id = 'cccccccc-0000-0000-0000-000000000006' $$,
+    'An E.164 number is stored');
+select lives_ok(
+    $$ update public.profiles set phone = '9876543216' where id = 'cccccccc-0000-0000-0000-000000000006' $$,
+    'An Indian mobile is still stored');
 
 -- The Pro rule (2.1) ---------------------------------------------------------------------------------------
 
@@ -171,6 +180,52 @@ insert into public.payments (txn_id, user_id, kind, status, amount_paise)
 select 'SPAM' || g, 'cccccccc-0000-0000-0000-000000000004', 'first', 'failed', 9900 from generate_series(1, 5) g;
 select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000004', null, 'autopay', 'month') ->> 'error', 'rate_limited',
     'At most 5 checkout attempts an hour');
+
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000009', null, 'manual', 'month', 'USD') ->> 'error',
+    'phone_required', 'A USD checkout still needs a phone number');
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000009', '+14155550009', 'autopay', 'month', 'USD')
+    ->> 'kind', 'first', 'A USD checkout accepts an E.164 number');
+select is(
+    (select amount_paise || ' ' || currency || ' ' || si::text from public.payments
+     where user_id = 'cccccccc-0000-0000-0000-000000000009' order by created_at desc limit 1),
+    '199 USD false', 'USD is $1.99 and never registers autopay');
+select public.attach_payment_link(
+    (select txn_id from public.payments where user_id = 'cccccccc-0000-0000-0000-000000000009' order by created_at desc limit 1),
+    'https://pay.example/usd', 'LU');
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000009', '+14155550009', 'manual', 'month', 'INR') ->> 'error',
+    'invalid_phone', 'INR still requires an Indian mobile');
+select is(public.begin_checkout('cccccccc-0000-0000-0000-000000000009', null, 'manual', 'month', 'INR') ->> 'error',
+    'payment_in_progress', 'A live USD link is not reused for an INR checkout');
+
+select is(public.apply_payment_result(
+    (select txn_id from public.payments
+     where user_id = 'cccccccc-0000-0000-0000-000000000009' order by created_at desc limit 1),
+    jsonb_build_object(
+        'status', 'success',
+        'txnId', (select txn_id from public.payments
+                  where user_id = 'cccccccc-0000-0000-0000-000000000009' order by created_at desc limit 1),
+        'payuRef', 'P-usd-inr',
+        'amountPaise', 199,
+        'currency', 'INR')) ->> 'error',
+    'mismatch', 'A USD payment is not accepted as INR');
+
+create temp table usd_paid as
+select public.begin_checkout('cccccccc-0000-0000-0000-000000000009', '+14155550009', 'manual', 'month', 'USD') as r;
+select public.attach_payment_link((select r ->> 'txnId' from usd_paid), 'https://pay.example/usd-ok', 'LU2');
+select is(public.apply_payment_result(
+    (select r ->> 'txnId' from usd_paid),
+    jsonb_build_object(
+        'status', 'success',
+        'txnId', (select r ->> 'txnId' from usd_paid),
+        'payuRef', 'P-usd-ok',
+        'amountPaise', 199,
+        'currency', 'USD')) ->> 'result',
+    'applied', 'A matching USD amount and currency grants Pro');
+select is((select currency from public.subscriptions
+           where user_id = 'cccccccc-0000-0000-0000-000000000009' and provider = 'payu'),
+    'USD', 'The subscription keeps USD');
+select is(public.compute_entitlements('cccccccc-0000-0000-0000-000000000009') -> 'subscription' ->> 'currency',
+    'USD', 'Entitlements report the USD subscription');
 
 select * from finish();
 rollback;

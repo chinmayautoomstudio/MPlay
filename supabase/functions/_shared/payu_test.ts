@@ -107,6 +107,14 @@ Deno.test("A manual-renewal link has no standing instruction", () => {
   assertEquals(p.source, "API");
 });
 
+Deno.test("A USD link has no standing instruction even in autopay mode", () => {
+  const p = buildLinkPayload({ ...linkRequest, amountPaise: 199, currency: "USD", mode: "autopay" });
+  assertEquals(p.currency, "USD");
+  assertEquals(p.subAmount, 1.99);
+  assertEquals(p.siDetails, undefined);
+  assertEquals(p.source, "API");
+});
+
 Deno.test("Link answers", () => {
   assertEquals(parseLinkResponse({ status: 0, result: { paymentLink: "https://u.payu.in/x", invoiceNumber: "MP1" } }), {
     url: "https://u.payu.in/x",

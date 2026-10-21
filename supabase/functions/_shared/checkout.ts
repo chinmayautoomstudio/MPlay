@@ -1,3 +1,5 @@
+import { type BillingRegion, parseRegion } from "./geo.ts";
+
 /** A 10-digit Indian mobile number from what the user typed: spaces, dashes, +91, 91 or a leading 0 are dropped. */
 export function normalizePhone(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -8,24 +10,37 @@ export function normalizePhone(value: unknown): string | null {
   return /^[6-9][0-9]{9}$/.test(digits) ? digits : null;
 }
 
+/** Indian mobile or E.164 (`+14…`) for a USD checkout. */
+export function normalizeIntlPhone(value: unknown): string | null {
+  const indian = normalizePhone(value);
+  if (indian) return indian;
+  if (typeof value !== "string") return null;
+  const compact = value.replace(/[\s\-()]/g, "");
+  return /^\+[1-9][0-9]{7,14}$/.test(compact) ? compact : null;
+}
+
 export type BillingInterval = "month" | "year";
 
-export type CheckoutRequest = { phone: string | null; interval: BillingInterval };
+export type CheckoutRequest = { phone: string | null; interval: BillingInterval; region: BillingRegion | null };
 
 /**
- * `{ phone?, interval? }` from the app. Missing phone is fine (the profile may have one); a malformed one is not.
- * The interval defaults to "month" for app versions that don't send it.
+ * `{ phone?, interval?, region? }` from the app. Missing phone is fine (the profile may have one).
+ * `region` is `in` or `intl`; omitted means the server will use the request IP.
  */
-export function parseCheckoutRequest(body: unknown): CheckoutRequest | { error: "invalid_phone" | "invalid_interval" } {
+export function parseCheckoutRequest(
+  body: unknown,
+): CheckoutRequest | { error: "invalid_phone" | "invalid_interval" | "invalid_region" } {
   const b = (body ?? {}) as Record<string, unknown>;
   let interval: BillingInterval = "month";
   if (b.interval !== undefined && b.interval !== null) {
     if (b.interval !== "month" && b.interval !== "year") return { error: "invalid_interval" };
     interval = b.interval;
   }
-  if (b.phone === undefined || b.phone === null || b.phone === "") return { phone: null, interval };
-  const phone = normalizePhone(b.phone);
-  return phone ? { phone, interval } : { error: "invalid_phone" };
+  const region = parseRegion(b.region);
+  if (region && typeof region === "object") return region;
+  if (b.phone === undefined || b.phone === null || b.phone === "") return { phone: null, interval, region };
+  const phone = region === "intl" ? normalizeIntlPhone(b.phone) : normalizePhone(b.phone);
+  return phone ? { phone, interval, region } : { error: "invalid_phone" };
 }
 
 const TXN = /^[A-Za-z0-9]{1,25}$/;
@@ -52,4 +67,5 @@ export const CHECKOUT_REFUSALS: Record<string, number> = {
   already_subscribed: 409,
   switch_not_yet: 409,
   mandate_update_pending: 409,
+  invalid_region: 400,
 };

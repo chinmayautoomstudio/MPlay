@@ -1,11 +1,14 @@
 package com.autoomstudio.mp3studio.data.billing
 
-/** Indian mobile numbers as PayU needs them; the same rules as `normalizePhone` in the Edge Functions. */
+import com.autoomstudio.mp3studio.data.plan.BillingRegion
+
+/** Indian and international numbers as PayU needs them; the same rules as the Edge Functions. */
 object PhoneNumber {
     private val MOBILE = Regex("^[6-9][0-9]{9}$")
+    private val E164 = Regex("^\\+[1-9][0-9]{7,14}$")
     private val SEPARATORS = Regex("[\\s\\-()]")
 
-    /** The 10-digit number from what the user typed (spaces, dashes, +91, 91 or a leading 0 allowed), or null. */
+    /** The 10-digit Indian number from what the user typed, or null. */
     fun normalize(input: String): String? {
         var digits = input.replace(SEPARATORS, "")
         digits = when {
@@ -16,6 +19,12 @@ object PhoneNumber {
         }
         return digits.takeIf { MOBILE.matches(it) }
     }
+
+    /** Indian mobile or E.164, for a USD checkout. */
+    fun normalizeIntl(input: String): String? = normalize(input) ?: input.replace(SEPARATORS, "").takeIf { E164.matches(it) }
+
+    fun normalize(input: String, region: BillingRegion): String? =
+        if (region == BillingRegion.International) normalizeIntl(input) else normalize(input)
 }
 
 /** Our transaction IDs; anything else arriving in a return link is ignored. */

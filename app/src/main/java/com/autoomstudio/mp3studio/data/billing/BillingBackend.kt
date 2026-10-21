@@ -1,7 +1,9 @@
 package com.autoomstudio.mp3studio.data.billing
 
+import com.autoomstudio.mp3studio.data.plan.BillingCurrency
 import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
+import com.autoomstudio.mp3studio.data.plan.BillingRegion
 import com.autoomstudio.mp3studio.data.plan.Plan
 import com.autoomstudio.mp3studio.data.plan.epochMillis
 import io.github.jan.supabase.SupabaseClient
@@ -23,8 +25,8 @@ import java.io.IOException
 
 /** Pro payments through the server (payments PRD). The app never talks to PayU; every call throws [BillingException]. */
 interface BillingBackend {
-    /** Creates a PayU payment link for [interval]; [phone] is saved to the profile when given. */
-    suspend fun startCheckout(phone: String?, interval: BillingInterval): CheckoutLink
+    /** Creates a PayU payment link for [interval] and [region]; [phone] is saved to the profile when given. */
+    suspend fun startCheckout(phone: String?, interval: BillingInterval, region: BillingRegion): CheckoutLink
 
     /** Checks [txnId] (or the latest attempt) with PayU on the server and returns where it stands. */
     suspend fun paymentStatus(txnId: String?): PaymentSummary
@@ -37,12 +39,17 @@ interface BillingBackend {
 
 class SupabaseBillingBackend(private val client: SupabaseClient) : BillingBackend {
 
-    override suspend fun startCheckout(phone: String?, interval: BillingInterval): CheckoutLink {
+    override suspend fun startCheckout(
+        phone: String?,
+        interval: BillingInterval,
+        region: BillingRegion,
+    ): CheckoutLink {
         val dto = call<CheckoutDto>(
             "start-checkout",
             buildJsonObject {
                 phone?.let { put("phone", it) }
                 put("interval", interval.wire)
+                put("region", region.wire)
             },
         )
         return CheckoutLink(dto.url, dto.txnId, BillingMode.of(dto.mode))
@@ -127,6 +134,7 @@ internal data class PaymentRow(
     @SerialName("billing_interval") val interval: String? = null,
     val status: String,
     @SerialName("amount_paise") val amountPaise: Int,
+    val currency: String? = null,
     @SerialName("refunded_paise") val refundedPaise: Int = 0,
     val method: String? = null,
     @SerialName("created_at") val createdAt: String,
@@ -141,6 +149,7 @@ internal data class PaymentRow(
         interval = BillingInterval.of(interval),
         state = PaymentState.of(status),
         amountPaise = amountPaise,
+        currency = BillingCurrency.of(currency),
         refundedPaise = refundedPaise,
         method = method,
         createdAt = epochMillis(createdAt),
@@ -152,7 +161,7 @@ internal data class PaymentRow(
 
     companion object {
         val COLUMNS = listOf(
-            "txn_id", "kind", "billing_interval", "status", "amount_paise", "refunded_paise", "method", "created_at", "completed_at",
+            "txn_id", "kind", "billing_interval", "status", "amount_paise", "currency", "refunded_paise", "method", "created_at", "completed_at",
             "period_start", "period_end", "failure_reason",
         )
     }

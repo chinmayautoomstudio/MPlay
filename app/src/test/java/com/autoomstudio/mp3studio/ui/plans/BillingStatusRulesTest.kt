@@ -1,9 +1,12 @@
 package com.autoomstudio.mp3studio.ui.plans
 
 import com.autoomstudio.mp3studio.data.plan.AutopayStatus
+import com.autoomstudio.mp3studio.data.plan.BillingCurrency
 import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
+import com.autoomstudio.mp3studio.data.plan.BillingRegion
 import com.autoomstudio.mp3studio.data.plan.BillingState
+import com.autoomstudio.mp3studio.data.plan.PriceList
 import com.autoomstudio.mp3studio.data.plan.PendingPayment
 import com.autoomstudio.mp3studio.data.plan.Plan
 import com.autoomstudio.mp3studio.data.plan.SubscriptionStatus
@@ -77,12 +80,34 @@ class BillingStatusRulesTest {
 
     @Test
     fun pricesMatchTheServer() {
-        assertEquals(9_900, pricePaise(BillingInterval.Month))
-        assertEquals(99_900, pricePaise(BillingInterval.Year))
-        assertEquals("₹999", wholeRupees(pricePaise(BillingInterval.Year)))
+        assertEquals(9_900, PriceList.India.of(BillingInterval.Month))
+        assertEquals(99_900, PriceList.India.of(BillingInterval.Year))
+        assertEquals(199, PriceList.International.of(BillingInterval.Month))
+        assertEquals(1_999, PriceList.International.of(BillingInterval.Year))
+        assertEquals("₹99", formatPrice(BillingInterval.Month, PriceList.India, BillingCurrency.Inr))
+        assertEquals("₹999", formatPrice(BillingInterval.Year, PriceList.India, BillingCurrency.Inr))
+        assertEquals("$1.99", formatPrice(BillingInterval.Month, PriceList.International, BillingCurrency.Usd))
+        assertEquals("$19.99", formatPrice(BillingInterval.Year, PriceList.International, BillingCurrency.Usd))
+        assertEquals("$3.89", formatPrice(PriceList.International.month * 12 - PriceList.International.year, BillingCurrency.Usd))
         assertEquals(BillingInterval.Year, BillingInterval.of("year"))
         assertEquals(BillingInterval.Month, BillingInterval.of(null))
         assertEquals(BillingInterval.Month, BillingInterval.Year.other)
+        val both = PlanUiState(
+            plan = Plan.Free,
+            cachedPlan = Plan.Free,
+            stale = false,
+            trialDaysLeft = null,
+            trialEndsAt = null,
+            trialClaim = null,
+            subscriptionExpiresAt = null,
+            subscriptionNextBillingAt = null,
+            cancelAtPeriodEnd = false,
+            checkedAt = now,
+            pricesIn = PriceList.India,
+            pricesIntl = PriceList.International,
+        )
+        assertEquals("₹99", formatPrice(BillingInterval.Month, both.prices(BillingRegion.India), BillingCurrency.Inr))
+        assertEquals("$19.99", formatPrice(BillingInterval.Year, both.prices(BillingRegion.International), BillingCurrency.Usd))
     }
 
     @Test

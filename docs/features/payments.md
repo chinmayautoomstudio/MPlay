@@ -1,10 +1,10 @@
 # Payments (PayU Pro subscription)
 
-> Status: Unreleased | Added in: next version after 3.2.3 | Last updated: 2026-10-10
+> Status: Unreleased | Added in: next version after 3.2.3 | Last updated: 2026-10-21
 
 ## Summary
 
-Pro costs ₹99 a month or ₹999 a year and is paid through PayU Payment Links ([payments PRD](../../MP3-Studio-PRD-Payments-PayU-Payment-Link.md)). "Go Pro" lets the user pick Monthly or Yearly, asks for an Indian mobile number, opens a PayU-hosted page in a Custom Tab and, on return, waits for the server to confirm the payment with PayU. By default the link registers autopay (a monthly or yearly standing instruction through UPI AutoPay, eNACH or card), and the server debits ₹99 each month or ₹999 each year. With the server flag `PAYU_BILLING_MODE=manual`, links are one-off and the user renews by hand. The app never talks to PayU, never holds PayU credentials and never decides Pro itself: every decision is made by the Supabase backend after a PayU status check.
+Pro is paid through PayU Payment Links ([payments PRD](../../MP3-Studio-PRD-Payments-PayU-Payment-Link.md)). India is ₹99 a month or ₹999 a year (Indian mobile, optional autopay). International is $1.99 a month or $19.99 a year (E.164 phone, one-off link; PayU standing instructions are INR-only). `entitlements` detects the country from the request IP (`detectedRegion`) and returns both price lists. Plans shows an India / International toggle that defaults to that region; a manual choice is stored as DataStore `billing_region_override` and sent as `start-checkout {region}`. The server maps region to a fixed amount — the app never invents a price. Renew / Fix / Switch stay on the existing subscription's currency. The app never talks to PayU, never holds PayU credentials and never decides Pro itself.
 
 ## Key files
 
@@ -14,22 +14,23 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 |---|---|
 | `data/billing/BillingModels.kt` | `BillingError` (server error codes), `BillingException`, `CheckoutLink`, `PaymentState`, `PaymentSummary`, `CancelResult`, `PaymentRecord`. |
 | `data/billing/BillingBackend.kt` | `SupabaseBillingBackend`: `start-checkout`, `payment-status` and `subscription` Edge Functions, and payment history from the `payments` table (own rows through RLS, newest 50). Maps HTTP errors to `BillingError`. |
-| `data/billing/BillingRepository.kt` | `startCheckout`, `confirm` (polls `payment-status` until settled, then refreshes the plan), `cancel`, `history`, `clear`; `DataStorePendingPaymentStore` keeps the awaited transaction across process death. |
-| `data/billing/PhoneNumber.kt` | `PhoneNumber.normalize` (accepts spaces, dashes, `+91`, `91` or a leading 0; same rule as the server) and `TxnId.parse`. |
-| `data/plan/Entitlements.kt` | `SubscriptionStatus`, `AutopayStatus`, `BillingInterval` (`Month`/`Year`), `BillingMode`, `BillingState` (with `interval`), `PendingPayment`, `LastPayment`, plus `subscriptionInterval`, `hasPhone`, `billingMode` and `paymentsEnabled` on `Entitlements`. |
+| `data/billing/BillingRepository.kt` | `startCheckout`, `confirm`, `cancel`, `history`, `clear`; `DataStorePendingPaymentStore` keeps the awaited transaction and `billing_region_override`. |
+| `data/billing/PhoneNumber.kt` | `PhoneNumber.normalize` (Indian) and `normalizeIntl` (E.164 or Indian); `TxnId.parse`. |
+| `data/plan/Entitlements.kt` | `BillingRegion`, `BillingCurrency`, `PriceList`, billing fields including `detectedRegion`, both price lists and `subscriptionCurrency`. |
 | `ui/plans/BillingViewModel.kt` | Checkout sheet state, opening the link, the return and resume checks, cancel autopay. |
 | `ui/plans/BillingHost.kt` | Root-level host: opens links in a Custom Tab (`androidx.browser`, https only), handles returns, checks on resume, shows the sheet, result screen and cancel dialog. |
-| `ui/plans/CheckoutSheet.kt` | Monthly/Yearly picker (hidden when switching), autopay or manual terms for the chosen interval, the switch note, the +91 phone field, Pay ₹99 or Pay ₹999, links to Terms, Refund policy and Privacy. |
+| `ui/plans/CheckoutSheet.kt` | Monthly/Yearly picker, terms and Pay button for the selected region, +91 or E.164 phone, policy links. |
 | `ui/plans/PaymentResultScreen.kt` | Full-screen result: confirming, success, failed, link expired, not completed, still processing, couldn't check, no browser. |
 | `ui/plans/BillingStatus.kt` | `BillingStatusRules.of(...)`: the notice and buttons the Plans screen shows for each subscription state. |
 | `ui/plans/PaymentReturnLink.kt` | Parses `https://<pay.returnHost>/pay/return?txn=...` App Links. |
 | `ui/plans/PaymentHistoryScreen.kt` | Settings > Plans > Payment history, with a receipt dialog. |
-| `ui/plans/PaymentText.kt` | Rupee and date formatting, error and status text, `pricePaise(interval)` (must match `billing_price_paise`). |
+| `ui/plans/PaymentText.kt` | `formatPrice` / `formatAmount` for INR and USD, date formatting, error and status text. |
 | `ui/admin/AdminPaymentsScreen.kt` | Admin payments list and billing health; see [admin](admin.md). |
 | `supabase/functions/start-checkout/`, `payment-status/`, `payu-webhook/`, `payu-return/`, `subscription/`, `billing-jobs/` | Billing Edge Functions; see [backend](../backend.md#billing-payu). |
-| `supabase/functions/_shared/payu.ts`, `billing.ts`, `checkout.ts`, `webhook.ts`, `jobs.ts`, `notifier.ts` | PayU client (OAuth Payment Links API and SHA-512-signed `postservice.php` commands), shared flows, request parsing, webhook classification and redaction, job auth, billing notices. |
+| `supabase/functions/_shared/payu.ts`, `billing.ts`, `checkout.ts`, `geo.ts`, `webhook.ts`, `jobs.ts`, `notifier.ts` | PayU client, IP country lookup, checkout parse (`region`), shared billing flows. |
 | `supabase/migrations/20261013000000_payu_billing.sql` to `20261015000000_billing_admin.sql` | Schema, verification, scheduled jobs and admin billing. |
 | `supabase/migrations/20261017000000_yearly_plan.sql` | `billing_interval` on subscriptions and payments, `billing_price_paise(interval)`, `billing_period_end()`, the switch rule in `begin_checkout()`, and yearly-aware verification, renewals, entitlements and admin detail. |
+| `supabase/migrations/20261021000000_intl_usd.sql` | `payments.currency` / `subscriptions.currency`, dual `billing_price_paise(interval, currency)`, E.164 phones, `begin_checkout(..., p_currency)`, currency check in `apply_payment_result`. |
 | `supabase/functions/_shared/return_page.ts` | The return page `payu-return` serves after checkout, with an intent link back to the app. |
 | `web/pay/return/index.html`, `web/.well-known/assetlinks.json` | Unpublished App Link page and Digital Asset Links template, for when `pay.returnHost` serves them. |
 
@@ -56,9 +57,9 @@ sequenceDiagram
 
 ### Checkout
 
-- Go Pro (Plans screen or upgrade sheet), Fix payment, Set up autopay, Renew and the switch buttons all open `CheckoutSheet` (`CheckoutPurpose`). The phone field shows only while `Entitlements.hasPhone` is false; the server stores the number in `profiles.phone` on the first checkout.
-- The sheet starts on the user's current interval (`BillingState.interval`, Monthly for new users) and sends it as `start-checkout {interval: "month" | "year"}`. The server sets the price (`billing_price_paise`: 9900 or 99900 paise) and the period (`billing_period_end`: one month, or the same day next year with 29 Feb falling back to 28 Feb). Each `payments` row and the subscription it pays for carry `billing_interval`; renewals debit the subscription's interval. The yearly link uses `billingCycle: "YEARLY"` in its standing instruction.
-- `start-checkout` calls `begin_checkout()`, which refuses with `phone_required`, `invalid_phone`, `payment_in_progress` (an open link exists; a live link is handed out again only for the same interval), `already_subscribed`, `switch_not_yet` or `mandate_update_pending`, and rate-limits attempts. A "replace" checkout while Pro is active is allowed only when autopay isn't `on` (or, in manual mode, within 7 days of expiry).
+- Go Pro (Plans screen or upgrade sheet), Fix payment, Set up autopay, Renew and the switch buttons all open `CheckoutSheet` (`CheckoutPurpose`). New purchases follow the Plans India / International toggle (IP default). Renew / Fix / Switch use the live subscription's currency. The phone field shows for India while `hasIndianPhone` is false, and for International while `hasPhone` is false.
+- The sheet sends `start-checkout {interval, region}`. The server maps `in` → INR (9900 / 99900) and `intl` → USD (199 / 1999). Omitted `region` uses the request IP. USD links are always `source: "API"` with no `siDetails`. A live link is reused only when interval **and** currency match.
+- `begin_checkout(..., p_currency)` refuses with `phone_required`, `invalid_phone`, `payment_in_progress`, `already_subscribed`, `switch_not_yet` or `mandate_update_pending`. A replace of an existing PayU row keeps that row's currency.
 
 ### Switching between monthly and yearly
 
@@ -108,9 +109,9 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 
 ## Data and persistence
 
-- DataStore `billing`: `pending_payment_user` and `pending_payment_txn`, the transaction being waited for. Cleared when it settles, when the server no longer knows it, and on sign-out.
-- DataStore `entitlements` (see [plans](plans.md)): the cached answer now includes `billing`, `pendingPayment`, `lastPayment`, `hasPhone`, `billingMode` and `paymentsEnabled`. A cache written before this change fails to decode and is fetched again. `subscriptionInterval` and `BillingState.interval` have defaults, so caches from before yearly Pro still decode.
-- Server columns `subscriptions.billing_interval` and `payments.billing_interval` (`month` or `year`, default `month`).
+- DataStore `billing`: `pending_payment_user`, `pending_payment_txn`, and `billing_region_override` (`in` | `intl`). Pending payment and the override are cleared on sign-out.
+- DataStore `entitlements` (see [plans](plans.md)): includes `detectedRegion`, `pricesIn`, `pricesIntl`, `hasIndianPhone` and `subscriptionCurrency`. Older caches still decode (`ignoreUnknownKeys` / defaults).
+- Server columns `subscriptions.currency` and `payments.currency` (`INR` | `USD`, default `INR`); `billing_interval` as before.
 - Server tables `subscriptions` (PayU columns), `payments`, `webhook_log`, `job_runs`, `payment_events.txn_id` and `profiles.phone`: see [backend](../backend.md#billing-payu). No Room changes.
 - The app stores no card, UPI or bank details, and neither does the server: only PayU's references, the method name and the mandate reference.
 
@@ -124,12 +125,13 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 ## Tests
 
 - Yearly Pro: `BillingViewModelTest` (Monthly default, the picked interval reaches the backend, a switch locks the other interval and carries the switch date), `BillingStatusRulesTest` (switch buttons and the 31-day window, prices), `EntitlementsResponseTest` (interval parsing, none for admin grants), `BillingRepositoryTest` (`switch_not_yet`, `invalid_interval`), Deno (`YEARLY` link payload, interval parsing) and pgTAP (yearly period and price, yearly first payment and renewal, monthly-to-yearly switch, `switch_not_yet`). The SQL and Deno tests have not been run yet.
+- International USD: `BillingViewModelTest` (International checkout is manual and sends `region`, IP default when there is no override, stored override beats IP, Renew/Fix stay on the subscription currency), `BillingRepositoryTest` (override survives a new repository / process death; no override stays null), `BillingStatusRulesTest` (`formatPrice` for ₹99 / ₹999 / $1.99 / $19.99 and the USD save), `PhoneNumberTest.kt` (Indian vs E.164), `EntitlementsResponseTest` (`detectedRegion`, both price lists, `needsPhone` per region), `EntitlementsRepositoryTest` (offline cache keeps the last detected region). Deno: `geo_test.ts`, USD link payload without SI, `region` on checkout. pgTAP: dual prices, USD checkout, INR still needs an Indian mobile, same-currency link reuse, currency mismatch on `apply_payment_result`.
 - `data/billing/BillingRepositoryTest.kt`: checkout remembers the transaction per user (and nothing on failure), confirm polls until PayU answers then refreshes the plan, an unsettled or offline payment stays remembered, an unknown transaction is forgotten, a return-link transaction doesn't touch the remembered one, cancel refreshes the plan.
 - `ui/plans/BillingViewModelTest.kt`: the phone field (asked when missing locally or on the server), phone validation before calling the server, refusals staying on the sheet, opening the link and confirming on return, results following the server, the quiet resume check, offline after returning, cancel results.
 - `ui/plans/BillingStatusRulesTest.kt`: the notice and buttons for each state, admin grants, the manual renewal window, and return-link parsing (host, scheme, path, transaction format).
 - `data/plan/EntitlementsResponseTest.kt`: billing fields and enums from the `entitlements` JSON.
 - `ui/admin/AdminViewModelTest.kt`: admin payments page, refund and cancel messages, refundable rule.
-- Deno, `supabase/functions/_shared/`: `payu_test.ts` (hashes, IST dates, link payload, parsers, config, the client against a fake fetch: token reuse, signed commands, the salt never sent; payment-link lookups by `udf1`, the link's transactions and `checkPayment`), `checkout_test.ts` (phone, checkout and status requests, job auth), `webhook_test.ts` (classification including payment-link postbacks, redaction, form and JSON bodies), `admin_test.ts` (billing actions).
+- Deno, `supabase/functions/_shared/`: `payu_test.ts` (hashes, IST dates, INR and USD link payloads, parsers, config, the client against a fake fetch: token reuse, signed commands, the salt never sent; payment-link lookups by `udf1`, the link's transactions and `checkPayment`), `checkout_test.ts` (Indian and E.164 phones, `region` `in`/`intl`, status requests, job auth), `geo_test.ts` (public vs private IP, `X-Forwarded-For`, IN vs US vs failed lookup, `parseRegion`), `webhook_test.ts` (classification including payment-link postbacks, redaction, form and JSON bodies), `admin_test.ts` (billing actions).
 - pgTAP: `supabase/tests/payments_test.sql` and `billing_flow_test.sql` (checkout rules, payment results, renewals, expiry, grace, cancellation, refunds, disputes, admin billing), run live with the new migrations rolled back (`run_live.ps1 -Pending`).
 - Gaps: no end-to-end test against PayU's sandbox yet; no UI tests for the sheet, result screen or history.
 
@@ -139,13 +141,16 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 - Deployed on 2026-10-10 with PayU **test** credentials and `PAYU_BILLING_MODE=manual`; real payments need the live credentials and `PAYU_ENV=live`. Whenever any PayU secret is missing, `paymentsEnabled` is false and the Plans screen shows "Payments aren't available yet." with Go Pro disabled.
 - `pay.returnHost` (autoomstudio.com) doesn't serve `/pay/return` or `assetlinks.json`, so a plain `https://autoomstudio.com/pay/return` link opens the company website, not the app. Only the intent link from the return page opens the app. Some browsers may block the automatic open, in which case the user taps the button.
 - Billing emails are only logged; GST invoices, partial refunds from the app and a web checkout are out of scope (PRD phase 6).
-- Switching interval with autopay on cancels the old mandate before the new link is paid; an abandoned switch leaves autopay off until the user sets it up again. PayU's `YEARLY` billing cycle hasn't been tried in the sandbox yet.- The prices in the app's strings and `pricePaise` are fixed copies of `billing_price_paise`; changing a price needs both.
+- Switching interval with autopay on cancels the old mandate before the new link is paid; an abandoned switch leaves autopay off until the user sets it up again. PayU's `YEARLY` billing cycle hasn't been tried in the sandbox yet.
+- USD checkout needs international / multi-currency enabled on the PayU merchant. A missing or private client IP defaults to India; Coolify must pass `X-Forwarded-For`.
+- Catalog prices come from the entitlements payload; changing a price is a server change only.
 - Receipts are in-app only (transaction ID, amount, date, method); there is no PDF.
 
 ## Change history
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-21 | - | International USD Pro ($1.99 / $19.99): IP `detectedRegion`, India / International toggle (`billing_region_override`), `start-checkout {region}`, USD Payment Links without SI, E.164 phone. Migration `20261021000000_intl_usd.sql` applied live (after yearly). |
 | 2026-10-10 | - | Yearly Pro at ₹999: Monthly/Yearly picker, yearly autopay mandate, switching between intervals at the end of the paid period (migration `20261017000000_yearly_plan.sql`, not yet applied). The Monthly and Yearly cards are the same height. |
 | 2026-10-10 | - | After checkout, `payu-return` serves the return page and opens the app through an intent link, instead of redirecting to autoomstudio.com, which showed the company website. |
 | 2026-10-10 | - | Admin revoke subscription: ends PayU Pro now and cancels any mandate, without a refund. |

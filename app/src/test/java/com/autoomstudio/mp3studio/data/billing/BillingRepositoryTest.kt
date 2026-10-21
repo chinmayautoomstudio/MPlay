@@ -2,6 +2,7 @@ package com.autoomstudio.mp3studio.data.billing
 
 import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
+import com.autoomstudio.mp3studio.data.plan.BillingRegion
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -22,15 +23,32 @@ class BillingRepositoryTest {
         }
     }
 
+    class FakeRegionStore : BillingRegionStore {
+        var value: BillingRegion? = null
+        override suspend fun readOverride() = value
+        override suspend fun writeOverride(region: BillingRegion) {
+            value = region
+        }
+        override suspend fun clearOverride() {
+            value = null
+        }
+    }
+
     class FakeBackend : BillingBackend {
         val answers = ArrayDeque<PaymentState>()
         val asked = mutableListOf<String?>()
         var fail: BillingError? = null
         var cancels = 0
         val intervals = mutableListOf<BillingInterval>()
+        val regions = mutableListOf<BillingRegion>()
 
-        override suspend fun startCheckout(phone: String?, interval: BillingInterval): CheckoutLink {
+        override suspend fun startCheckout(
+            phone: String?,
+            interval: BillingInterval,
+            region: BillingRegion,
+        ): CheckoutLink {
             intervals += interval
+            regions += region
             fail?.let { throw BillingException(it) }
             return CheckoutLink("https://u.payu.in/x", "MPNEW", BillingMode.Autopay)
         }
@@ -50,14 +68,32 @@ class BillingRepositoryTest {
     }
 
     private val store = FakeStore()
+    private val regions = FakeRegionStore()
     private val backend = FakeBackend()
     private val refreshed = mutableListOf<String>()
     private val sleeps = mutableListOf<Long>()
-    private val repository = BillingRepository(backend, store, { refreshed += it }, { sleeps += it })
+    private val repository = BillingRepository(backend, store, regions, { refreshed += it }, { sleeps += it })
+
+    @Test
+    fun aRegionOverrideSurvivesANewRepository() = runTest {
+        repository.setRegionOverride(BillingRegion.International)
+        assertEquals(BillingRegion.International, regions.value)
+        val again = BillingRepository(backend, store, regions, {}, {})
+        assertNull(again.regionOverride.value)
+        again.loadRegionOverride()
+        assertEquals(BillingRegion.International, again.regionOverride.value)
+    }
+
+    @Test
+    fun noOverrideMeansTheClientUsesTheDetectedRegion() = runTest {
+        assertNull(repository.regionOverride.value)
+        repository.loadRegionOverride()
+        assertNull(repository.regionOverride.value)
+    }
 
     @Test
     fun checkoutRemembersTheTransactionForTheUser() = runTest {
-        val link = repository.startCheckout("u1", "9876543210", BillingInterval.Year)
+        val link = repository.startCheckout("u1", "9876543210", BillingInterval.Year, BillingRegion.India)
         assertEquals("MPNEW", link.txnId)
         assertEquals(listOf(BillingInterval.Year), backend.intervals)
         assertEquals("u1" to "MPNEW", store.value)
@@ -69,7 +105,7 @@ class BillingRepositoryTest {
     fun aFailedCheckoutRemembersNothing() = runTest {
         backend.fail = BillingError.PaymentInProgress
         try {
-            repository.startCheckout("u1", null, BillingInterval.Month)
+            repository.startCheckout("u1", null, BillingInterval.Month, BillingRegion.India)
             fail()
         } catch (e: BillingException) {
             assertEquals(BillingError.PaymentInProgress, e.error)

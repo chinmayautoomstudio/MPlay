@@ -4,7 +4,7 @@
 
 ## Summary
 
-Every account is on Free, Trial or Pro (PRD v3.2 section 6.3, M2). The server decides the plan; the app caches it and locks BPM detection and Sing Along on Free, showing an upgrade sheet instead. Free users can separate 10 songs a week (M3). New accounts get a one-time 30-day trial with everything in Pro, at most once per normalized email and per phone. Settings > Plans shows the plan, its dates, what each plan includes and, for paying users, the billing status. "Go Pro" (₹99 a month or ₹999 a year) opens the PayU checkout described in [payments](payments.md), and a paying user's plan reads "Pro · Monthly" or "Pro · Yearly" (`PlanUiState.subscriptionInterval`); it is disabled with "Payments aren't available yet." while the server has no PayU secrets.
+Every account is on Free, Trial or Pro (PRD v3.2 section 6.3, M2). The server decides the plan; the app caches it and locks BPM detection and Sing Along on Free, showing an upgrade sheet instead. Free users can separate 10 songs a week (M3). New accounts get a one-time 30-day trial with everything in Pro, at most once per normalized email and per phone. Settings > Plans shows the plan, its dates, what each plan includes and, for paying users, the billing status. An India / International toggle defaults to the IP-detected region and switches the catalog between ₹99 / ₹999 and $1.99 / $19.99. "Go Pro" opens the PayU checkout described in [payments](payments.md). A paying user's plan reads "Pro · Monthly" or "Pro · Yearly" (`PlanUiState.subscriptionInterval`); it is disabled with "Payments aren't available yet." while the server has no PayU secrets.
 
 ## Key files
 
@@ -66,8 +66,8 @@ sequenceDiagram
 - Plans screen layout (`PlansScreen.kt`), from top to bottom:
   - The title is "Upgrade to Pro", or "Your plan" on Pro.
   - "Your subscription": the plan label and dates, usage, stale warning, Refresh, billing notices, Payment history, and the billing actions the Pro card doesn't handle (`Renew`, `FixPayment`, `SetUpAutopay`, `CheckPayment`, `CancelAutopay`).
-  - A Monthly/Yearly toggle, which starts on the current `subscriptionInterval`.
-  - Free and Pro cards of equal height. The Pro card's price follows the toggle.
+  - An India / International toggle (`PlansViewModel.selectedRegion`), then a Monthly/Yearly toggle which starts on the current `subscriptionInterval`.
+  - Free and Pro cards of equal height. The Pro card's price follows both toggles.
   - The Pro card's button comes from `ProCardButton.of(plan, subscriptionInterval, billing, toggle)`:
     - `Buy` (Go Pro or Go Pro again) opens checkout with `openCheckout(Subscribe, preselect = toggle)`.
     - `CurrentPlan` (disabled) when the toggle matches the paid interval, and for Admin-granted Pro.
@@ -79,7 +79,7 @@ sequenceDiagram
 
 ## Data and persistence
 
-- DataStore `entitlements`, key `entitlements_json`: the serialized `Entitlements` (user ID, plan, trial and subscription dates, `subscriptionStatus`, trial claim, separator usage, billing fields, `serverTime`, `checkedAt`). A cache from before the billing fields (status stored as a string) fails to decode and is fetched again. Cleared on sign-out (PRD AU6). A cache for a different user ID unlocks nothing.
+- DataStore `entitlements`, key `entitlements_json`: the serialized `Entitlements` (user ID, plan, trial and subscription dates, `subscriptionStatus`, trial claim, separator usage, billing fields including `detectedRegion` and both price lists, `serverTime`, `checkedAt`). A cache from before the billing fields (status stored as a string) fails to decode and is fetched again. Cleared on sign-out (PRD AU6). A cache for a different user ID unlocks nothing. The India / International toggle is stored separately as DataStore `billing` key `billing_region_override` (see [payments](payments.md)).
 - Server tables `trials`, `trial_claims`, `subscriptions`: see [backend](../backend.md#tables). No Room changes.
 
 ## Manifest, permissions and notifications
@@ -90,8 +90,8 @@ None. Uses the existing `INTERNET` permission.
 
 - `data/plan/EntitlementPolicyTest.kt`: access table for Free, Trial and Pro, no cache, ended trial, expired subscription with and without a trial, 7-day grace boundary, clock turned back, server time deciding end dates, days-left rounding, usage shown only on Free and rolled over after the reset.
 - `data/plan/EntitlementsRepositoryTest.kt`: refresh stores and maps the server answer, offline refresh keeps the cache, another account's cache unlocks nothing, clear, unknown plan values.
-- `data/plan/EntitlementsResponseTest.kt`: `role` maps to `isAdmin`; billing state, pending and last payment, billing mode and `paymentsEnabled` are mapped, unknown statuses become `Unknown`.
-- `ui/plans/BillingStatusRulesTest.kt` (`theProCardButtonFollowsTheToggle`) and `BillingViewModelTest.kt` (`thePlansToggleSetsTheStartingIntervalExceptForASwitch`): the Pro card button for each plan and toggle position, and the toggle's preselected interval.
+- `data/plan/EntitlementsResponseTest.kt`: `role` maps to `isAdmin`; billing state, pending and last payment, billing mode, `paymentsEnabled`, `detectedRegion` and both price lists are mapped, unknown statuses become `Unknown`.
+- `ui/plans/BillingStatusRulesTest.kt` (`theProCardButtonFollowsTheToggle`, `pricesMatchTheServer`) and `BillingViewModelTest.kt` (`thePlansToggleSetsTheStartingIntervalExceptForASwitch`, region default and override): the Pro card button and price for each plan, Monthly/Yearly and India/International position.
 - `data/tempo/TempoDetectionGateTest.kt`: cached tempo on Free, locked new detection, detection with BPM Detector.
 - `supabase/tests/plans_test.sql` (pgTAP, 16 checks): plan computation, claim idempotence, email and device reuse denied, disabled account, both functions not executable by `authenticated`.
 - `supabase/functions/_shared/trial_test.ts` (Deno, 5 tests): email normalization, device ID validation, peppered hashing.
@@ -112,6 +112,7 @@ None. Uses the existing `INTERNET` permission.
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-21 | - | India / International price toggle on Plans; prices come from `entitlements` (`detectedRegion`, `pricesIn`, `pricesIntl`). See [payments](payments.md). |
 | 2026-10-21 | - | Live `TRIAL_HASH_PEPPER` restored after a Coolify save dropped it on 2026-10-13; six accounts stuck on Free were granted a 30-day trial through `claim_trial()`. |
 | 2026-10-10 | - | Plans screen redesign: "Your subscription" section at the top, Monthly/Yearly toggle, Free and Pro cards whose Pro button follows the toggle (Current Plan or Switch for subscribers), icon-based Compare Plans table. |
 | 2026-10-10 | - | Yearly Pro at ₹999 next to monthly; the plan label shows the interval. |

@@ -3,15 +3,19 @@ package com.autoomstudio.mp3studio.ui.plans
 import com.autoomstudio.mp3studio.data.billing.BillingError
 import com.autoomstudio.mp3studio.data.billing.BillingRepository
 import com.autoomstudio.mp3studio.data.billing.BillingRepositoryTest.FakeBackend
+import com.autoomstudio.mp3studio.data.billing.BillingRepositoryTest.FakeRegionStore
 import com.autoomstudio.mp3studio.data.billing.BillingRepositoryTest.FakeStore
 import com.autoomstudio.mp3studio.data.billing.CancelResult
 import com.autoomstudio.mp3studio.data.billing.PaymentState
 import com.autoomstudio.mp3studio.data.plan.AutopayStatus
 import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
+import com.autoomstudio.mp3studio.data.plan.BillingRegion
 import com.autoomstudio.mp3studio.data.plan.BillingState
+import com.autoomstudio.mp3studio.data.plan.BillingCurrency
 import com.autoomstudio.mp3studio.data.plan.Entitlements
 import com.autoomstudio.mp3studio.data.plan.Plan
+import com.autoomstudio.mp3studio.data.plan.PriceList
 import com.autoomstudio.mp3studio.data.plan.SubscriptionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -41,20 +45,74 @@ class BillingViewModelTest {
 
     private val backend = FakeBackend()
     private val store = FakeStore()
+    private val regionStore = FakeRegionStore()
+    private val repository = BillingRepository(backend, store, regionStore, {}, {})
     private var entitlements = Entitlements(
         userId = "u1",
         plan = Plan.Free,
         hasPhone = false,
+        hasIndianPhone = false,
         billingMode = BillingMode.Autopay,
         paymentsEnabled = true,
         serverTime = 0,
         checkedAt = 0,
     )
     private val viewModel = BillingViewModel(
-        repository = BillingRepository(backend, store, {}, {}),
+        repository = repository,
         signedInUserId = { "u1" },
         entitlements = { entitlements },
     )
+
+    @Test
+    fun anInternationalCheckoutIsManualAndSendsTheRegion() {
+        entitlements = entitlements.copy(detectedRegion = BillingRegion.International)
+        viewModel.openCheckout(region = BillingRegion.International)
+        val sheet = viewModel.state.value.checkout!!
+        assertEquals(BillingRegion.International, sheet.region)
+        assertEquals(BillingMode.Manual, sheet.mode)
+        assertTrue(sheet.needsPhone)
+        viewModel.onPhoneChange("+14155551212")
+        viewModel.pay()
+        assertEquals(listOf(BillingRegion.International), backend.regions)
+    }
+
+    @Test
+    fun checkoutDefaultsToTheDetectedRegionWhenThereIsNoOverride() {
+        entitlements = entitlements.copy(detectedRegion = BillingRegion.International, hasPhone = true)
+        viewModel.openCheckout()
+        val sheet = viewModel.state.value.checkout!!
+        assertEquals(BillingRegion.International, sheet.region)
+        assertEquals(BillingMode.Manual, sheet.mode)
+        assertEquals(PriceList.International, sheet.prices)
+    }
+
+    @Test
+    fun aStoredOverrideBeatsTheDetectedRegion() = runTest {
+        repository.setRegionOverride(BillingRegion.International)
+        entitlements = entitlements.copy(detectedRegion = BillingRegion.India, hasPhone = true)
+        viewModel.openCheckout()
+        assertEquals(BillingRegion.International, viewModel.state.value.checkout!!.region)
+        assertEquals(BillingMode.Manual, viewModel.state.value.checkout!!.mode)
+    }
+
+    @Test
+    fun renewAndFixStayOnTheSubscriptionCurrency() {
+        val usd = BillingState(
+            SubscriptionStatus.Active,
+            AutopayStatus.NotSet,
+            expiresAt = 5_000L,
+            currency = BillingCurrency.Usd,
+        )
+        entitlements = entitlements.copy(
+            hasPhone = true,
+            detectedRegion = BillingRegion.India,
+            billing = usd,
+        )
+        viewModel.openCheckout(CheckoutPurpose.Renew, region = BillingRegion.India)
+        assertEquals(BillingRegion.International, viewModel.state.value.checkout!!.region)
+        viewModel.openCheckout(CheckoutPurpose.FixPayment, region = BillingRegion.India)
+        assertEquals(BillingRegion.International, viewModel.state.value.checkout!!.region)
+    }
 
     @Test
     fun checkoutAsksForAPhoneWhenTheProfileHasNone() {
@@ -66,7 +124,7 @@ class BillingViewModelTest {
 
     @Test
     fun newUsersStartOnMonthlyAndThePickedIntervalIsSent() {
-        entitlements = entitlements.copy(hasPhone = true)
+        entitlements = entitlements.copy(hasPhone = true, hasIndianPhone = true)
         viewModel.openCheckout()
         val sheet = viewModel.state.value.checkout!!
         assertEquals(BillingInterval.Month, sheet.interval)
@@ -85,7 +143,7 @@ class BillingViewModelTest {
             expiresAt = 5_000L,
             interval = BillingInterval.Year,
         )
-        entitlements = entitlements.copy(hasPhone = true, billing = yearly)
+        entitlements = entitlements.copy(hasPhone = true, hasIndianPhone = true, billing = yearly)
         viewModel.openCheckout(CheckoutPurpose.FixPayment)
         assertEquals(BillingInterval.Year, viewModel.state.value.checkout!!.interval)
         assertNull(viewModel.state.value.checkout!!.switchStartsAt)
@@ -104,7 +162,7 @@ class BillingViewModelTest {
     @Test
     fun thePlansToggleSetsTheStartingIntervalExceptForASwitch() {
         val monthly = BillingState(SubscriptionStatus.Active, AutopayStatus.On, expiresAt = 5_000L)
-        entitlements = entitlements.copy(hasPhone = true, billing = monthly)
+        entitlements = entitlements.copy(hasPhone = true, hasIndianPhone = true, billing = monthly)
         viewModel.openCheckout(CheckoutPurpose.Subscribe, preselect = BillingInterval.Year)
         assertEquals(BillingInterval.Year, viewModel.state.value.checkout!!.interval)
         assertFalse(viewModel.state.value.checkout!!.intervalLocked)
@@ -124,7 +182,7 @@ class BillingViewModelTest {
 
     @Test
     fun payingOpensTheLinkAndComingBackConfirms() = runTest {
-        entitlements = entitlements.copy(hasPhone = true)
+        entitlements = entitlements.copy(hasPhone = true, hasIndianPhone = true)
         viewModel.openCheckout()
         viewModel.pay()
         assertNull(viewModel.state.value.checkout)
@@ -138,7 +196,7 @@ class BillingViewModelTest {
 
     @Test
     fun serverRefusalsStayOnTheSheet() {
-        entitlements = entitlements.copy(hasPhone = true)
+        entitlements = entitlements.copy(hasPhone = true, hasIndianPhone = true)
         backend.fail = BillingError.MandateUpdatePending
         viewModel.openCheckout()
         viewModel.pay()
@@ -149,7 +207,7 @@ class BillingViewModelTest {
 
     @Test
     fun aMissingPhoneOnTheServerShowsThePhoneField() {
-        entitlements = entitlements.copy(hasPhone = true)
+        entitlements = entitlements.copy(hasPhone = true, hasIndianPhone = true)
         backend.fail = BillingError.PhoneRequired
         viewModel.openCheckout()
         viewModel.pay()

@@ -212,9 +212,11 @@ class AppContainer(context: Context) {
     val adminBackend: AdminBackend by lazy { SupabaseAdminBackend(supabase) }
 
     val billingRepository: BillingRepository by lazy {
+        val billingPrefs = DataStorePendingPaymentStore(appContext)
         BillingRepository(
             backend = SupabaseBillingBackend(supabase),
-            store = DataStorePendingPaymentStore(appContext),
+            store = billingPrefs,
+            regionStore = billingPrefs,
             refreshPlan = { entitlementsRepository.refresh(it) },
         )
     }

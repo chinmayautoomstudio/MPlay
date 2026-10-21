@@ -6,7 +6,11 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+### Database
+- Applied live: yearly Pro (`20261017000000_yearly_plan`) and international USD (`20261021000000_intl_usd`). Existing `begin_checkout(user, phone, mode)` still maps to monthly INR. ([backend](backend.md#migrations))
+
 ### Added
+- International Pro at $1.99 a month or $19.99 a year, next to India at ₹99 / ₹999. The Plans screen detects the country from the request IP and shows an India / International toggle; checkout sends `region` and the server sets the PayU amount. USD is a one-off Payment Link (no autopay). DataStore `billing_region_override`. ([payments](features/payments.md), [plans](features/plans.md))
 - Profile → Library → Exclude folders: hide songs under chosen MediaStore folders from the library (files stay on the device). Paths stored in DataStore `library_prefs` key `excluded_folders`; applied in `MediaStoreSongSource.querySongs`. ([library](features/library.md))
 - Swipe between Library Songs, Albums and Artists tabs (`HorizontalPager` in `LibraryScreen`). ([library](features/library.md))
 

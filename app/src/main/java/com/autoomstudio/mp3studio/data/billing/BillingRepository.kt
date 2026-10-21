@@ -7,7 +7,11 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.autoomstudio.mp3studio.data.plan.BillingInterval
+import com.autoomstudio.mp3studio.data.plan.BillingRegion
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 
 /** The payment attempt the user last opened, so it is still checked after the app was closed (payments PRD CK8). */
@@ -18,9 +22,16 @@ interface PendingPaymentStore {
     suspend fun clear()
 }
 
+/** Manual India / International override; null means use the IP-detected region. */
+interface BillingRegionStore {
+    suspend fun readOverride(): BillingRegion?
+    suspend fun writeOverride(region: BillingRegion)
+    suspend fun clearOverride()
+}
+
 private val Context.billingDataStore: DataStore<Preferences> by preferencesDataStore(name = "billing")
 
-class DataStorePendingPaymentStore(context: Context) : PendingPaymentStore {
+class DataStorePendingPaymentStore(context: Context) : PendingPaymentStore, BillingRegionStore {
 
     private val dataStore = context.applicationContext.billingDataStore
 
@@ -45,9 +56,24 @@ class DataStorePendingPaymentStore(context: Context) : PendingPaymentStore {
         }
     }
 
+    override suspend fun readOverride(): BillingRegion? = when (dataStore.data.first()[KEY_REGION]) {
+        BillingRegion.India.wire -> BillingRegion.India
+        BillingRegion.International.wire -> BillingRegion.International
+        else -> null
+    }
+
+    override suspend fun writeOverride(region: BillingRegion) {
+        dataStore.edit { it[KEY_REGION] = region.wire }
+    }
+
+    override suspend fun clearOverride() {
+        dataStore.edit { it.remove(KEY_REGION) }
+    }
+
     private companion object {
         val KEY_USER = stringPreferencesKey("pending_payment_user")
         val KEY_TXN = stringPreferencesKey("pending_payment_txn")
+        val KEY_REGION = stringPreferencesKey("billing_region_override")
     }
 }
 
@@ -58,14 +84,33 @@ class DataStorePendingPaymentStore(context: Context) : PendingPaymentStore {
 class BillingRepository(
     private val backend: BillingBackend,
     private val store: PendingPaymentStore,
+    private val regionStore: BillingRegionStore,
     private val refreshPlan: suspend (userId: String) -> Unit,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
 ) {
-    /** Creates the link for [interval] and remembers its transaction for [userId]; throws [BillingException]. */
-    suspend fun startCheckout(userId: String, phone: String?, interval: BillingInterval): CheckoutLink {
-        val link = backend.startCheckout(phone, interval)
+    private val _regionOverride = MutableStateFlow<BillingRegion?>(null)
+
+    /** Manual India / International choice; null until loaded or when the user has not overridden IP. */
+    val regionOverride: StateFlow<BillingRegion?> = _regionOverride.asStateFlow()
+    /** Creates the link for [interval] and [region] and remembers its transaction for [userId]. */
+    suspend fun startCheckout(
+        userId: String,
+        phone: String?,
+        interval: BillingInterval,
+        region: BillingRegion,
+    ): CheckoutLink {
+        val link = backend.startCheckout(phone, interval, region)
         store.write(userId, link.txnId)
         return link
+    }
+
+    suspend fun loadRegionOverride() {
+        _regionOverride.value = regionStore.readOverride()
+    }
+
+    suspend fun setRegionOverride(region: BillingRegion) {
+        _regionOverride.value = region
+        regionStore.writeOverride(region)
     }
 
     /** The transaction still waiting for an answer for [userId], if any. */
@@ -108,7 +153,11 @@ class BillingRepository(
     suspend fun history(): List<PaymentRecord> = backend.payments()
 
     /** On sign-out. */
-    suspend fun clear() = store.clear()
+    suspend fun clear() {
+        store.clear()
+        regionStore.clearOverride()
+        _regionOverride.value = null
+    }
 
     companion object {
         const val POLL_INTERVAL_MS = 3_000L

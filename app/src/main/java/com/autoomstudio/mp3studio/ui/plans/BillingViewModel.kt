@@ -15,7 +15,9 @@ import com.autoomstudio.mp3studio.data.billing.PaymentSummary
 import com.autoomstudio.mp3studio.data.billing.PhoneNumber
 import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
+import com.autoomstudio.mp3studio.data.plan.BillingRegion
 import com.autoomstudio.mp3studio.data.plan.Entitlements
+import com.autoomstudio.mp3studio.data.plan.PriceList
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +34,8 @@ enum class CheckoutPurpose { Subscribe, FixPayment, SetUpAutopay, Renew, SwitchI
 data class CheckoutUi(
     val purpose: CheckoutPurpose,
     val mode: BillingMode,
+    val region: BillingRegion = BillingRegion.India,
+    val prices: PriceList = PriceList.India,
     val needsPhone: Boolean,
     val interval: BillingInterval = BillingInterval.Month,
     /** True when switching: the picker is hidden. */
@@ -100,16 +104,36 @@ class BillingViewModel(
     private var checking = false
 
     /** [preselect] picks the interval the sheet starts on; a switch ignores it and locks the other interval. */
-    fun openCheckout(purpose: CheckoutPurpose = CheckoutPurpose.Subscribe, preselect: BillingInterval? = null) {
+    fun openCheckout(
+        purpose: CheckoutPurpose = CheckoutPurpose.Subscribe,
+        preselect: BillingInterval? = null,
+        region: BillingRegion? = null,
+    ) {
         val current = entitlements()
         val switching = purpose == CheckoutPurpose.SwitchInterval
         val interval = (if (switching) null else preselect) ?: current?.billing?.interval ?: BillingInterval.Month
+        val checkoutRegion = when (purpose) {
+            CheckoutPurpose.Subscribe -> region ?: repository.regionOverride.value ?: current?.detectedRegion
+                ?: BillingRegion.India
+            else -> current?.billing?.currency?.region ?: region ?: BillingRegion.India
+        }
+        val mode = if (checkoutRegion == BillingRegion.International) {
+            BillingMode.Manual
+        } else {
+            current?.billingMode ?: BillingMode.Autopay
+        }
         _state.update {
             it.copy(
                 checkout = CheckoutUi(
                     purpose = purpose,
-                    mode = current?.billingMode ?: BillingMode.Autopay,
-                    needsPhone = current?.hasPhone != true,
+                    mode = mode,
+                    region = checkoutRegion,
+                    prices = current?.prices(checkoutRegion) ?: if (checkoutRegion == BillingRegion.International) {
+                        PriceList.International
+                    } else {
+                        PriceList.India
+                    },
+                    needsPhone = current?.needsPhone(checkoutRegion) ?: true,
                     interval = if (switching) interval.other else interval,
                     intervalLocked = switching,
                     switchStartsAt = current?.billing?.expiresAt?.takeIf { switching },
@@ -141,7 +165,7 @@ class BillingViewModel(
         val userId = signedInUserId() ?: return
         if (sheet.busy) return
         val phone = if (sheet.needsPhone) {
-            PhoneNumber.normalize(sheet.phone) ?: run {
+            PhoneNumber.normalize(sheet.phone, sheet.region) ?: run {
                 _state.update { s -> s.copy(checkout = s.checkout?.copy(phoneInvalid = true)) }
                 return
             }
@@ -151,7 +175,7 @@ class BillingViewModel(
         _state.update { s -> s.copy(checkout = s.checkout?.copy(busy = true, error = null)) }
         viewModelScope.launch {
             try {
-                val link = repository.startCheckout(userId, phone, sheet.interval)
+                val link = repository.startCheckout(userId, phone, sheet.interval, sheet.region)
                 awaitingReturn = link.txnId
                 _state.update { it.copy(checkout = null) }
                 _openUrl.send(link.url)
@@ -265,7 +289,7 @@ class BillingViewModel(
         /** About 30 seconds of checking while the user watches; the server keeps going after that. */
         const val VISIBLE_ATTEMPTS = 10
         const val LINK_EXPIRED = "link_expired"
-        private const val MAX_PHONE_INPUT = 16
+        private const val MAX_PHONE_INPUT = 20
 
         val Factory = viewModelFactory {
             initializer {

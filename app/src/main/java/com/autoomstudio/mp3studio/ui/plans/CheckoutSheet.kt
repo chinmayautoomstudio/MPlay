@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
+import com.autoomstudio.mp3studio.data.plan.BillingRegion
 
 /**
  * Before PayU opens (payments PRD CK1, CK13): monthly or yearly, the price, what autopay means, the policies, and the
@@ -63,6 +64,11 @@ fun CheckoutSheet(
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
     val yearly = state.interval == BillingInterval.Year
+    val intl = state.region == BillingRegion.International
+    val currency = state.region.currency
+    val monthPrice = formatPrice(state.prices.month, currency)
+    val yearPrice = formatPrice(state.prices.year, currency)
+    val save = formatPrice(state.prices.month * 12 - state.prices.year, currency)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -99,7 +105,7 @@ fun CheckoutSheet(
                 ) {
                     IntervalOption(
                         title = stringResource(R.string.checkout_interval_monthly),
-                        price = stringResource(R.string.checkout_interval_monthly_price),
+                        price = stringResource(R.string.checkout_interval_price_month, monthPrice),
                         tag = null,
                         selected = !yearly,
                         enabled = !state.busy,
@@ -110,8 +116,8 @@ fun CheckoutSheet(
                     )
                     IntervalOption(
                         title = stringResource(R.string.checkout_interval_yearly),
-                        price = stringResource(R.string.checkout_interval_yearly_price),
-                        tag = stringResource(R.string.checkout_interval_save),
+                        price = stringResource(R.string.checkout_interval_price_year, yearPrice),
+                        tag = stringResource(R.string.checkout_interval_save_amount, save),
                         selected = yearly,
                         enabled = !state.busy,
                         onClick = { onIntervalChange(BillingInterval.Year) },
@@ -122,14 +128,12 @@ fun CheckoutSheet(
                 }
             }
             Text(
-                stringResource(
-                    when {
-                        state.mode == BillingMode.Autopay && yearly -> R.string.checkout_autopay_terms_yearly
-                        state.mode == BillingMode.Autopay -> R.string.checkout_autopay_terms
-                        yearly -> R.string.checkout_manual_terms_yearly
-                        else -> R.string.checkout_manual_terms
-                    },
-                ),
+                when {
+                    state.mode == BillingMode.Autopay && yearly -> stringResource(R.string.checkout_autopay_terms_yearly)
+                    state.mode == BillingMode.Autopay -> stringResource(R.string.checkout_autopay_terms)
+                    yearly -> stringResource(R.string.checkout_manual_terms_yearly_amount, yearPrice)
+                    else -> stringResource(R.string.checkout_manual_terms_amount, monthPrice)
+                },
                 style = MaterialTheme.typography.bodyMedium,
             )
             state.switchStartsAt?.let {
@@ -143,14 +147,19 @@ fun CheckoutSheet(
                     value = state.phone,
                     onValueChange = onPhoneChange,
                     label = { Text(stringResource(R.string.checkout_phone_label)) },
-                    prefix = { Text("+91 ") },
+                    prefix = if (intl) null else ({ Text("+91 ") }),
                     singleLine = true,
                     enabled = !state.busy,
                     isError = state.phoneInvalid,
                     supportingText = {
                         Text(
                             stringResource(
-                                if (state.phoneInvalid) R.string.checkout_phone_invalid else R.string.checkout_phone_help,
+                                when {
+                                    state.phoneInvalid && intl -> R.string.checkout_phone_invalid_intl
+                                    state.phoneInvalid -> R.string.checkout_phone_invalid
+                                    intl -> R.string.checkout_phone_help_intl
+                                    else -> R.string.checkout_phone_help
+                                },
                             ),
                         )
                     },
@@ -161,7 +170,7 @@ fun CheckoutSheet(
             }
             state.error?.let {
                 Text(
-                    stringResource(billingErrorText(it)),
+                    stringResource(billingErrorText(it, state.region)),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                 )
@@ -170,7 +179,7 @@ fun CheckoutSheet(
                 if (state.busy) {
                     CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
                 } else {
-                    Text(stringResource(R.string.checkout_pay, wholeRupees(pricePaise(state.interval))))
+                    Text(stringResource(R.string.checkout_pay, formatPrice(state.interval, state.prices, currency)))
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

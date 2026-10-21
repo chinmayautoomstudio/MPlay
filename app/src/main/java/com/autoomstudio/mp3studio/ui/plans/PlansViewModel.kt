@@ -6,12 +6,15 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.autoomstudio.mp3studio.MPlayApp
+import com.autoomstudio.mp3studio.data.plan.BillingCurrency
 import com.autoomstudio.mp3studio.data.plan.BillingInterval
+import com.autoomstudio.mp3studio.data.plan.BillingRegion
 import com.autoomstudio.mp3studio.data.plan.EntitlementPolicy
 import com.autoomstudio.mp3studio.data.plan.Entitlements
 import com.autoomstudio.mp3studio.data.plan.Feature
 import com.autoomstudio.mp3studio.data.plan.LastPayment
 import com.autoomstudio.mp3studio.data.plan.Plan
+import com.autoomstudio.mp3studio.data.plan.PriceList
 import com.autoomstudio.mp3studio.data.plan.SeparatorUsage
 import com.autoomstudio.mp3studio.data.plan.TrialClaim
 import com.autoomstudio.mp3studio.di.AppContainer
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -51,7 +55,14 @@ data class PlanUiState(
     val lastPayment: LastPayment? = null,
     /** Whether the user ever had a PayU subscription or payment, so payment history is worth offering. */
     val hasPayments: Boolean = false,
+    val detectedRegion: BillingRegion = BillingRegion.India,
+    val pricesIn: PriceList = PriceList.India,
+    val pricesIntl: PriceList = PriceList.International,
+    val subscriptionCurrency: BillingCurrency? = null,
 ) {
+    fun prices(region: BillingRegion): PriceList =
+        if (region == BillingRegion.International) pricesIntl else pricesIn
+
     fun unlocks(feature: Feature): Boolean = when (feature) {
         Feature.BpmDetector, Feature.SingAlong, Feature.UnlimitedSeparator -> plan != Plan.Free
     }
@@ -90,6 +101,10 @@ data class PlanUiState(
                 },
                 lastPayment = entitlements?.lastPayment,
                 hasPayments = entitlements?.billing != null || entitlements?.lastPayment != null,
+                detectedRegion = entitlements?.detectedRegion ?: BillingRegion.India,
+                pricesIn = entitlements?.pricesIn ?: PriceList.India,
+                pricesIntl = entitlements?.pricesIntl ?: PriceList.International,
+                subscriptionCurrency = entitlements?.subscriptionCurrency,
             )
         }
     }
@@ -98,10 +113,23 @@ data class PlanUiState(
 class PlansViewModel(private val container: AppContainer) : ViewModel() {
 
     private val repository = container.entitlementsRepository
+    private val billing = container.billingRepository
 
     val state: StateFlow<PlanUiState> = repository.entitlements
         .map { cached -> PlanUiState.of(cached?.takeIf { it.userId == container.signedInUserId() }, repository.now()) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, PlanUiState.of(null, repository.now()))
+
+    val selectedRegion: StateFlow<BillingRegion> = combine(state, billing.regionOverride) { ui, override ->
+        override ?: ui.detectedRegion
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, BillingRegion.India)
+
+    init {
+        viewModelScope.launch { billing.loadRegionOverride() }
+    }
+
+    fun setRegion(region: BillingRegion) {
+        viewModelScope.launch { billing.setRegionOverride(region) }
+    }
 
     private val _refreshing = MutableStateFlow(false)
     val refreshing: StateFlow<Boolean> = _refreshing.asStateFlow()

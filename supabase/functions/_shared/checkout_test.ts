@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { normalizePhone, parseCheckoutRequest, parseStatusRequest } from "./checkout.ts";
+import { normalizeIntlPhone, normalizePhone, parseCheckoutRequest, parseStatusRequest } from "./checkout.ts";
 import { jobAuthorized, parseJobAction } from "./jobs.ts";
 
 Deno.test("Indian mobile numbers are normalized and validated", () => {
@@ -10,17 +10,27 @@ Deno.test("Indian mobile numbers are normalized and validated", () => {
   assertEquals(normalizePhone("5876543210"), null);
   assertEquals(normalizePhone("98765"), null);
   assertEquals(normalizePhone(9876543210), null);
+  assertEquals(normalizeIntlPhone("+14155551212"), "+14155551212");
+  assertEquals(normalizeIntlPhone("+91 98765-43210"), "9876543210");
+  assertEquals(normalizeIntlPhone("14155551212"), null);
 });
 
 Deno.test("Checkout and status requests", () => {
-  assertEquals(parseCheckoutRequest({}), { phone: null, interval: "month" });
-  assertEquals(parseCheckoutRequest(null), { phone: null, interval: "month" });
-  assertEquals(parseCheckoutRequest({ phone: "+919876543210" }), { phone: "9876543210", interval: "month" });
+  assertEquals(parseCheckoutRequest({}), { phone: null, interval: "month", region: null });
+  assertEquals(parseCheckoutRequest(null), { phone: null, interval: "month", region: null });
+  assertEquals(parseCheckoutRequest({ phone: "+919876543210" }), { phone: "9876543210", interval: "month", region: null });
   assertEquals(parseCheckoutRequest({ phone: "12" }), { error: "invalid_phone" });
-  assertEquals(parseCheckoutRequest({ amount: 1, phone: "9876543210" }), { phone: "9876543210", interval: "month" });
-  assertEquals(parseCheckoutRequest({ interval: "year" }), { phone: null, interval: "year" });
+  assertEquals(parseCheckoutRequest({ amount: 1, phone: "9876543210" }), { phone: "9876543210", interval: "month", region: null });
+  assertEquals(parseCheckoutRequest({ interval: "year" }), { phone: null, interval: "year", region: null });
   assertEquals(parseCheckoutRequest({ interval: "week" }), { error: "invalid_interval" });
   assertEquals(parseCheckoutRequest({ interval: 12 }), { error: "invalid_interval" });
+  assertEquals(parseCheckoutRequest({ region: "in" }), { phone: null, interval: "month", region: "in" });
+  assertEquals(parseCheckoutRequest({ region: "intl", phone: "+14155551212" }), {
+    phone: "+14155551212",
+    interval: "month",
+    region: "intl",
+  });
+  assertEquals(parseCheckoutRequest({ region: "us" }), { error: "invalid_region" });
   assertEquals(parseStatusRequest({}), { txnId: null });
   assertEquals(parseStatusRequest({ txnId: "MPABC" }), { txnId: "MPABC" });
   assertEquals(parseStatusRequest({ txnId: "MP'; drop" }), null);

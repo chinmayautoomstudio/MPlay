@@ -43,7 +43,11 @@ data class EntitlementsResponse(
     val pendingPayment: PendingPaymentDto? = null,
     val lastPayment: LastPaymentDto? = null,
     val hasPhone: Boolean = false,
+    val hasIndianPhone: Boolean = false,
     val billingMode: String? = null,
+    val detectedRegion: String? = null,
+    val pricesIn: PriceListDto? = null,
+    val pricesIntl: PriceListDto? = null,
     val paymentsEnabled: Boolean = false,
     val serverTime: String,
 ) {
@@ -55,6 +59,7 @@ data class EntitlementsResponse(
         val status: String,
         val provider: String? = null,
         val interval: String? = null,
+        val currency: String? = null,
         val expiresAt: String? = null,
         val nextBillingAt: String? = null,
         val cancelAtPeriodEnd: Boolean = false,
@@ -65,6 +70,7 @@ data class EntitlementsResponse(
         val status: String,
         val autopayStatus: String? = null,
         val interval: String? = null,
+        val currency: String? = null,
         val expiresAt: String? = null,
         val nextBillingAt: String? = null,
         val graceEnd: String? = null,
@@ -76,6 +82,7 @@ data class EntitlementsResponse(
             status = SubscriptionStatus.of(status) ?: SubscriptionStatus.Unknown,
             autopayStatus = AutopayStatus.of(autopayStatus),
             interval = BillingInterval.of(interval),
+            currency = BillingCurrency.of(currency),
             expiresAt = expiresAt?.let(::epochMillis),
             nextBillingAt = nextBillingAt?.let(::epochMillis),
             graceEnd = graceEnd?.let(::epochMillis),
@@ -94,7 +101,18 @@ data class EntitlementsResponse(
     )
 
     @Serializable
-    data class LastPaymentDto(val txnId: String, val status: String, val amountPaise: Int, val at: String)
+    data class LastPaymentDto(
+        val txnId: String,
+        val status: String,
+        val amountPaise: Int,
+        val at: String,
+        val currency: String? = null,
+    )
+
+    @Serializable
+    data class PriceListDto(val month: Int, val year: Int) {
+        fun toList() = PriceList(month, year)
+    }
 
     @Serializable
     data class ClaimDto(val result: String, val reason: String? = null)
@@ -126,9 +144,16 @@ data class EntitlementsResponse(
         pendingPayment = pendingPayment?.let {
             PendingPayment(it.txnId, it.status, it.linkExpiresAt?.let(::epochMillis), it.resolveUntil?.let(::epochMillis))
         },
-        lastPayment = lastPayment?.let { LastPayment(it.txnId, it.status, it.amountPaise, epochMillis(it.at)) },
+        lastPayment = lastPayment?.let {
+            LastPayment(it.txnId, it.status, it.amountPaise, epochMillis(it.at), BillingCurrency.of(it.currency))
+        },
         hasPhone = hasPhone,
+        hasIndianPhone = hasIndianPhone,
         billingMode = BillingMode.of(billingMode),
+        detectedRegion = BillingRegion.of(detectedRegion),
+        pricesIn = pricesIn?.toList() ?: PriceList.India,
+        pricesIntl = pricesIntl?.toList() ?: PriceList.International,
+        subscriptionCurrency = subscription?.takeIf { it.provider == "payu" }?.currency?.let(BillingCurrency::of),
         paymentsEnabled = paymentsEnabled,
         serverTime = epochMillis(serverTime),
         checkedAt = checkedAt,

@@ -93,5 +93,27 @@ class EntitlementsResponseTest {
         assertFalse(e.hasPhone)
         assertEquals(BillingMode.Autopay, e.billingMode)
         assertNull(e.billing)
+        assertEquals(BillingRegion.India, e.detectedRegion)
+        assertEquals(PriceList.India, e.pricesIn)
+        assertEquals(PriceList.International, e.pricesIntl)
+    }
+
+    @Test
+    fun theDetectedRegionAndPriceListsAreRead() {
+        val json = Json { ignoreUnknownKeys = true }
+        val body = """
+            {"plan":"free","detectedRegion":"intl","hasIndianPhone":false,"hasPhone":true,
+             "pricesIn":{"month":9900,"year":99900},"pricesIntl":{"month":199,"year":1999},
+             "subscription":{"status":"active","provider":"payu","interval":"month","currency":"USD"},
+             "serverTime":"2027-02-01T10:00:00+00:00"}
+        """.trimIndent()
+        val e = json.decodeFromString<EntitlementsResponse>(body).toEntitlements("u", 0)
+        assertEquals(BillingRegion.International, e.detectedRegion)
+        assertEquals(199, e.pricesIntl.month)
+        assertEquals(BillingCurrency.Usd, e.subscriptionCurrency)
+        assertTrue(e.hasPhone)
+        assertFalse(e.hasIndianPhone)
+        assertTrue(e.needsPhone(BillingRegion.India))
+        assertFalse(e.needsPhone(BillingRegion.International))
     }
 }

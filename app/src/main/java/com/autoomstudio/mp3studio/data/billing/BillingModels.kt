@@ -1,5 +1,6 @@
 package com.autoomstudio.mp3studio.data.billing
 
+import com.autoomstudio.mp3studio.data.plan.BillingCurrency
 import com.autoomstudio.mp3studio.data.plan.BillingInterval
 import com.autoomstudio.mp3studio.data.plan.BillingMode
 import com.autoomstudio.mp3studio.data.plan.Plan
@@ -104,6 +105,7 @@ data class PaymentRecord(
     val kind: String,
     val state: PaymentState,
     val amountPaise: Int,
+    val currency: BillingCurrency = BillingCurrency.Inr,
     val refundedPaise: Int,
     val interval: BillingInterval = BillingInterval.Month,
     val method: String?,

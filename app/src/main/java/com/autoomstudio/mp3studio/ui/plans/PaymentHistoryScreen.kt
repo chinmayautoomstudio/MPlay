@@ -136,7 +136,7 @@ fun PaymentHistoryScreen(
                                 )
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                Text(rupees(payment.amountPaise), fontWeight = FontWeight.SemiBold)
+                                Text(formatAmount(payment.amountPaise, payment.currency), fontWeight = FontWeight.SemiBold)
                                 Text(
                                     stringResource(paymentStateText(payment.state)),
                                     style = MaterialTheme.typography.bodySmall,
@@ -169,8 +169,10 @@ private fun ReceiptDialog(payment: PaymentRecord, onDismiss: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.receipt_seller), style = MaterialTheme.typography.titleSmall)
                 ReceiptRow(R.string.receipt_item, stringResource(paymentKindText(payment.kind, payment.interval)))
-                ReceiptRow(R.string.receipt_amount, rupees(payment.amountPaise))
-                if (payment.refundedPaise > 0) ReceiptRow(R.string.receipt_refunded, rupees(payment.refundedPaise))
+                ReceiptRow(R.string.receipt_amount, formatAmount(payment.amountPaise, payment.currency))
+                if (payment.refundedPaise > 0) {
+                    ReceiptRow(R.string.receipt_refunded, formatAmount(payment.refundedPaise, payment.currency))
+                }
                 ReceiptRow(R.string.receipt_status, stringResource(paymentStateText(payment.state)))
                 ReceiptRow(R.string.receipt_date, billingDateTime(context, payment.completedAt ?: payment.createdAt))
                 if (payment.periodStart != null && payment.periodEnd != null) {

@@ -4,6 +4,7 @@
 // cancellation and refunds. Endpoint paths, command names and field names follow PayU's developer documentation as
 // of 2026-10; verify with PayU before going live (PRD section 4 note).
 import type { BillingInterval } from "./checkout.ts";
+import type { BillingCurrency } from "./geo.ts";
 
 export type BillingMode = "autopay" | "manual";
 
@@ -150,6 +151,7 @@ export type LinkRequest = {
   mode: BillingMode;
   /** What one payment buys and how often the standing instruction debits; "month" when not given. */
   interval?: BillingInterval;
+  currency?: BillingCurrency;
   successUrl: string;
   failureUrl: string;
   /** Mandate tenure (PRD 5.6, proposed 5 years). */
@@ -162,14 +164,16 @@ export type LinkRequest = {
  */
 export function buildLinkPayload(req: LinkRequest): Record<string, unknown> {
   const yearly = req.interval === "year";
+  const currency = req.currency ?? "INR";
+  const autopay = req.mode === "autopay" && currency === "INR";
   const mandateEnd = new Date(req.periodEnd);
   mandateEnd.setUTCFullYear(mandateEnd.getUTCFullYear() + (req.mandateYears ?? 5));
   const payload: Record<string, unknown> = {
     invoiceNumber: req.txnId,
     subAmount: Number(rupees(req.amountPaise)),
-    currency: "INR",
+    currency,
     description: yearly ? "MP3 Studio Pro, 1 year" : "MP3 Studio Pro, 1 month",
-    source: req.mode === "autopay" ? "si_payment_link" : "API",
+    source: autopay ? "si_payment_link" : "API",
     isPartialPaymentAllowed: false,
     isAmountFilledByCustomer: false,
     maxPaymentsAllowed: 1,
@@ -182,7 +186,7 @@ export function buildLinkPayload(req: LinkRequest): Record<string, unknown> {
     customer: { name: req.customer.name, email: req.customer.email, phone: req.customer.phone },
     udf: { udf1: req.txnId },
   };
-  if (req.mode === "autopay") {
+  if (autopay) {
     payload.siDetails = {
       billingAmount: rupees(req.amountPaise),
       billingCurrency: "INR",
@@ -213,6 +217,7 @@ export type VerifiedPayment = {
   txnId: string;
   payuRef?: string;
   amountPaise?: number;
+  currency?: string;
   method?: string;
   mandateRef?: string;
   reason?: string;
@@ -235,6 +240,7 @@ export function parseVerifyResponse(txnId: string, body: unknown): VerifiedPayme
   else status = "pending";
 
   const amount = paise(t.transaction_amount ?? t.amt);
+  const rawCurrency = t.currency ?? t.transaction_currency;
   const si = (t.si_details ?? t.siDetails) as Record<string, unknown> | undefined;
   const mandate = si ? (si.authpayuid ?? si.authPayuId ?? t.mihpayid) : undefined;
   return {
@@ -242,6 +248,7 @@ export function parseVerifyResponse(txnId: string, body: unknown): VerifiedPayme
     txnId: String(t.txnid ?? txnId),
     payuRef: t.mihpayid == null ? undefined : String(t.mihpayid),
     amountPaise: amount ?? undefined,
+    currency: rawCurrency == null ? undefined : String(rawCurrency).toUpperCase(),
     method: t.mode == null ? undefined : String(t.mode).toUpperCase(),
     mandateRef: mandate == null ? undefined : String(mandate),
     reason: status === "failure" ? String(t.error_Message ?? t.field9 ?? unmapped ?? "failed").slice(0, 200) : undefined,
