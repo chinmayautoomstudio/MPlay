@@ -2,6 +2,8 @@
 
 > Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-21
 
+
+
 ## Summary
 
 Every account is on Free, Trial or Pro (PRD v3.2 section 6.3, M2). The server decides the plan; the app caches it and locks BPM detection and Sing Along on Free, showing an upgrade sheet instead. Free users can separate 10 songs a week (M3). New accounts get a one-time 30-day trial with everything in Pro, at most once per normalized email and per phone. Settings > Plans shows the plan, its dates, what each plan includes and, for paying users, the billing status. An India / International toggle defaults to the IP-detected region and switches the catalog between ₹99 / ₹999 and $1.99 / $19.99. "Go Pro" opens the PayU checkout described in [payments](payments.md). A paying user's plan reads "Pro · Monthly" or "Pro · Yearly" (`PlanUiState.subscriptionInterval`); it is disabled with "Payments aren't available yet." while the server has no PayU secrets.
@@ -46,7 +48,7 @@ sequenceDiagram
 
 ### Server
 
-- `compute_entitlements`: Pro when a `pro` subscription counts as Pro (`is_pro_sub()`, shared with `plan_of()`): `active` before `expires_at` (plus one day when autopay is on, so the hourly renewal can debit), `cancelled` before `expires_at`, or `past_due` before `grace_end`; else Trial while `trials.ends_at` is in the future; else Free. It also returns the profile `role`, which the app maps to `Entitlements.isAdmin` to offer the [Admin](admin.md) screens, and the billing fields `billing`, `pendingPayment`, `lastPayment` and `hasPhone`. The `entitlements` function adds `billingMode` (from `PAYU_BILLING_MODE`) and `paymentsEnabled` (all PayU secrets set). See [payments](payments.md).
+- `compute_entitlements`: Pro when a `pro` subscription counts as Pro (`is_pro_sub()`, shared with `plan_of()`): `active` before `expires_at` (plus one day when autopay is on, so the hourly renewal can debit), `cancelled` before `expires_at`, or `past_due` before `grace_end`; else Trial while `trials.ends_at` is in the future; else Free. It also returns the profile `role` (used by the website Admin, not the app) and the billing fields `billing`, `pendingPayment`, `lastPayment` and `hasPhone`. The `entitlements` function adds `billingMode` (from `PAYU_BILLING_MODE`) and `paymentsEnabled` (all PayU secrets set). See [payments](payments.md).
 - Admin Pro grants (M5): an Admin can grant Pro until a date (at most 5 years ahead) or remove it. That is a `subscriptions` row with `provider = 'admin'`, `payment_status = 'granted'` and `expires_at` as the end, so the rule above needs no special case; removing it marks the row `expired`. See [admin](admin.md).
 - `claim_trial`: serialised per user with an advisory lock. Returns `existing` if the user has a trial row, `denied` (`account`) for a disabled profile, `denied` (`email` or `device`) when `trial_claims` already holds that hash, otherwise inserts the claim and a 30-day `trials` row and returns `granted`.
 - The Edge Function takes the email from the verified token, normalizes it (lowercase, no `+alias`, Gmail dots removed, `googlemail.com` as `gmail.com`) and HMAC-SHA256s it and the device ID with `TRIAL_HASH_PEPPER`. Only hashes are stored.
@@ -90,7 +92,7 @@ None. Uses the existing `INTERNET` permission.
 
 - `data/plan/EntitlementPolicyTest.kt`: access table for Free, Trial and Pro, no cache, ended trial, expired subscription with and without a trial, 7-day grace boundary, clock turned back, server time deciding end dates, days-left rounding, usage shown only on Free and rolled over after the reset.
 - `data/plan/EntitlementsRepositoryTest.kt`: refresh stores and maps the server answer, offline refresh keeps the cache, another account's cache unlocks nothing, clear, unknown plan values.
-- `data/plan/EntitlementsResponseTest.kt`: `role` maps to `isAdmin`; billing state, pending and last payment, billing mode, `paymentsEnabled`, `detectedRegion` and both price lists are mapped, unknown statuses become `Unknown`.
+- `data/plan/EntitlementsResponseTest.kt`: billing state, pending and last payment, billing mode, `paymentsEnabled`, `detectedRegion` and both price lists are mapped, unknown statuses become `Unknown`. The app no longer maps `role` to `isAdmin`.
 - `ui/plans/BillingStatusRulesTest.kt` (`theProCardButtonFollowsTheToggle`, `pricesMatchTheServer`) and `BillingViewModelTest.kt` (`thePlansToggleSetsTheStartingIntervalExceptForASwitch`, region default and override): the Pro card button and price for each plan, Monthly/Yearly and India/International position.
 - `data/tempo/TempoDetectionGateTest.kt`: cached tempo on Free, locked new detection, detection with BPM Detector.
 - `supabase/tests/plans_test.sql` (pgTAP, 16 checks): plan computation, claim idempotence, email and device reuse denied, disabled account, both functions not executable by `authenticated`.
@@ -120,4 +122,5 @@ None. Uses the existing `INTERNET` permission.
 | 2026-10-08 | - | Usage limit (M3): `SeparatorUsage` in the cache, `separatorUsage()`, usage on the Plans card, limit-reached upgrade sheet. |
 | 2026-10-08 | - | M6: offline grace checked end to end on the emulator. |
 | 2026-10-08 | - | Admin (M5): `Entitlements.isAdmin` from `role`, `PlanUiState.isAdmin`, admin Pro grants as `provider = 'admin'` subscriptions. |
+| 2026-10-21 | - | Removed `Entitlements.isAdmin` and `PlanUiState.isAdmin` with the in-app Admin. Admin Pro grants (`provider = 'admin'`) still unlock Pro. ([admin](admin.md)) |
 | 2026-10-10 | - | PayU payments: Go Pro enabled when payments are available, billing status section and Payment history on the Plans screen, `SubscriptionStatus` enum and billing fields in the cache, `is_pro_sub()` with grace for `past_due` ([payments](payments.md)). |

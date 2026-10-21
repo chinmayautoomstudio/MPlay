@@ -139,7 +139,6 @@ data class EntitlementsResponse(
             else -> null
         },
         usage = usage?.toUsage(),
-        isAdmin = role == "admin",
         billing = billing?.toState(),
         pendingPayment = pendingPayment?.let {
             PendingPayment(it.txnId, it.status, it.linkExpiresAt?.let(::epochMillis), it.resolveUntil?.let(::epochMillis))

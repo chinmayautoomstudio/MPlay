@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-10-14
+> Last updated: 2026-10-21
 
 ## Modules
 
@@ -43,7 +43,6 @@ There is no DI framework. [`di/AppContainer.kt`](../app/src/main/java/com/autoom
 - Accounts: `supabase` (`SupabaseClient` with Auth using the private `SecureSessionStore`, Postgrest and Functions), `authRepository` (with `SupabaseAccountDeletionBackend` for Delete account), `profileRepository`, `googleSignIn`, and `signedInUserId()`. `separationController` gets `isSignedIn = { authRepository.isSignedIn }`. See [accounts](features/accounts.md).
 - Plans: `entitlementsRepository` (`SupabaseEntitlementsBackend` with `DeviceId`, `DataStoreEntitlementsCache`). `MetronomeViewModel` gets a `TempoDetectionGate` over `tempoAnalyzer`. See [plans](features/plans.md).
 - Usage limit: a private `usageBackend` (`SupabaseUsageBackend`), `usageGate` (`SeparationUsageGate`, passed to `separationController` with `signedInUserId`) and `usageReporter` (`UsageReporter` over `stemRepository`'s `usage_reports`). `stemRepository` gets `onUsageReported = { UsageSyncWorker.schedule(...) }`. See [vocal separation](features/vocal-separation.md#weekly-usage-limit-prd-us1-us9-pl5).
-- Admin: `adminBackend` (`SupabaseAdminBackend` over the `admin` Edge Function). `AdminViewModel` also gets `signedInUserId` and `entitlementsRepository.refresh`. See [admin](features/admin.md).
 - Payments: `billingRepository` (`BillingRepository` over `SupabaseBillingBackend` and `DataStorePendingPaymentStore`, with `refreshPlan = entitlementsRepository::refresh`). `AuthEffects` clears it on sign-out. `BillingViewModel` and `PaymentHistoryViewModel` use it. See [payments](features/payments.md).
 - `albumArtLoader` (`AlbumArtLoader`) is shared by Coil, the media session and the widget. `MPlayApp` implements Coil's `SingletonImageLoader.Factory` and registers `AlbumArtFetcher` on it. See [library](features/library.md#album-art).
 - `coverArtEmbedder` (`CoverArtEmbedder`) embeds the app logo as MP4 cover art when saving clips and sing-along recordings.
@@ -61,19 +60,18 @@ companion object {
 }
 ```
 
-ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `SeparationViewModel`, `SettingsViewModel`, `EqualizerViewModel`, `MetronomeViewModel`, `SingAlongViewModel`, `TrimEditorViewModel`, `AuthViewModel`, `AccountViewModel`, `AdminViewModel`, `PlansViewModel` (shared by the main screen, Now Playing, the metronome sheet, the Profile screen and the Plans screen), `BillingViewModel` (one per signed-in user, shared by `BillingHost`, the Plans screen and the upgrade sheet), `PaymentHistoryViewModel`. State is exposed as `StateFlow` and collected with `collectAsStateWithLifecycle`; one-off events (snackbar messages) are `Flow`s.
+ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `SeparationViewModel`, `SettingsViewModel`, `EqualizerViewModel`, `MetronomeViewModel`, `SingAlongViewModel`, `TrimEditorViewModel`, `AuthViewModel`, `AccountViewModel`, `PlansViewModel` (shared by the main screen, Now Playing, the metronome sheet, the Profile screen and the Plans screen), `BillingViewModel` (one per signed-in user, shared by `BillingHost`, the Plans screen and the upgrade sheet), `PaymentHistoryViewModel`. State is exposed as `StateFlow` and collected with `collectAsStateWithLifecycle`; one-off events (snackbar messages) are `Flow`s.
 
 `SettingsViewModel` and `AuthViewModel` belong to `MainActivity`. Everything under `MPlayRoot` gets its ViewModels from `SignedInViewModelScope` (an activity ViewModel holding a separate `ViewModelStore` per user), provided as `LocalViewModelStoreOwner`. The store is cleared on sign-out, which releases the playback `MediaController` and all per-user state, and survives rotation.
 
 ## Startup
 
-1. `MPlayApp.onCreate` builds the container. In the main process only, it calls `authRepository.start()` (reads the saved session), `separationController.start()`, `AuthEffects(...).start()` (refreshes the plan, schedules `UsageSyncWorker` and resumes the separation queue after sign-in, keeps `AdminActivityWorker` scheduled for admins, stops background features on sign-out, refreshes the widget) and `singAlongSession.cleanUpLeftovers()`. The `:separator` process skips all of these.
-2. The system splash (`Theme.MPlay.Splash`) shows `drawable-nodpi/splash_logo` on `splash_screen_background` (`#030013`); the launcher icons come from Android Studio's Image Asset wizard (foreground from v2; background `#030013`), and `tools/generate_logo_assets.py` rebuilds the splash and in-app logo from `logos/mp3-studio-logo-v3.png`. `MainActivity.onCreate` keeps the splash screen until `SettingsViewModel.theme` has loaded (avoids a theme flash) and `AuthState` is no longer `Loading`. Signed out, it renders `SignInScreen`; signed in, `MPlayAppTheme { MPlayRoot(...) }` inside the signed-in `ViewModelStoreOwner`. `onStart` runs `AuthViewModel.verifyAccount()` (disabled or revoked accounts are signed out). See [accounts](features/accounts.md).
+1. `MPlayApp.onCreate` builds the container. In the main process only, it calls `authRepository.start()` (reads the saved session), `separationController.start()`, `AuthEffects(...).start()` (refreshes the plan, schedules `UsageSyncWorker` and resumes the separation queue after sign-in, cancels leftover `"admin-activity"` work, stops background features on sign-out, refreshes the widget) and `singAlongSession.cleanUpLeftovers()`. The `:separator` process skips all of these.
+2. The system splash (`Theme.MPlay.Splash`) shows `drawable-nodpi/splash_logo` on `splash_screen_background` (`#030013`); the launcher icons come from Android Studio's Image Asset wizard (foreground from v2; background `#030013`), and `tools/generate_logo_assets.py` rebuilds the splash and in-app logo from `logos/mp3-studio-logo-v3.png`. `MainActivity.onCreate` keeps the splash screen until `SettingsViewModel.theme` has loaded (avoids a theme flash) and `AuthState` is no longer `Loading`. Signed out, it renders `SignInScreen`; signed in, `MPlayAppTheme { MPlayRoot(...) }` inside the signed-in `ViewModelStoreOwner`. `onStart` runs `AuthViewModel.verifyAccount()` (disabled or revoked accounts are signed out). See [accounts](features/accounts.md). In the main process `AuthEffects` also cancels leftover `"admin-activity"` WorkManager work from older installs that had the in-app Admin.
 3. `handleIntent` (also from `onNewIntent`; the activity is `singleTop`) turns these into one-shot UI flags:
    - `EXTRA_OPEN_NOW_PLAYING` from the media notification and widget
    - `SeparationLinks.ACTION_OPEN_QUEUE` from the separation notification
    - `EXTRA_OPEN_METRONOME` from the metronome notification
-   - `AdminNotifications.ACTION_OPEN_ADMIN_ACTIVITY` from an Admin activity notification (opens Profile > Admin > Activity)
    - the payment App Link `https://<pay.returnHost>/pay/return?txn=...` (`PaymentReturnLink.parse`), passed to `BillingHost` as a return request
 4. `MPlayRoot` requests the audio permission (shows `PermissionRationaleScreen` while denied), asks for `POST_NOTIFICATIONS` once on Android 13+, calls `LibraryViewModel.onAppForeground()` on every resume, and renders `MainScreen` with `BillingHost` above it (checkout sheet, payment result, cancel dialog, and a payment check on every resume).
 
@@ -82,7 +80,7 @@ ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `Sepa
 No Navigation-Compose. [`ui/main/MainScreen.kt`](../app/src/main/java/com/autoomstudio/mp3studio/ui/main/MainScreen.kt) holds state in `rememberSaveable` and swaps screens with `AnimatedContent` + `fadeThrough()`.
 
 - Bottom bar (`Destination`): `Library`, `Playlists`, `Metronome`, `Profile` (its icon is the account photo, from `AccountViewModel`).
-- Profile sub-pages (`ProfilePage`): `Main` (the Profile screen; `MPlayTopBar` is hidden here), `EditProfile`, `Appearance`, `Library`, `Duplicates`, `ExcludeFolders`, `Separation` (settings), `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `PaymentHistory` (from Plans), `Admin` (shown to admins; it keeps its own page stack in `AdminViewModel`). See [settings](features/settings-and-about.md). Selecting Profile in the bottom bar resets to `Main`; deep links still open a specific page after `openProfile()`. `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`. The Now Playing Equalizer chip also collapses the player and opens `Equalizer`.
+- Profile sub-pages (`ProfilePage`): `Main` (the Profile screen; `MPlayTopBar` is hidden here), `EditProfile`, `Appearance`, `Library`, `Duplicates`, `ExcludeFolders`, `Separation` (settings), `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `PaymentHistory` (from Plans). See [settings](features/settings-and-about.md). Selecting Profile in the bottom bar resets to `Main`; deep links still open a specific page after `openProfile()`. `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`. The Now Playing Equalizer chip also collapses the player and opens `Equalizer`.
 - The trial banner (last 3 days of the trial) sits above the screen content inside the scaffold.
 - Library: Songs/Albums/Artists via `HorizontalPager`; back stack route strings `album:<id>` / `artist:<name>`.
 - `ExpandablePlayer` is a draggable sheet from the mini player to Now Playing.
@@ -123,7 +121,6 @@ flowchart LR
 | `singalong.RecordingService` | Service | `microphone` | Only while a take is being prepared or recorded. Notification ID 4301. |
 | `SeparationWorker` (via WorkManager `SystemForegroundService`) | `CoroutineWorker` | `mediaProcessing` (35+) / `dataSync` (29-34) | Notification IDs 4101/4102. |
 | `data.usage.UsageSyncWorker` | `CoroutineWorker`, unique `"usage-sync"`, needs a network | none | Sends separation outcomes to `finish-separation`; scheduled after each job ends and on sign-in. |
-| `data.admin.AdminActivityWorker` | Periodic `CoroutineWorker` (15 min), unique `"admin-activity"`, needs a network | none | Posts new Admin activity to channel `admin_activity` (notification IDs 4401, 5000-6023). `AuthEffects` keeps it scheduled while the user is an admin with the switch on. See [admin](features/admin.md). |
 | `separation.worker.SeparatorService` | Bound service, `:separator` process | none | Runs the model so a native crash or OOM never kills playback. |
 | `separation.worker.SeparationTaskWatcher` | Started service, not exported | none | Runs while `SeparationWorker` does; its `onTaskRemoved` pauses separation when the app is swiped away. |
 | `playback.SignedInMediaButtonReceiver` | Receiver, exported | | Headset/widget play-pause; extends Media3's `MediaButtonReceiver` and doesn't start the service while signed out. |
@@ -194,3 +191,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-13 | - | Release R8 `packageScope` limited to `androidx.**` (with `android.r8.gradual.support=true`) so Kotlin stdlib is not repackaged in a way that crashes WorkManager at launch. |
 | 2026-10-14 | - | `ProfilePage.ExcludeFolders`; splash/in-app logos from `logos/mp3-studio-logo-v3.png`; `SongRepository` reads `libraryPreferences.excludedFolders`. |
 | 2026-10-14 | - | Bottom-bar Profile tap resets `profilePage` to `Main`; Library Songs/Albums/Artists use `HorizontalPager`. |
+| 2026-10-21 | - | Removed in-app Admin: `adminBackend`, `AdminViewModel`, `ProfilePage.Admin`, `AdminActivityWorker` and `ACTION_OPEN_ADMIN_ACTIVITY`. Server `admin` functions stay ([admin](features/admin.md)). |

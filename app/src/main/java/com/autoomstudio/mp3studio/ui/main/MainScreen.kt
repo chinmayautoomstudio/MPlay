@@ -78,7 +78,6 @@ import com.autoomstudio.mp3studio.data.settings.ThemeSettings
 import com.autoomstudio.mp3studio.playback.NowPlayingState
 import com.autoomstudio.mp3studio.playback.PlaybackQueue
 import com.autoomstudio.mp3studio.data.library.SongDeleter
-import com.autoomstudio.mp3studio.ui.admin.AdminScreen
 import com.autoomstudio.mp3studio.ui.common.rememberWithLegacyStorage
 import com.autoomstudio.mp3studio.ui.components.MPlayTopBar
 import com.autoomstudio.mp3studio.ui.components.MetronomeIcons
@@ -194,8 +193,6 @@ fun MainScreen(
     onOpenSeparationHandled: () -> Unit,
     openMetronomeRequest: Boolean,
     onOpenMetronomeHandled: () -> Unit,
-    openAdminActivityRequest: Boolean = false,
-    onOpenAdminActivityHandled: () -> Unit = {},
     modifier: Modifier = Modifier,
     plansViewModel: PlansViewModel = viewModel(factory = PlansViewModel.Factory),
     accountViewModel: AccountViewModel = viewModel(factory = AccountViewModel.Factory),
@@ -230,14 +227,6 @@ fun MainScreen(
             destination = Destination.Metronome
             onShowNowPlayingChange(false)
             onOpenMetronomeHandled()
-        }
-    }
-    LaunchedEffect(openAdminActivityRequest) {
-        // AdminScreen opens its Activity page and consumes the request.
-        if (openAdminActivityRequest) {
-            openProfile()
-            profilePage = ProfilePage.Admin
-            onShowNowPlayingChange(false)
         }
     }
     val openPlans = {
@@ -441,10 +430,7 @@ fun MainScreen(
                             }
                         },
                     )
-                } else if (
-                    destination != Destination.Profile ||
-                    (profilePage != ProfilePage.Main && profilePage != ProfilePage.Admin)
-                ) {
+                } else if (destination != Destination.Profile || profilePage != ProfilePage.Main) {
                     MPlayTopBar(
                         showActions = destination == Destination.Library,
                         searchActive = searchActive && destination == Destination.Library,
@@ -575,7 +561,6 @@ fun MainScreen(
                                         },
                                         onOpenEdit = { profilePage = ProfilePage.EditProfile },
                                         onOpenPlans = { profilePage = ProfilePage.Plans },
-                                        onOpenAdmin = { profilePage = ProfilePage.Admin },
                                         onOpenAppearance = { profilePage = ProfilePage.Appearance },
                                         onOpenLibrary = { profilePage = ProfilePage.Library },
                                         onOpenSeparation = { profilePage = ProfilePage.Separation },
@@ -674,14 +659,6 @@ fun MainScreen(
                                         onBack = { profilePage = ProfilePage.Plans },
                                         modifier = contentModifier,
                                         backEnabled = pageBackEnabled,
-                                    )
-                                    ProfilePage.Admin -> AdminScreen(
-                                        onBack = backToMain,
-                                        onMessage = showMessage,
-                                        modifier = contentModifier,
-                                        backEnabled = pageBackEnabled,
-                                        openActivityRequest = openAdminActivityRequest,
-                                        onOpenActivityHandled = onOpenAdminActivityHandled,
                                     )
                                 }
                             }
@@ -840,7 +817,6 @@ private enum class ProfilePage {
     Licenses,
     Plans,
     PaymentHistory,
-    Admin,
 }
 
 /** Last days of the free trial (PRD TR6); tapping it opens Plans. */

@@ -114,8 +114,6 @@ data class Entitlements(
     val cancelAtPeriodEnd: Boolean = false,
     val trialClaim: TrialClaim? = null,
     val usage: SeparatorUsage? = null,
-    /** Only decides whether the Admin screens are offered; the server checks every admin call. */
-    val isAdmin: Boolean = false,
     /** The latest PayU subscription, even when it no longer gives Pro (for Fix payment and Resubscribe). */
     val billing: BillingState? = null,
     val pendingPayment: PendingPayment? = null,

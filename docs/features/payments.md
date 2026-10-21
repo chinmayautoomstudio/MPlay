@@ -25,7 +25,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 | `ui/plans/PaymentReturnLink.kt` | Parses `https://<pay.returnHost>/pay/return?txn=...` App Links. |
 | `ui/plans/PaymentHistoryScreen.kt` | Settings > Plans > Payment history, with a receipt dialog. |
 | `ui/plans/PaymentText.kt` | `formatPrice` / `formatAmount` for INR and USD, date formatting, error and status text. |
-| `ui/admin/AdminPaymentsScreen.kt` | Admin payments list and billing health; see [admin](admin.md). |
+| `supabase/functions/admin/` | Server-side Admin payment list, refund and revoke; see [admin](admin.md). No in-app Admin screens. |
 | `supabase/functions/start-checkout/`, `payment-status/`, `payu-webhook/`, `payu-return/`, `subscription/`, `billing-jobs/` | Billing Edge Functions; see [backend](../backend.md#billing-payu). |
 | `supabase/functions/_shared/payu.ts`, `billing.ts`, `checkout.ts`, `geo.ts`, `webhook.ts`, `jobs.ts`, `notifier.ts` | PayU client, IP country lookup, checkout parse (`region`), shared billing flows. |
 | `supabase/migrations/20261013000000_payu_billing.sql` to `20261015000000_billing_admin.sql` | Schema, verification, scheduled jobs and admin billing. |
@@ -99,7 +99,7 @@ Scheduled by pg_cron through `run_billing_job()` and the `billing-jobs` function
 
 Cancel autopay (`subscription` with `{action: "cancel"}`) stops renewals at once and asks PayU to revoke the mandate. Pro stays until the paid period ends. If PayU doesn't confirm, the answer is `cancel_pending` and the `renewals` job retries.
 
-An Admin can also revoke a PayU subscription (`revokeSubscription`, [admin](admin.md)): Pro ends at once (`revoke_subscription()` sets it `expired` now), renewals stop and any mandate is cancelled, retried by the `renewals` job if PayU doesn't confirm. Nothing is refunded.
+An Admin can also revoke a PayU subscription from the website dashboard (`revokeSubscription`, [admin](admin.md)): Pro ends at once (`revoke_subscription()` sets it `expired` now), renewals stop and any mandate is cancelled, retried by the `renewals` job if PayU doesn't confirm. Nothing is refunded.
 
 Deleting the account cancels any live mandate first; if PayU refuses, deletion stops with `mandate_cancel_failed` ("We couldn't cancel your autopay...", [accounts](accounts.md)).
 
@@ -130,7 +130,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 - `ui/plans/BillingViewModelTest.kt`: the phone field (asked when missing locally or on the server), phone validation before calling the server, refusals staying on the sheet, opening the link and confirming on return, results following the server, the quiet resume check, offline after returning, cancel results.
 - `ui/plans/BillingStatusRulesTest.kt`: the notice and buttons for each state, admin grants, the manual renewal window, and return-link parsing (host, scheme, path, transaction format).
 - `data/plan/EntitlementsResponseTest.kt`: billing fields and enums from the `entitlements` JSON.
-- `ui/admin/AdminViewModelTest.kt`: admin payments page, refund and cancel messages, refundable rule.
+- Admin payment list, refund and revoke are covered in pgTAP (`billing_flow_test.sql`) and Deno `admin_test.ts`; the in-app `AdminViewModelTest` was removed.
 - Deno, `supabase/functions/_shared/`: `payu_test.ts` (hashes, IST dates, INR and USD link payloads, parsers, config, the client against a fake fetch: token reuse, signed commands, the salt never sent; payment-link lookups by `udf1`, the link's transactions and `checkPayment`), `checkout_test.ts` (Indian and E.164 phones, `region` `in`/`intl`, status requests, job auth), `geo_test.ts` (public vs private IP, `X-Forwarded-For`, IN vs US vs failed lookup, `parseRegion`), `webhook_test.ts` (classification including payment-link postbacks, redaction, form and JSON bodies), `admin_test.ts` (billing actions).
 - pgTAP: `supabase/tests/payments_test.sql` and `billing_flow_test.sql` (checkout rules, payment results, renewals, expiry, grace, cancellation, refunds, disputes, admin billing), run live with the new migrations rolled back (`run_live.ps1 -Pending`).
 - Gaps: no end-to-end test against PayU's sandbox yet; no UI tests for the sheet, result screen or history.
@@ -154,6 +154,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 | 2026-10-10 | - | Yearly Pro at ₹999: Monthly/Yearly picker, yearly autopay mandate, switching between intervals at the end of the paid period (migration `20261017000000_yearly_plan.sql`, not yet applied). The Monthly and Yearly cards are the same height. |
 | 2026-10-10 | - | After checkout, `payu-return` serves the return page and opens the app through an intent link, instead of redirecting to autoomstudio.com, which showed the company website. |
 | 2026-10-10 | - | Admin revoke subscription: ends PayU Pro now and cancels any mandate, without a refund. |
+| 2026-10-21 | - | In-app Admin payment screens removed; revoke and refund stay on the server for the website dashboard ([admin](admin.md)). |
 | 2026-10-10 | - | Payment-link payments are verified under PayU's own txnid (from the webhook or the link's transactions); a webhook hash mismatch no longer drops the event. First test payment confirmed. |
 | 2026-10-10 | - | Deployed to the live server in PayU test mode with manual renewal. |
 | 2026-10-10 | - | PayU Payment Links: checkout with autopay or manual mode, server verification, Plans billing status, cancel autopay, renewals and expiry jobs, refunds and disputes, payment history and receipts, admin payments. |

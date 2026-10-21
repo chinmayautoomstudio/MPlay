@@ -14,15 +14,20 @@ Each entry should say what changed and link to the feature doc. Use these groups
 - Profile → Library → Exclude folders: hide songs under chosen MediaStore folders from the library (files stay on the device). Paths stored in DataStore `library_prefs` key `excluded_folders`; applied in `MediaStoreSongSource.querySongs`. ([library](features/library.md))
 - Swipe between Library Songs, Albums and Artists tabs (`HorizontalPager` in `LibraryScreen`). ([library](features/library.md))
 
+### Removed
+- In-app Admin panel: Profile Admin card, `ui/admin/*`, `data/admin/*` (`AdminBackend`, `AdminActivityWorker`, `AdminNotifications`), DataStore keys `admin_activity_seen_at`, `admin_notifications_enabled` and `admin_activity_notified_at`, notification channel `admin_activity`, and `Entitlements.isAdmin` / `PlanUiState.isAdmin`. `AuthEffects` cancels leftover `"admin-activity"` WorkManager work on upgrade. The `admin` Edge Function and SQL stay for the website dashboard. ([admin](features/admin.md), [architecture](architecture.md), [PRD](../MP3-Studio-PRD-Web-Admin-Dashboard.md))
+
 ### Changed
 - Splash and in-app logos regenerated from `logos/mp3-studio-logo-v3.png` (`tools/generate_logo_assets.py` → `splash_logo`, `ic_mp3studio_logo`). ([settings](features/settings-and-about.md), [accounts](features/accounts.md), [architecture](architecture.md))
 
 ### Fixed
+- Website Google login no longer lands on `securedbmp3.autoomstudio.com`. Coolify Auth now uses `GOTRUE_SITE_URL=https://mp3studio.in` and an allow-list for localhost, `mp3studio.in` and `mp3studio://auth-callback`. ([backend](backend.md#auth-settings), [accounts](features/accounts.md))
 - Tapping Profile in the bottom bar always opens the main Profile menu, instead of restoring the last Profile sub-page (e.g. Vocal Separation). ([settings](features/settings-and-about.md), [architecture](architecture.md))
 - Samsung/system call recordings under `Recordings/Call/` (and other `Recordings/` voice files) show in Profile → Library → Exclude folders so they can be hidden. Library query now treats `IS_RECORDING` and the `Recordings/` path as eligible alongside music. ([library](features/library.md))
 - Trial claims work again on the live server. A Coolify UI save on 2026-10-13 dropped `TRIAL_HASH_PEPPER` (and `BILLING_JOBS_SECRET`) from `.env`, so every new sign-in after that stayed on Free with `unavailable`. A new pepper was generated, `BILLING_JOBS_SECRET` was copied back from Vault, and the functions container was recreated. Those two keys must also be set in the Coolify UI, or the next save will drop them again. Six accounts created while the pepper was missing were granted a 30-day trial through `claim_trial()` (ends 2026-11-20). ([plans](features/plans.md), [backend](backend.md#edge-functions))
 
 ### Docs
+- Web Admin Dashboard PRD: website at `mp3studio.in/admin` replaces the in-app Admin and adds billing recovery, support inbox (site forms + Gmail), receipts / GST, and site CMS. ([PRD](../MP3-Studio-PRD-Web-Admin-Dashboard.md), [admin](features/admin.md))
 - UI/UX improvement backlog from a Compose audit (library scrubbers, Now Playing tiles / EQ path, selection, Profile chrome, trim/EQ/separation polish). ([ui-ux-improvements](ui-ux-improvements.md))
 
 ## [1.0.0] - 2026-10-13

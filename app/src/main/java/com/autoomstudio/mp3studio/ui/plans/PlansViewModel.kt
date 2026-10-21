@@ -49,8 +49,6 @@ data class PlanUiState(
     val subscriptionInterval: BillingInterval? = null,
     /** Free users' AI Vocal Separator uses this week; null on Trial and Pro. */
     val usage: SeparatorUsage? = null,
-    /** Shows the Admin entry in Settings; the server checks every admin call. */
-    val isAdmin: Boolean = false,
     val billing: BillingStatus = BillingStatus(null, emptyList()),
     val lastPayment: LastPayment? = null,
     /** Whether the user ever had a PayU subscription or payment, so payment history is worth offering. */
@@ -86,7 +84,6 @@ data class PlanUiState(
                 checkedAt = entitlements?.checkedAt,
                 subscriptionInterval = entitlements?.subscriptionInterval?.takeIf { plan == Plan.Pro },
                 usage = EntitlementPolicy.separatorUsage(entitlements, now),
-                isAdmin = entitlements?.isAdmin == true,
                 billing = if (entitlements == null) {
                     BillingStatus(null, emptyList())
                 } else {

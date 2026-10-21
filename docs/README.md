@@ -40,7 +40,7 @@ MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.au
 | Sing-along recording | [features/sing-along.md](features/sing-along.md) | Unreleased |
 | Accounts and Google sign-in | [features/accounts.md](features/accounts.md) | Unreleased |
 | Plans, trial and feature gates | [features/plans.md](features/plans.md) | Unreleased |
-| Admin (users, roles, invites, Pro grants, audit log, payments) | [features/admin.md](features/admin.md) | Unreleased |
+| Admin (server functions for the website dashboard; no in-app screens) | [features/admin.md](features/admin.md) | Unreleased |
 | Payments (PayU Pro subscription, autopay, history, refunds) | [features/payments.md](features/payments.md) | Unreleased |
 
 ## Product requirement documents
@@ -54,6 +54,7 @@ The PRDs describe intent; these docs describe what the code actually does.
 - [MP3 Studio PRD v3.2.md](../MP3%20Studio%20PRD%20v3.2.md) (rename, accounts, plans)
 - [MP3-Studio-PRD-Payments-PayU-Payment-Link.md](../MP3-Studio-PRD-Payments-PayU-Payment-Link.md) (PayU Pro payments)
 - [MP3-Studio-PRD-v3.3-Equalizer.md](../MP3-Studio-PRD-v3.3-Equalizer.md) (equalizer)
+- [MP3-Studio-PRD-Web-Admin-Dashboard.md](../MP3-Studio-PRD-Web-Admin-Dashboard.md) (website Admin dashboard; replaces in-app Admin)
 
 ## Keeping the docs current
 

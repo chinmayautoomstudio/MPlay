@@ -9,22 +9,10 @@ import org.junit.Test
 
 class EntitlementsResponseTest {
 
-    private fun response(role: String?) = EntitlementsResponse(
+    private fun response() = EntitlementsResponse(
         plan = "free",
-        role = role,
         serverTime = "2027-01-15T08:00:01.5+00:00",
     )
-
-    @Test
-    fun theAdminRoleShowsTheAdminScreens() {
-        assertTrue(response("admin").toEntitlements("u", 0).isAdmin)
-    }
-
-    @Test
-    fun otherRolesAndOlderAnswersDoNot() {
-        assertFalse(response("user").toEntitlements("u", 0).isAdmin)
-        assertFalse(response(null).toEntitlements("u", 0).isAdmin)
-    }
 
     @Test
     fun subscriptionStatusesMapToTheEnum() {
@@ -88,7 +76,7 @@ class EntitlementsResponseTest {
 
     @Test
     fun anOlderServerMeansNoPaymentsAndAutopayMode() {
-        val e = response(null).toEntitlements("u", 0)
+        val e = response().toEntitlements("u", 0)
         assertFalse(e.paymentsEnabled)
         assertFalse(e.hasPhone)
         assertEquals(BillingMode.Autopay, e.billingMode)

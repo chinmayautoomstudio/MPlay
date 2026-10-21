@@ -4,7 +4,7 @@
 
 ## Summary
 
-The last bottom tab is Profile, and its icon is the account photo. The Profile screen shows the photo, name, email and an Edit button ([accounts](accounts.md)), a subscription card, an Admin card (admins only), then cards for Appearance (System/Light/Dark, dynamic colour on Android 12+), Library (hide and review duplicates, exclude folders), Vocal Separation, Background Playback (battery optimisation) and About, and finally Log out. Each card opens its own page. About MP3 Studio shows the version, Autoom Studio links, a privacy note, the privacy policy and terms links, and open-source licenses. The UI uses the "Neon Midnight" purple palette, or wallpaper colours.
+The last bottom tab is Profile, and its icon is the account photo. The Profile screen shows the photo, name, email and an Edit button ([accounts](accounts.md)), a subscription card, then cards for Appearance (System/Light/Dark, dynamic colour on Android 12+), Library (hide and review duplicates, exclude folders), Vocal Separation, Background Playback (battery optimisation) and About, and finally Log out. Each card opens its own page. About MP3 Studio shows the version, Autoom Studio links, a privacy note, the privacy policy and terms links, and open-source licenses. The UI uses the "Neon Midnight" purple palette, or wallpaper colours.
 
 ## Key files
 
@@ -26,7 +26,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 ## How it works
 
-- `MainScreen` keeps `ProfilePage` (`Main`, `EditProfile`, `Appearance`, `Library`, `Duplicates`, `ExcludeFolders`, `Separation`, `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `Admin`). Sub-pages go back to `Main`, except Duplicates and Exclude folders (back to Library), the separation queue (back to Separation) and Licenses (back to About). Tapping Profile in the bottom bar always sets `profilePage` to `Main` (so leaving a sub-page for another tab and returning to Profile shows the Profile menu, not the last sub-page). Deep links (`openSeparation`, `openPlans`, Now Playing Equalizer, Admin activity) still set the target page after opening Profile. `MPlayTopBar` is hidden on `Main`, because the Profile screen draws its own back button and "Profile" title. That back button returns to the tab that was open before Profile.
+- `MainScreen` keeps `ProfilePage` (`Main`, `EditProfile`, `Appearance`, `Library`, `Duplicates`, `ExcludeFolders`, `Separation`, `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `PaymentHistory`). Sub-pages go back to `Main`, except Duplicates and Exclude folders (back to Library), the separation queue (back to Separation), Payment history (back to Plans) and Licenses (back to About). Tapping Profile in the bottom bar always sets `profilePage` to `Main` (so leaving a sub-page for another tab and returning to Profile shows the Profile menu, not the last sub-page). Deep links (`openSeparation`, `openPlans`, Now Playing Equalizer) still set the target page after opening Profile. `MPlayTopBar` is hidden on `Main`, because the Profile screen draws its own back button and "Profile" title. That back button returns to the tab that was open before Profile.
 - The subscription card shows "MP3 Studio" plus the plan name (Free, Trial or Pro). Below that it shows the days left in the trial, or the days until the Pro subscription expires or renews; Free users see an upgrade hint. Tapping it opens Plans. The Profile cards use theme colours, so they follow light and dark mode. The layout is compact so the whole screen fits above the mini player and bottom bar on a typical phone: the back button and title share one row, the avatar is 56dp, category rows are about 60dp tall, and Edit is a small pencil-only icon button (content description "Edit").
 - `MPlayAppTheme` decides dark/light from the setting (or system), or dark when `forceDark` is set (`MainActivity` sets it while signed out, so the sign-in screen is always dark), runs edge-to-edge with matching bar icons, and uses dynamic colour on API 31+ when enabled, otherwise `NeonDarkColors` / `NeonLightColors`.
 - Typography (`MPlayTypography` in `Type.kt`): Outfit for `display*` / `headline*` and `WordmarkStyle`; DM Sans for `title*` / `body*` / `label*`. Fonts are bundled under `res/font/` (offline; no downloadable Google Fonts provider). The home-screen widget keeps the system font.
@@ -62,9 +62,6 @@ All keys in DataStore `app_settings`:
 | `metronome_sound` | String | `Classic` | Metronome |
 | `metronome_volume` | Float | 0.8 (0-1) | Metronome |
 | `singalong_note_seen` | Boolean | `false` | [Sing-along](sing-along.md) |
-| `admin_activity_seen_at` | Long | 0 (epoch ms) | [Admin](admin.md) Activity bell |
-| `admin_notifications_enabled` | Boolean | `true` | [Admin](admin.md) phone notifications switch |
-| `admin_activity_notified_at` | Long | 0 (epoch ms; cleared on sign-out) | [Admin](admin.md) newest event posted as a notification |
 
 Other DataStores: `playback_session`, `library_prefs` (`sort_order`; `excluded_folders` string set — see [library](library.md)), `widget_state`, and `auth_session` (key `session`: the Supabase session, encrypted with Tink, excluded from backup; see [accounts](accounts.md)). The Tink keyset lives in SharedPreferences `auth_keyset_prefs`. DataStore `entitlements` (key `entitlements_json`: the last plan answer from the server, cleared on sign-out; see [plans](plans.md)). DataStore `billing` (keys `pending_payment_user`, `pending_payment_txn`: the PayU payment the app is waiting for; `billing_region_override`: `in` or `intl` when the user picked a catalog on Plans; all cleared on sign-out; see [payments](payments.md)). DataStore `equalizer_settings` (equalizer on/off, bands, presets and switches; see [equalizer](equalizer.md)).
 
@@ -113,3 +110,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-14 | - | Profile → Library → Exclude folders (`ProfilePage.ExcludeFolders`); splash/About logos from `logos/mp3-studio-logo-v3.png`. |
 | 2026-10-21 | - | DataStore `billing` key `billing_region_override` for the Plans India / International toggle ([payments](payments.md)). |
 | 2026-10-14 | - | Bottom-bar Profile tap resets to `ProfilePage.Main` instead of restoring the last sub-page. |
+| 2026-10-21 | - | Removed the Admin card, `ProfilePage.Admin` and unused Admin DataStore keys (`admin_activity_seen_at`, `admin_notifications_enabled`, `admin_activity_notified_at`). Admin lives on the website ([admin](admin.md)). |

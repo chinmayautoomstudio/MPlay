@@ -10,8 +10,6 @@ import com.autoomstudio.mp3studio.data.account.ProfileRepository
 import com.autoomstudio.mp3studio.data.account.SecureSessionStore
 import com.autoomstudio.mp3studio.data.account.SupabaseAccountDeletionBackend
 import com.autoomstudio.mp3studio.data.account.SupabaseAuthBackend
-import com.autoomstudio.mp3studio.data.admin.AdminBackend
-import com.autoomstudio.mp3studio.data.admin.SupabaseAdminBackend
 import com.autoomstudio.mp3studio.data.clip.ClipExporter
 import com.autoomstudio.mp3studio.data.clip.ClipStore
 import com.autoomstudio.mp3studio.data.clip.RingtoneSetter
@@ -208,8 +206,6 @@ class AppContainer(context: Context) {
     }
 
     val profileRepository: ProfileRepository by lazy { ProfileRepository(supabase) }
-
-    val adminBackend: AdminBackend by lazy { SupabaseAdminBackend(supabase) }
 
     val billingRepository: BillingRepository by lazy {
         val billingPrefs = DataStorePendingPaymentStore(appContext)

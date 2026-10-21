@@ -26,6 +26,21 @@ On the self-hosted server, `config.toml` isn't applied automatically. Set these 
 
 - `GOTRUE_EXTERNAL_GOOGLE_ENABLED=true`, `GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID=<Web client ID>` (the same ID as `google.webClientId`), `GOTRUE_EXTERNAL_GOOGLE_SECRET=<Web client secret>`.
 - `GOTRUE_EXTERNAL_EMAIL_ENABLED=false` and `GOTRUE_EXTERNAL_PHONE_ENABLED=false`. As of 2026-10-07 `/auth/v1/settings` still reports email and phone as enabled.
+- Website Google login (`mp3studio.in`) uses `redirectTo` (for example `/studio-ops/auth/callback`). Coolify's template used to hardcode `GOTRUE_SITE_URL` to the Kong URL (`https://securedbmp3.autoomstudio.com`) and map `GOTRUE_URI_ALLOW_LIST` from `ADDITIONAL_REDIRECT_URLS`, so a `GOTRUE_URI_ALLOW_LIST` line in `.env` was ignored and Auth fell back to securedb. As of 2026-10-21 the live compose is:
+
+```
+GOTRUE_SITE_URL: '${GOTRUE_SITE_URL:-${SERVICE_URL_SUPABASEKONG}}'
+GOTRUE_URI_ALLOW_LIST: '${GOTRUE_URI_ALLOW_LIST:-${ADDITIONAL_REDIRECT_URLS}}'
+```
+
+  Live values (also set `ADDITIONAL_REDIRECT_URLS` to the same allow-list as a fallback):
+
+```
+GOTRUE_SITE_URL=https://mp3studio.in
+GOTRUE_URI_ALLOW_LIST=http://localhost:3000/**,http://127.0.0.1:3000/**,https://mp3studio.in/**,mp3studio://auth-callback
+```
+
+  Google's authorized redirect URI stays `https://securedbmp3.autoomstudio.com/auth/v1/callback` (the provider hop). After Google, GoTrue must send the browser to an allow-listed `redirectTo`. A Coolify UI save regenerates `.env` and can rewrite compose from the template, so these three keys and the two compose lines must also exist in the Coolify UI. Recreate only Auth: `docker compose --project-name faifqncpzdrvhsf6zbvzwhvb -f docker-compose.yml --env-file .env up -d --no-deps --force-recreate supabase-auth`.
 
 To disable an account, an Admin uses Disable account on the user's Admin page, which sets `profiles.disabled = true` (the app signs out on the next foreground check). Banning the user in GoTrue also works: the refresh fails with `user_banned`.
 
@@ -164,7 +179,7 @@ Remaining for production, in order: switch the five PayU values to the live ones
 
 ## Usage reports (admin)
 
-Every separation request and outcome is an `ai_usage` row (US9), shown in the in-app Admin screens ([admin](features/admin.md)). Per-user weekly totals from the SQL editor:
+Every separation request and outcome is an `ai_usage` row (US9), shown on the website Admin dashboard ([admin](features/admin.md)). Per-user weekly totals from the SQL editor:
 
 ```sql
 select u.email, a.week_start,
@@ -215,7 +230,7 @@ Run everything against the live database with `.\supabase\tests\run_live.ps1` (S
 
 ## First Admin
 
-Sign in once with the Google account, then run `supabase/seed/first_admin.sql` (with that email) in the SQL editor. Later Admins are added from the in-app Admins page (Settings > Admin > Admins), by email; an email that hasn't signed in yet is stored as an invite.
+Sign in once with the Google account, then run `supabase/seed/first_admin.sql` (with that email) in the SQL editor. Later Admins are added from the website Admin dashboard ([admin](features/admin.md)), by email; an email that hasn't signed in yet is stored as an invite.
 
 `supabase/tests/admin_test.sql` (pgTAP, 25 checks) covers the admin functions: refusals for users and disabled admins, last admin and self rules, invites and the trigger, Pro grants, search and audit rows.
 
@@ -237,3 +252,5 @@ Sign in once with the Google account, then run `supabase/seed/first_admin.sql` (
 | 2026-10-10 | - | Yearly Pro (₹999): migration `20261017000000_yearly_plan` (not applied or run yet), `start-checkout` takes `interval`, YEARLY standing instruction in `payu.ts`; new pgTAP and Deno cases. |
 | 2026-10-21 | - | International USD Pro: migration `20261021000000_intl_usd` applied live (after yearly), `geo.ts`, `start-checkout` `region`, entitlements `detectedRegion` and both price lists. |
 | 2026-10-21 | - | `TRIAL_HASH_PEPPER` and `BILLING_JOBS_SECRET` restored on the live functions container after the 2026-10-13 Coolify save dropped them. New pepper generated; billing secret copied from Vault. Six Free accounts from that window were granted a 30-day trial via `claim_trial()` (ends 2026-11-20). |
+| 2026-10-21 | - | Coolify Auth redirects: compose now reads `GOTRUE_SITE_URL` / `GOTRUE_URI_ALLOW_LIST` (fallback Kong URL / `ADDITIONAL_REDIRECT_URLS`). Live site URL is `https://mp3studio.in`; allow-list covers localhost, `mp3studio.in` and `mp3studio://auth-callback`. Auth container recreated and checked healthy. |
+| 2026-10-21 | - | In-app Admin removed. `admin_*` SQL and the `admin` Edge Function stay for the website dashboard; later Admins are added there, not from Settings. |

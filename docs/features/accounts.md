@@ -1,6 +1,6 @@
 # Accounts and Google sign-in
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-14
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-21
 
 ## Summary
 
@@ -24,7 +24,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `ui/auth/SignInScreen.kt`, `AuthViewModel.kt` | Sign-in screen (logo, title, Google button, legal links), error snackbar, foreground account check. |
 | `ui/auth/SignInBackdrop.kt` | Sign-in background (`SignInBackdrop`), animated hero (`SignInHero`) and the screen's palette (`SignInColors`). |
 | `ui/auth/SignedInViewModelScope.kt` | `ViewModelStore` for signed-in screens, cleared on sign-out. |
-| `ui/settings/ProfileScreen.kt` | Profile header (photo, name, email, Edit), Admin card, Log out ([settings](settings-and-about.md)). |
+| `ui/settings/ProfileScreen.kt` | Profile header (photo, name, email, Edit), subscription card, Log out ([settings](settings-and-about.md)). |
 | `ui/settings/EditProfileScreen.kt`, `AccountViewModel.kt` | Edit page (photo, name field, Delete account), `Avatar`, log-out and delete-account dialogs. |
 | `di/AuthEffects.kt` | App-wide reactions to sign-in and sign-out (separation, metronome, sing-along, profile, widget). |
 | `playback/SignedInMediaButtonReceiver.kt` | Media button receiver that doesn't start playback while signed out. |
@@ -75,7 +75,7 @@ Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `Auth
 
 ### Profile, edit, log out and delete
 
-The Profile tab icon (`ProfileTabIcon`) and the `ProfileScreen` header show the photo (`Avatar`: Coil, with a person icon as placeholder), name and email. Below them, the subscription card opens Profile > Plans ([plans](plans.md)), and admins get an Admin card that opens the [Admin](admin.md) screens. The profile row wins; the Google account details cover it until it loads. Edit opens `EditProfileScreen`, where Save updates `profiles.display_name` (max 80 characters, trimmed) and shows an error under the field if it fails. Log out (the last card on the Profile screen) asks for confirmation, then runs `AuthRepository.signOut()` on the application scope (local sign-out falls back to clearing the session if the server can't be reached).
+The Profile tab icon (`ProfileTabIcon`) and the `ProfileScreen` header show the photo (`Avatar`: Coil, with a person icon as placeholder), name and email. Below them, the subscription card opens Profile > Plans ([plans](plans.md)). The profile row wins; the Google account details cover it until it loads. Edit opens `EditProfileScreen`, where Save updates `profiles.display_name` (max 80 characters, trimmed) and shows an error under the field if it fails. Log out (the last card on the Profile screen) asks for confirmation, then runs `AuthRepository.signOut()` on the application scope (local sign-out falls back to clearing the session if the server can't be reached).
 
 ### Delete account (PRD AU9, PR4)
 
@@ -108,6 +108,8 @@ Delete account (at the bottom of the Edit page, in the error color) opens a dial
 - An **Android** OAuth client per signing key, all with package `com.autoomstudio.mp3studio`: the debug keystore, the release keystore, and the Play App Signing key once the app is on Play. The app never uses these IDs; they authorise the package and key to get tokens for the Web client.
 - While the consent screen (Audience) is External and in Testing, every account that signs in must be listed under Test users. Publish to Production before release.
 
+The Android app signs in with a Google ID token (no browser redirect). The website uses the Google OAuth redirect flow; GoTrue's site URL and allow-list are on the Coolify Auth service ([backend](../backend.md#auth-settings)).
+
 ## Manifest, permissions and notifications
 
 - `INTERNET` and `ACCESS_NETWORK_STATE`. `USE_BIOMETRIC` and `USE_FINGERPRINT`, merged in by `androidx.credentials`, are removed with `tools:node="remove"`.
@@ -131,7 +133,7 @@ Delete account (at the bottom of the Edit page, in the error color) opens a dial
 - Requires Google Play services; phones without them can't sign in.
 - The terms URL (`about_terms_url`, `https://autoomstudio.com/terms`) is a placeholder until the page exists.
 - If GoTrue still allows email or phone sign-up, someone could create an account through the API; disable them on the server ([backend](../backend.md#auth-settings)).
-- An account disabled by an Admin (Disable account on the Admin user page) is noticed on the next foreground check, not instantly.
+- An account disabled by an Admin (website dashboard, [admin](admin.md)) is noticed on the next foreground check, not instantly.
 - Deleting doesn't revoke the Google grant; signing in again with the same Google account creates a new, empty account (without a trial).
 - A deleted account's access token stays valid until it expires (up to an hour) but every call fails, because the user no longer exists.
 - MP3 Studio uses a new application ID (`com.autoomstudio.mp3studio`), so old MPlay (`com.autoomstudio.mplay`) installs don't upgrade in place and their data isn't migrated (decided in M6; see [architecture](../architecture.md)).
@@ -152,3 +154,5 @@ Delete account (at the bottom of the Edit page, in the error color) opens a dial
 | 2026-10-10 | - | Delete account cancels a PayU autopay mandate first; `DeletionError.MandateCancelFailed` replaces `ActiveSubscription`; sign-out also clears the awaited payment. |
 | 2026-10-12 | - | Sign-in logo regenerated from `logos/mp3-studio-logo-v2.png` (`ic_mp3studio_logo`). |
 | 2026-10-14 | - | Sign-in logo regenerated from `logos/mp3-studio-logo-v3.png` (`ic_mp3studio_logo`). |
+| 2026-10-21 | - | Live GoTrue site URL is `https://mp3studio.in` with an allow-list for the website and `mp3studio://auth-callback`. Android ID-token sign-in is unchanged. |
+| 2026-10-21 | - | Profile no longer shows an Admin card; invited emails still become Admin on first sign-in for the website dashboard ([admin](admin.md)). |

@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.rounded.Brightness5
 import androidx.compose.material.icons.rounded.GraphicEq
@@ -75,7 +74,6 @@ fun ProfileScreen(
     onBack: () -> Unit,
     onOpenEdit: () -> Unit,
     onOpenPlans: () -> Unit,
-    onOpenAdmin: () -> Unit,
     onOpenAppearance: () -> Unit,
     onOpenLibrary: () -> Unit,
     onOpenSeparation: () -> Unit,
@@ -131,14 +129,6 @@ fun ProfileScreen(
 
         SubscriptionCard(plan = plan, onClick = onOpenPlans)
 
-        if (plan.isAdmin) {
-            CategoryRow(
-                icon = Icons.Outlined.AdminPanelSettings,
-                title = stringResource(R.string.admin_title),
-                subtitle = stringResource(R.string.admin_row_summary),
-                onClick = onOpenAdmin,
-            )
-        }
         CategoryRow(
             icon = Icons.Rounded.Brightness5,
             title = stringResource(R.string.profile_appearance),
