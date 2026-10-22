@@ -90,6 +90,8 @@ class BillingStatusRulesTest {
         assertEquals("$19.99", formatPrice(BillingInterval.Year, PriceList.International, BillingCurrency.Usd))
         assertEquals("$3.89", formatPrice(PriceList.International.month * 12 - PriceList.International.year, BillingCurrency.Usd))
         assertEquals("$1.99", formatPrice(199, BillingCurrency.Usd))
+        assertEquals("₹0", formatPrice(0, BillingCurrency.Inr))
+        assertEquals("$0.00", formatPrice(0, BillingCurrency.Usd))
         assertEquals(BillingInterval.Year, BillingInterval.of("year"))
         assertEquals(BillingInterval.Month, BillingInterval.of(null))
         assertEquals(BillingInterval.Month, BillingInterval.Year.other)

@@ -13,6 +13,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 - International Pro is ₹99 a month or ₹999 a year (INR) in Cashfree sandbox because that merchant cannot settle USD. Switching Coolify to live Cashfree keys charges USD. ([payments](features/payments.md), [plans](features/plans.md))
 
 ### Fixed
+- The Plans Free card shows `$0` on International instead of a hardcoded `₹0`. ([plans](features/plans.md))
 - International checkout no longer ignores `region`. The live 10 Oct `start-checkout` always created monthly INR; it now reads `{interval, region}`. ([payments](features/payments.md), [backend](backend.md#edge-functions))
 
 ## [1.0.1] - 2026-10-21

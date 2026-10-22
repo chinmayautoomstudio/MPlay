@@ -214,7 +214,7 @@ private fun PlanCards(state: PlanUiState, selected: BillingInterval, region: Bil
             .height(IntrinsicSize.Min)
             .padding(top = 12.dp),
     ) {
-        FreeCard(state, Modifier.weight(1f).fillMaxHeight())
+        FreeCard(state, region, Modifier.weight(1f).fillMaxHeight())
         ProCard(state, selected, region, billing, Modifier.weight(1f).fillMaxHeight())
     }
 }
@@ -222,7 +222,7 @@ private fun PlanCards(state: PlanUiState, selected: BillingInterval, region: Bil
 private val CardShape = RoundedCornerShape(20.dp)
 
 @Composable
-private fun FreeCard(state: PlanUiState, modifier: Modifier) {
+private fun FreeCard(state: PlanUiState, region: BillingRegion, modifier: Modifier) {
     Surface(
         shape = CardShape,
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -248,7 +248,7 @@ private fun FreeCard(state: PlanUiState, modifier: Modifier) {
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                stringResource(R.string.plans_free_price),
+                if (region.currency == BillingCurrency.Usd) "$0" else formatPrice(0, BillingCurrency.Inr),
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
             )

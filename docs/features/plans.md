@@ -114,6 +114,7 @@ None. Uses the existing `INTERNET` permission.
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-22 | - | Free card price follows the India / International toggle (`₹0` / `$0`) instead of a hardcoded `₹0`. |
 | 2026-10-22 | - | International prices are $1.99 / $19.99 with live Cashfree keys. |
 | 2026-10-22 | - | International prices match India (₹99 / ₹999) until PayU USD is enabled. |
 | 2026-10-22 | - | Live `entitlements` now returns `detectedRegion`, `pricesIn` and `pricesIntl`. International Go Pro uses the deployed `start-checkout` (see [payments](payments.md)). |
