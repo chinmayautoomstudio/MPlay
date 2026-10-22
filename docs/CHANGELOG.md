@@ -36,6 +36,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 ### Changed
 - `versionName` 1.0.0 to 1.0.1 and `versionCode` 11 to 12. ([settings](features/settings-and-about.md))
 - Splash and in-app logos regenerated from `logos/mp3-studio-logo-v3.png` (`tools/generate_logo_assets.py` → `splash_logo`, `ic_mp3studio_logo`). ([settings](features/settings-and-about.md), [accounts](features/accounts.md), [architecture](architecture.md))
+- A successful `devices` register now claims the 30-day trial, so a new Google sign-in is Trial even if the later entitlements refresh misses. `entitlements` waits briefly for the profile before returning `no_profile`. ([plans](features/plans.md), [accounts](features/accounts.md))
 
 ### Fixed
 - Google sign-in no longer shows "Couldn't sign in" after a successful token exchange. The live `devices` Edge Function had no entrypoint, so `registerDevice` failed and the app signed the new session out. The function and `user_devices` SQL are now deployed. ([accounts](features/accounts.md), [backend](backend.md#edge-functions))

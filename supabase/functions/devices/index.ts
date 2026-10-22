@@ -1,7 +1,8 @@
 // POST { action, deviceId, deviceName?, replaceDeviceId? } -> register, verify, list or remove this
 // account's phones. At most two stay signed in; a third must replace one of the two.
+// A successful register also claims the 30-day trial (same as entitlements), so first sign-in is Trial.
 import { parseDeviceRequest, sessionIdFromRequest } from "../_shared/devices.ts";
-import { adminClient, caller, json, readJson } from "../_shared/server.ts";
+import { adminClient, caller, claimTrial, json, readJson } from "../_shared/server.ts";
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -38,6 +39,10 @@ Deno.serve(async (req) => {
       if (result.error === "not_found") return json({ error: "no_profile" }, 404);
       if (result.result === "limit_reached") {
         return json({ error: "device_limit_reached", maxDevices: 2, devices: result.devices }, 409);
+      }
+      // Sign-in has succeeded; claim here so a later entitlements miss cannot leave a new account on Free.
+      if (result.error == null) {
+        await claimTrial(admin, user, call.deviceId);
       }
       return json(result);
     }

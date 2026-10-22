@@ -13,6 +13,10 @@ Deno.serve(async (req) => {
 
   try {
     let current = await entitlements(admin, user.id);
+    for (let i = 0; i < 8 && !current; i++) {
+      await new Promise((r) => setTimeout(r, 50));
+      current = await entitlements(admin, user.id);
+    }
     if (!current) return json({ error: "no_profile" }, 404);
     if (current.disabled) return json({ error: "account_disabled" }, 403);
 

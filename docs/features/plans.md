@@ -36,7 +36,7 @@ sequenceDiagram
     participant App
     participant Fn as entitlementsFunction
     participant Db as Postgres
-    App->>Fn: POST deviceId with the user's JWT
+    App->>Fn: POST deviceId with the user's JWT (also claimed earlier by devices register)
     Fn->>Db: compute_entitlements(uid)
     alt no trial row yet
         Fn->>Db: claim_trial(uid, emailHash, deviceHash)
@@ -55,7 +55,7 @@ sequenceDiagram
 
 ### App
 
-- Refresh: `AuthEffects` on sign-in, `AuthViewModel.verifyAccount()` on every foreground, and Refresh on the Plans screen (which also refreshes when opened). A failed call keeps the cache.
+- Claim on sign-in: the `devices` register that finishes Google sign-in calls `claim_trial` with the phone's device ID. `entitlements` claims again if there is still no trial (and waits briefly for the profile if `handle_new_user` has not finished). Refresh: `AuthEffects` on sign-in, `AuthViewModel.verifyAccount()` on every foreground, and Refresh on the Plans screen (which also refreshes when opened). A failed entitlements call keeps the cache but does not undo a trial already written at register.
 - `EntitlementPolicy.effectivePlan` uses the cached plan, but:
   - more than 7 days since the last successful check, or a phone clock more than an hour behind it, makes the cache stale and everything is Free until the next check (PL4);
   - trial and subscription end dates are compared with server time (`serverTime` plus time elapsed on the phone), so an ended trial locks offline.
@@ -119,6 +119,7 @@ None. Uses the existing `INTERNET` permission.
 | 2026-10-22 | - | International prices match India (₹99 / ₹999) until PayU USD is enabled. |
 | 2026-10-22 | - | Live `entitlements` now returns `detectedRegion`, `pricesIn` and `pricesIntl`. International Go Pro uses the deployed `start-checkout` (see [payments](payments.md)). |
 | 2026-10-21 | - | India / International price toggle on Plans; prices come from `entitlements` (`detectedRegion`, `pricesIn`, `pricesIntl`). See [payments](payments.md). |
+| 2026-10-22 | - | Trial is claimed on `devices` register at sign-in; entitlements retries if the profile is not ready yet. |
 | 2026-10-21 | - | Live `TRIAL_HASH_PEPPER` dropped twice more by Coolify saves (13 Oct and 21 Oct 10:54 UTC). Restored each time; `ashisghosh.ori@gmail.com` and `noahsummers.62475@gmail.com` granted a 30-day trial. Vault fallback so a later Coolify save does not block new trials. |
 | 2026-10-10 | - | Plans screen redesign: "Your subscription" section at the top, Monthly/Yearly toggle, Free and Pro cards whose Pro button follows the toggle (Current Plan or Switch for subscribers), icon-based Compare Plans table. |
 | 2026-10-10 | - | Yearly Pro at ₹999 next to monthly; the plan label shows the interval. |

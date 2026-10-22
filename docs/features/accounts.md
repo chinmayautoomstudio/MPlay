@@ -1,6 +1,6 @@
 # Accounts and Google sign-in
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-21
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-22
 
 ## Summary
 
@@ -58,7 +58,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 1. `Nonce.generate()`; Google gets `Nonce.sha256Hex(raw)`, Supabase gets the raw value.
 2. `GoogleSignIn.requestIdToken()` shows the Google account sheet (`GetSignInWithGoogleOption` with `GOOGLE_WEB_CLIENT_ID`).
 3. `auth.signInWith(IDToken) { provider = Google; nonce = raw }`. On the server, the `handle_new_user` trigger creates the profile on first sign-in (see [backend](../backend.md)). If an Admin invited that email (`admin_invites`), the new account starts as Admin and the invite is used up ([admin](admin.md)).
-4. `AuthRepository` holds `state` at `SignedOut` until `registerDevice` succeeds on the `devices` Edge Function. A first or second phone, or this same phone again, returns `registered` and `state` becomes `SignedIn`. A third phone returns `limit_reached` and `SignInScreen` shows `DeviceLimitDialog`: pick one of the two to log out, or Cancel (which signs out the temporary session). Replacing calls `registerDevice(replaceDeviceId)` and then signs in.
+4. `AuthRepository` holds `state` at `SignedOut` until `registerDevice` succeeds on the `devices` Edge Function. A first or second phone, or this same phone again, returns `registered` and `state` becomes `SignedIn`. That register call also claims the 30-day trial ([plans](plans.md)), so a new account is Trial even if the later entitlements refresh fails. A third phone returns `limit_reached` and `SignInScreen` shows `DeviceLimitDialog`: pick one of the two to log out, or Cancel (which signs out the temporary session). Replacing calls `registerDevice(replaceDeviceId)` and then signs in.
 5. `verifyAccount()` signs out again if the profile is disabled.
 
 Errors map to `AuthError` and show as a snackbar (`auth_error_*` strings); `AuthViewModel` also logs the exception (`Log.w`, tag `AuthViewModel`). A cancelled sheet shows nothing. Play services reports a failed account check as a cancellation with the message `[16] Account reauth failed.`; `AuthErrors.classify` turns that into `AuthError.AccountUnavailable` ("Google couldn't confirm this account on this phone...") so it isn't silent. Typical causes: no Android OAuth client for this package and signing key, the account isn't a test user while the consent screen is in Testing, or a work account that still needs setup on the device.
@@ -164,4 +164,5 @@ The Android app signs in with a Google ID token (no browser redirect). The websi
 | 2026-10-21 | - | Profile no longer shows an Admin card; invited emails still become Admin on first sign-in for the website dashboard ([admin](admin.md)). |
 | 2026-10-21 | - | Two-device limit: a third sign-in asks which phone to log out of; Profile lists logged-in devices; `user_devices` and the `devices` Edge Function; Admins can remove a device from the user page. |
 | 2026-10-21 | - | Device-limit hold and a stuck session load now leave `SignedOut` so the splash can dismiss; `verifyDevice` only treats an explicit `device_revoked` as a revoke. |
+| 2026-10-22 | - | `devices` register claims the 30-day trial on first sign-in so a missed entitlements call cannot leave a new account on Free. |
 | 2026-10-21 | - | Live `devices` function and `user_devices` SQL deployed so Google sign-in can finish after the ID token (the missing entrypoint had been signing the new session out). |
