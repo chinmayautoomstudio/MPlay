@@ -6,7 +6,7 @@
 
 ## Summary
 
-Every account is on Free, Trial or Pro (PRD v3.2 section 6.3, M2). The server decides the plan; the app caches it and locks BPM detection and Sing Along on Free, showing an upgrade sheet instead. Free users can separate 10 songs a week (M3). New accounts get a one-time 30-day trial with everything in Pro, at most once per normalized email and per phone. Settings > Plans shows the plan, its dates, what each plan includes and, for paying users, the billing status. An India / International toggle defaults to the IP-detected region. India is ₹99 / ₹999; International matches that in Cashfree sandbox and becomes $1.99 / $19.99 when `CASHFREE_ENV=live`. "Go Pro" opens the checkout described in [payments](payments.md) (PayU in India, Cashfree internationally). A paying user's plan reads "Pro · Monthly" or "Pro · Yearly" (`PlanUiState.subscriptionInterval`); it is disabled with "Payments aren't available yet." while the server has no PayU secrets.
+Every account is on Free, Trial or Pro (PRD v3.2 section 6.3, M2). The server decides the plan; the app caches it and locks BPM detection and Sing Along on Free, showing an upgrade sheet instead. Free users can separate 10 songs a week (M3). New accounts get a one-time 30-day trial with everything in Pro, at most once per normalized email and per phone. Settings > Plans shows the plan, its dates, what each plan includes and, for paying users, the billing status. An India / International toggle defaults to the IP-detected region. India is ₹99 / ₹999; International is $1.99 / $19.99 (`CASHFREE_ENV=live`). "Go Pro" opens the checkout described in [payments](payments.md) (PayU in India, Cashfree internationally). A paying user's plan reads "Pro · Monthly" or "Pro · Yearly" (`PlanUiState.subscriptionInterval`); it is disabled with "Payments aren't available yet." while the server has no PayU secrets.
 
 ## Key files
 
@@ -114,7 +114,7 @@ None. Uses the existing `INTERNET` permission.
 
 | Date | Commit | Change |
 |---|---|---|
-| 2026-10-22 | - | International checkout uses Cashfree Orders + hosted Checkout. Sandbox prices stay ₹99 / ₹999; live Cashfree keys switch the catalog to USD. |
+| 2026-10-22 | - | International prices are $1.99 / $19.99 with live Cashfree keys. |
 | 2026-10-22 | - | International prices match India (₹99 / ₹999) until PayU USD is enabled. |
 | 2026-10-22 | - | Live `entitlements` now returns `detectedRegion`, `pricesIn` and `pricesIntl`. International Go Pro uses the deployed `start-checkout` (see [payments](payments.md)). |
 | 2026-10-21 | - | India / International price toggle on Plans; prices come from `entitlements` (`detectedRegion`, `pricesIn`, `pricesIntl`). See [payments](payments.md). |

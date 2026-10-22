@@ -4,7 +4,7 @@
 
 ## Summary
 
-Pro is paid through **PayU Payment Links for India** and **Cashfree Orders / Checkout for International**. India is ₹99 a month or ₹999 a year. International is the same INR amounts while `CASHFREE_ENV` is sandbox (that merchant cannot settle USD); `CASHFREE_ENV=live` switches the catalog to $1.99 / $19.99. `entitlements` detects the country from the request IP (`detectedRegion`) and returns both price lists. Plans shows an India / International toggle that defaults to that region; a manual choice is stored as DataStore `billing_region_override` and sent as `start-checkout {region}`. The server maps region to a fixed amount and gateway — the app never invents a price. Renew / Fix / Switch stay on the existing subscription's currency. The app never talks to PayU or Cashfree, never holds their credentials and never decides Pro itself.
+Pro is paid through **PayU Payment Links for India** and **Cashfree Orders / Checkout for International**. India is ₹99 a month or ₹999 a year. International is $1.99 / $19.99 while `CASHFREE_ENV=live` (sandbox was INR because that merchant cannot settle USD). `entitlements` detects the country from the request IP (`detectedRegion`) and returns both price lists. Plans shows an India / International toggle that defaults to that region; a manual choice is stored as DataStore `billing_region_override` and sent as `start-checkout {region}`. The server maps region to a fixed amount and gateway — the app never invents a price. Renew / Fix / Switch stay on the existing subscription's currency. The app never talks to PayU or Cashfree, never holds their credentials and never decides Pro itself.
 
 ## Key files
 
@@ -58,7 +58,7 @@ sequenceDiagram
 ### Checkout
 
 - Go Pro (Plans screen or upgrade sheet), Fix payment, Set up autopay, Renew and the switch buttons all open `CheckoutSheet` (`CheckoutPurpose`). New purchases follow the Plans India / International toggle (IP default). Renew / Fix / Switch use the live subscription's currency. The phone field shows for India while `hasIndianPhone` is false, and for International while `hasPhone` is false.
-- The sheet sends `start-checkout {interval, region}`. India (`in`) creates a PayU link. International (`intl`) creates a Cashfree order (manual, no autopay) and returns a `cashfree-checkout` URL that starts hosted Checkout with the `payment_session_id`. Sandbox Cashfree is INR 9900 / 99900; live Cashfree is USD 199 / 1999. Omitted `region` uses the request IP. A live link is reused only when interval **and** currency match; a leftover PayU or Payment-Link URL is failed and replaced.
+- The sheet sends `start-checkout {interval, region}`. India (`in`) creates a PayU link. International (`intl`) creates a Cashfree order (manual, no autopay) and returns a `cashfree-checkout` URL that starts hosted Checkout with the `payment_session_id`. Live Cashfree is USD 199 / 1999. Omitted `region` uses the request IP. A live link is reused only when interval **and** currency match; a leftover PayU or Payment-Link URL is failed and replaced.
 - `begin_checkout(..., p_currency)` refuses with `phone_required`, `invalid_phone`, `payment_in_progress`, `already_subscribed`, `switch_not_yet` or `mandate_update_pending`. A replace of an existing PayU row keeps that row's currency.
 
 ### Switching between monthly and yearly
@@ -143,7 +143,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 - `pay.returnHost` (autoomstudio.com) doesn't serve `/pay/return` or `assetlinks.json`, so a plain `https://autoomstudio.com/pay/return` link opens the company website, not the app. Only the intent link from the return page opens the app. Some browsers may block the automatic open, in which case the user taps the button.
 - Billing emails are only logged; GST invoices, partial refunds from the app and a web checkout are out of scope (PRD phase 6).
 - Switching interval with autopay on cancels the old mandate before the new link is paid; an abandoned switch leaves autopay off until the user sets it up again. PayU's `YEARLY` billing cycle hasn't been tried in the sandbox yet.
-- International USD needs Cashfree live keys (`CASHFREE_ENV=live`). Sandbox Cashfree answers `Currency USD is not enabled`, so sandbox International is INR. A missing or private client IP defaults to India; Coolify must pass `X-Forwarded-For`.
+- Live Cashfree keys are set (`CASHFREE_ENV=live`). Sandbox still cannot create USD orders. A missing or private client IP defaults to India; Coolify must pass `X-Forwarded-For`. The installed 1.0.1 app used INR fallbacks until this change; a new build is needed to show $ on Plans.
 - Catalog prices come from the entitlements payload; changing a price is a server change only.
 - Receipts are in-app only (transaction ID, amount, date, method); there is no PDF.
 
@@ -151,6 +151,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-22 | - | Live Cashfree keys (`CASHFREE_ENV=live`). International catalog is $1.99 / $19.99 (`PriceList.International` 199 / 1999, `BillingRegion.International` is USD). |
 | 2026-10-22 | - | International Cashfree switched from Payment Links to Orders + hosted Checkout (`cashfree-checkout` JS launcher, `POST /pg/orders`, `GET /pg/orders/{order_id}`). Leftover Payment Link `MPE5DC7FF3695240AC9BDD` failed so retry is unblocked. |
 | 2026-10-22 | - | International checkout routed to Cashfree (`_shared/cashfree.ts`, `cashfree-webhook`, `cashfree-return`). Sandbox INR ₹99 / ₹999; `CASHFREE_ENV=live` uses USD $1.99 / $19.99. India stays on PayU. |
 | 2026-10-22 | - | International catalog temporarily ₹99 / ₹999 INR (`currencyOf` always INR, `PRICES_INTL` matches India) because the PayU India test merchant displays USD links as ₹. |

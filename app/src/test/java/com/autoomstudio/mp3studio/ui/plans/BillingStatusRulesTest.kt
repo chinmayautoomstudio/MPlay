@@ -82,13 +82,13 @@ class BillingStatusRulesTest {
     fun pricesMatchTheServer() {
         assertEquals(9_900, PriceList.India.of(BillingInterval.Month))
         assertEquals(99_900, PriceList.India.of(BillingInterval.Year))
-        assertEquals(9_900, PriceList.International.of(BillingInterval.Month))
-        assertEquals(99_900, PriceList.International.of(BillingInterval.Year))
+        assertEquals(199, PriceList.International.of(BillingInterval.Month))
+        assertEquals(1_999, PriceList.International.of(BillingInterval.Year))
         assertEquals("₹99", formatPrice(BillingInterval.Month, PriceList.India, BillingCurrency.Inr))
         assertEquals("₹999", formatPrice(BillingInterval.Year, PriceList.India, BillingCurrency.Inr))
-        assertEquals("₹99", formatPrice(BillingInterval.Month, PriceList.International, BillingCurrency.Inr))
-        assertEquals("₹999", formatPrice(BillingInterval.Year, PriceList.International, BillingCurrency.Inr))
-        assertEquals("₹189", formatPrice(PriceList.International.month * 12 - PriceList.International.year, BillingCurrency.Inr))
+        assertEquals("$1.99", formatPrice(BillingInterval.Month, PriceList.International, BillingCurrency.Usd))
+        assertEquals("$19.99", formatPrice(BillingInterval.Year, PriceList.International, BillingCurrency.Usd))
+        assertEquals("$3.89", formatPrice(PriceList.International.month * 12 - PriceList.International.year, BillingCurrency.Usd))
         assertEquals("$1.99", formatPrice(199, BillingCurrency.Usd))
         assertEquals(BillingInterval.Year, BillingInterval.of("year"))
         assertEquals(BillingInterval.Month, BillingInterval.of(null))
@@ -108,7 +108,7 @@ class BillingStatusRulesTest {
             pricesIntl = PriceList.International,
         )
         assertEquals("₹99", formatPrice(BillingInterval.Month, both.prices(BillingRegion.India), BillingCurrency.Inr))
-        assertEquals("₹999", formatPrice(BillingInterval.Year, both.prices(BillingRegion.International), BillingCurrency.Inr))
+        assertEquals("$19.99", formatPrice(BillingInterval.Year, both.prices(BillingRegion.International), BillingCurrency.Usd))
     }
 
     @Test
