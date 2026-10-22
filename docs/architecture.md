@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-10-21
+> Last updated: 2026-10-22
 
 ## Modules
 
@@ -32,7 +32,7 @@ Other top-level folders: `supabase/` (backend config, migrations, Edge Functions
   - `check<Variant>Permissions` (`CheckAllowedPermissions`): fails `assemble`/`bundle` if the merged manifest has a `uses-permission` outside `ALLOWED_PERMISSIONS` (plus the app's own `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`). Writes the list to `build/reports/permissions/<variant>.txt`.
   - `check<Variant>BackendConfig` (`CheckBackendConfig`): fails release builds when a Supabase or Google setting is blank; warns in debug.
 
-Key libraries: Compose BOM 2026.09.00, Material 3, Media3 1.11.1 (ExoPlayer, Session, Transformer), Room 2.8.5, WorkManager 2.10.1, Glance 1.2.0, DataStore 1.2.1, Coil 3 (with `coil-network-okhttp` for profile photos), Lottie 6.7.1, Coroutines 1.11.0, ONNX Runtime Android 1.22.0 (in `:separation`), supabase-kt 3.8.0 (Auth, Postgrest, Functions) on Ktor OkHttp 3.5.1, Credential Manager 1.6.0 with `googleid` 1.2.1, Tink 1.23.0, `androidx.browser` 1.9.0 (Custom Tabs for PayU checkout).
+Key libraries: Compose BOM 2026.09.00, Material 3, Media3 1.11.1 (ExoPlayer, Session, Transformer), Room 2.8.5, WorkManager 2.10.1, Glance 1.2.0, DataStore 1.2.1, Coil 3 (with `coil-network-okhttp` for profile photos), Lottie 6.7.1, Coroutines 1.11.0, ONNX Runtime Android 1.22.0 (in `:separation`), supabase-kt 3.8.0 (Auth, Postgrest, Functions) on Ktor OkHttp 3.5.1, Credential Manager 1.6.0 with `googleid` 1.2.1, Tink 1.23.0, `androidx.browser` 1.9.0 (Custom Tabs for PayU / Cashfree checkout).
 
 ## Dependency injection
 
@@ -192,3 +192,4 @@ From [`AndroidManifest.xml`](../app/src/main/AndroidManifest.xml):
 | 2026-10-14 | - | `ProfilePage.ExcludeFolders`; splash/in-app logos from `logos/mp3-studio-logo-v3.png`; `SongRepository` reads `libraryPreferences.excludedFolders`. |
 | 2026-10-14 | - | Bottom-bar Profile tap resets `profilePage` to `Main`; Library Songs/Albums/Artists use `HorizontalPager`. |
 | 2026-10-21 | - | Removed in-app Admin: `adminBackend`, `AdminViewModel`, `ProfilePage.Admin`, `AdminActivityWorker` and `ACTION_OPEN_ADMIN_ACTIVITY`. Server `admin` functions stay ([admin](features/admin.md)). |
+| 2026-10-22 | - | International checkout uses Cashfree Orders + hosted Checkout; India stays on PayU. `cashfree_unavailable` maps to `BillingError.Unavailable`. |

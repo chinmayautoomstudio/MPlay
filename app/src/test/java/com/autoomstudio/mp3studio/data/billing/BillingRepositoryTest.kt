@@ -188,6 +188,7 @@ class BillingRepositoryTest {
         assertEquals(BillingError.InvalidInterval, billingErrorOf(400, """{"error":"invalid_interval"}"""))
         assertEquals(BillingError.RateLimited, billingErrorOf(429, """{"error":"rate_limited"}"""))
         assertEquals(BillingError.Unavailable, billingErrorOf(503, """{"error":"payu_unavailable"}"""))
+        assertEquals(BillingError.Unavailable, billingErrorOf(503, """{"error":"cashfree_unavailable"}"""))
         assertEquals(BillingError.Unavailable, billingErrorOf(503, ""))
         assertEquals(BillingError.Other, billingErrorOf(500, """{"error":"server_error"}"""))
     }

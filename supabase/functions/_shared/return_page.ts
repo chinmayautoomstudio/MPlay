@@ -1,7 +1,7 @@
-// The page PayU's browser lands on after checkout (payments PRD CK5), served by payu-return itself so it doesn't
-// depend on a website hosting it. On Android it opens MP3 Studio through an intent link that names the app's
+// The page the browser lands on after checkout (payments PRD CK5), served by payu-return and cashfree-return so it
+// doesn't depend on a website hosting it. On Android it opens MP3 Studio through an intent link that names the app's
 // package, which reaches MainActivity's /pay/return intent filter without App Link verification. The page decides
-// nothing: the app asks payment-status, which checks the payment with PayU.
+// nothing: the app asks payment-status, which checks the payment with PayU or Cashfree.
 
 export const APP_PACKAGE = "com.autoomstudio.mp3studio";
 
@@ -31,7 +31,7 @@ export function returnPageHtml(opts: { success: boolean; txnId: string | null; a
   const intent = escapeHtml(appIntent(opts.appLink, opts.success, opts.txnId));
   const title = opts.success ? "Payment received" : "Payment not completed";
   const note = opts.success
-    ? "Return to MP3 Studio to see your payment. We confirm it with PayU before turning on Pro."
+    ? "Return to MP3 Studio to see your payment. We confirm it with the payment provider before turning on Pro."
     : "Nothing was charged for this attempt. Return to MP3 Studio to try again.";
   return `<!doctype html>
 <html lang="en">

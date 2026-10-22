@@ -1,10 +1,10 @@
-# Payments (PayU Pro subscription)
+# Payments (PayU India + Cashfree International)
 
-> Status: Unreleased | Added in: next version after 3.2.3 | Last updated: 2026-10-21
+> Status: Unreleased | Added in: next version after 3.2.3 | Last updated: 2026-10-22
 
 ## Summary
 
-Pro is paid through PayU Payment Links ([payments PRD](../../MP3-Studio-PRD-Payments-PayU-Payment-Link.md)). India is ₹99 a month or ₹999 a year (Indian mobile, optional autopay). International is $1.99 a month or $19.99 a year (E.164 phone, one-off link; PayU standing instructions are INR-only). `entitlements` detects the country from the request IP (`detectedRegion`) and returns both price lists. Plans shows an India / International toggle that defaults to that region; a manual choice is stored as DataStore `billing_region_override` and sent as `start-checkout {region}`. The server maps region to a fixed amount — the app never invents a price. Renew / Fix / Switch stay on the existing subscription's currency. The app never talks to PayU, never holds PayU credentials and never decides Pro itself.
+Pro is paid through **PayU Payment Links for India** and **Cashfree Orders / Checkout for International**. India is ₹99 a month or ₹999 a year. International is the same INR amounts while `CASHFREE_ENV` is sandbox (that merchant cannot settle USD); `CASHFREE_ENV=live` switches the catalog to $1.99 / $19.99. `entitlements` detects the country from the request IP (`detectedRegion`) and returns both price lists. Plans shows an India / International toggle that defaults to that region; a manual choice is stored as DataStore `billing_region_override` and sent as `start-checkout {region}`. The server maps region to a fixed amount and gateway — the app never invents a price. Renew / Fix / Switch stay on the existing subscription's currency. The app never talks to PayU or Cashfree, never holds their credentials and never decides Pro itself.
 
 ## Key files
 
@@ -26,8 +26,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 | `ui/plans/PaymentHistoryScreen.kt` | Settings > Plans > Payment history, with a receipt dialog. |
 | `ui/plans/PaymentText.kt` | `formatPrice` / `formatAmount` for INR and USD, date formatting, error and status text. |
 | `supabase/functions/admin/` | Server-side Admin payment list, refund and revoke; see [admin](admin.md). No in-app Admin screens. |
-| `supabase/functions/start-checkout/`, `payment-status/`, `payu-webhook/`, `payu-return/`, `subscription/`, `billing-jobs/` | Billing Edge Functions; see [backend](../backend.md#billing-payu). |
-| `supabase/functions/_shared/payu.ts`, `billing.ts`, `checkout.ts`, `geo.ts`, `webhook.ts`, `jobs.ts`, `notifier.ts` | PayU client, IP country lookup, checkout parse (`region`), shared billing flows. |
+| `supabase/functions/start-checkout/`, `payment-status/`, `payu-webhook/`, `payu-return/`, `cashfree-checkout/`, `cashfree-webhook/`, `cashfree-return/`, `subscription/`, `billing-jobs/` | Billing Edge Functions; see [backend](../backend.md#billing-payu). |
+| `supabase/functions/_shared/payu.ts`, `cashfree.ts`, `billing.ts`, `checkout.ts`, `geo.ts`, `webhook.ts`, `jobs.ts`, `notifier.ts` | PayU and Cashfree clients, IP country lookup, checkout parse (`region`), shared billing flows. |
 | `supabase/migrations/20261013000000_payu_billing.sql` to `20261015000000_billing_admin.sql` | Schema, verification, scheduled jobs and admin billing. |
 | `supabase/migrations/20261017000000_yearly_plan.sql` | `billing_interval` on subscriptions and payments, `billing_price_paise(interval)`, `billing_period_end()`, the switch rule in `begin_checkout()`, and yearly-aware verification, renewals, entitlements and admin detail. |
 | `supabase/migrations/20261021000000_intl_usd.sql` | `payments.currency` / `subscriptions.currency`, dual `billing_price_paise(interval, currency)`, E.164 phones, `begin_checkout(..., p_currency)`, currency check in `apply_payment_result`. |
@@ -40,25 +40,25 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 sequenceDiagram
     participant App
     participant Fn as start-checkout
-    participant PayU
-    participant Ret as payu-return
+    participant GW as PayU or Cashfree
+    participant Ret as return function
     participant St as payment-status
-    App->>Fn: phone (first time only)
-    Fn->>PayU: create payment link (amount fixed on the server)
+    App->>Fn: phone, region (first time only)
+    Fn->>GW: create PayU link or Cashfree order (amount fixed on the server)
     Fn-->>App: url, txnId, mode
-    App->>PayU: Custom Tab
-    PayU->>Ret: success or failure URL
+    App->>GW: Custom Tab
+    GW->>Ret: success or failure URL
     Ret-->>App: return page, intent link to https://host/pay/return?txn=...
     App->>St: txnId
-    St->>PayU: verify_payment status check
+    St->>GW: status check
     St-->>App: status, plan
-    PayU-->>App: (webhook to payu-webhook, also re-checked with PayU)
+    GW-->>App: (webhook, also re-checked with the gateway)
 ```
 
 ### Checkout
 
 - Go Pro (Plans screen or upgrade sheet), Fix payment, Set up autopay, Renew and the switch buttons all open `CheckoutSheet` (`CheckoutPurpose`). New purchases follow the Plans India / International toggle (IP default). Renew / Fix / Switch use the live subscription's currency. The phone field shows for India while `hasIndianPhone` is false, and for International while `hasPhone` is false.
-- The sheet sends `start-checkout {interval, region}`. The server maps `in` → INR (9900 / 99900) and `intl` → USD (199 / 1999). Omitted `region` uses the request IP. USD links are always `source: "API"` with no `siDetails`. A live link is reused only when interval **and** currency match.
+- The sheet sends `start-checkout {interval, region}`. India (`in`) creates a PayU link. International (`intl`) creates a Cashfree order (manual, no autopay) and returns a `cashfree-checkout` URL that starts hosted Checkout with the `payment_session_id`. Sandbox Cashfree is INR 9900 / 99900; live Cashfree is USD 199 / 1999. Omitted `region` uses the request IP. A live link is reused only when interval **and** currency match; a leftover PayU or Payment-Link URL is failed and replaced.
 - `begin_checkout(..., p_currency)` refuses with `phone_required`, `invalid_phone`, `payment_in_progress`, `already_subscribed`, `switch_not_yet` or `mandate_update_pending`. A replace of an existing PayU row keeps that row's currency.
 
 ### Switching between monthly and yearly
@@ -68,11 +68,12 @@ A PayU mandate has a fixed cycle and amount, so a switch is a new checkout, not 
 
 ### Confirmation
 
-- PayU's success and failure URLs point at `payu-return`, which serves the return page itself (`returnPageHtml`): "Payment received" or "Payment not completed" and a "Return to MP3 Studio" button. On Android the page opens `intent://<host of PAYU_RETURN_PAGE>/pay/return?result=...&txn=...#Intent;scheme=https;package=com.autoomstudio.mp3studio;end` straight away, and the button repeats it. Because the intent names the package, it reaches the `/pay/return` intent filter without App Link verification. `MainActivity.handleIntent` passes the transaction to `BillingViewModel.onReturned`. For a PayU POST the transaction comes from `udf1` (ours) before `txnid`.
-- `BillingRepository.confirm` polls `payment-status` every 3 s (`POLL_INTERVAL_MS`) up to 10 times (`VISIBLE_ATTEMPTS`) while the result screen shows "Confirming". `payment-status` asks PayU (`verify_payment`) and applies the answer through `apply_payment_result()`; the app only displays what comes back. A payment PayU still reports as pending is checked until `resolveUntil` before it is failed.
+- PayU's success and failure URLs point at `payu-return`. Cashfree's `order_meta.return_url` is `cashfree-return?txn={order_id}` (Cashfree substitutes the order id). Both serve the same return page (`returnPageHtml`): "Payment received" or "Payment not completed" and a "Return to MP3 Studio" button. On Android the page opens `intent://<host of PAYU_RETURN_PAGE>/pay/return?result=...&txn=...#Intent;scheme=https;package=com.autoomstudio.mp3studio;end` straight away, and the button repeats it. Because the intent names the package, it reaches the `/pay/return` intent filter without App Link verification. `MainActivity.handleIntent` passes the transaction to `BillingViewModel.onReturned`. For a PayU POST the transaction comes from `udf1` (ours) before `txnid`.
+- `BillingRepository.confirm` polls `payment-status` every 3 s (`POLL_INTERVAL_MS`) up to 10 times (`VISIBLE_ATTEMPTS`) while the result screen shows "Confirming". `payment-status` asks PayU or Cashfree (Cashfree links are recognised by `link_url`) and applies the answer through `apply_payment_result()`; the app only displays what comes back. A payment the gateway still reports as pending is checked until `resolveUntil` before it is failed.
 - If the App Link didn't fire (browser closed, link verification missing), `onForeground` checks the stored transaction on every resume. A quiet check only surfaces Success; a return the user was waiting for shows every result.
 - PayU runs each payment-link payment under a txnid it picks (for example `938632`) and puts our txnid in `udf1`. `PayuClient.checkPayment` therefore asks `verify_payment` for our txnid first (renewals use it), then for the PayU txnid a webhook named, accepted only when the answer's `udf1` is ours, and then for each transaction on the link (`GET /payment-links/{invoice}/txns`, OAuth scope `read_payment_links`). The answer is reported under our txnid, so `apply_payment_result()` matches it.
 - `payu-webhook` saves every PayU notification to `webhook_log` first (secrets and card fields redacted) and then re-checks the payment with PayU. `classifyWebhook` takes our txnid from `udf1` when it looks like ours (`MP` or `RN` plus 20 hex digits). The reverse hash is still computed; a mismatch is logged as `_hashMismatch` but the event is processed anyway, because PayU's status answer decides and payment-link postbacks have failed the documented formula. Failed processing is retried by the `webhooks` job and flagged after 5 tries.
+- `cashfree-webhook` does the same for Cashfree (`x-webhook-signature` = Base64 HMAC-SHA256 of `timestamp + raw body` with `CASHFREE_CLIENT_SECRET`). The body is only used to find our `MP…` txn id (`data.order.order_id`); the order is re-checked with `GET /pg/orders/{order_id}` before `apply_payment_result`. Logged rows carry `_gateway: "cashfree"` so the sweep job routes them correctly. `payment-status` treats `cashfree-checkout` URLs as Cashfree so it does not ask PayU. The dashboard URL is `https://securedbmp3.autoomstudio.com/functions/v1/cashfree-webhook` (no extra Coolify secret).
 
 ### Plans screen
 
@@ -142,7 +143,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 - `pay.returnHost` (autoomstudio.com) doesn't serve `/pay/return` or `assetlinks.json`, so a plain `https://autoomstudio.com/pay/return` link opens the company website, not the app. Only the intent link from the return page opens the app. Some browsers may block the automatic open, in which case the user taps the button.
 - Billing emails are only logged; GST invoices, partial refunds from the app and a web checkout are out of scope (PRD phase 6).
 - Switching interval with autopay on cancels the old mandate before the new link is paid; an abandoned switch leaves autopay off until the user sets it up again. PayU's `YEARLY` billing cycle hasn't been tried in the sandbox yet.
-- USD checkout needs international / multi-currency enabled on the PayU merchant. A missing or private client IP defaults to India; Coolify must pass `X-Forwarded-For`.
+- International USD needs Cashfree live keys (`CASHFREE_ENV=live`). Sandbox Cashfree answers `Currency USD is not enabled`, so sandbox International is INR. A missing or private client IP defaults to India; Coolify must pass `X-Forwarded-For`.
 - Catalog prices come from the entitlements payload; changing a price is a server change only.
 - Receipts are in-app only (transaction ID, amount, date, method); there is no PDF.
 
@@ -150,6 +151,10 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-22 | - | International Cashfree switched from Payment Links to Orders + hosted Checkout (`cashfree-checkout` JS launcher, `POST /pg/orders`, `GET /pg/orders/{order_id}`). Leftover Payment Link `MPE5DC7FF3695240AC9BDD` failed so retry is unblocked. |
+| 2026-10-22 | - | International checkout routed to Cashfree (`_shared/cashfree.ts`, `cashfree-webhook`, `cashfree-return`). Sandbox INR ₹99 / ₹999; `CASHFREE_ENV=live` uses USD $1.99 / $19.99. India stays on PayU. |
+| 2026-10-22 | - | International catalog temporarily ₹99 / ₹999 INR (`currencyOf` always INR, `PRICES_INTL` matches India) because the PayU India test merchant displays USD links as ₹. |
+| 2026-10-22 | - | Live `start-checkout` / `_shared` / `entitlements` deployed (backups `*.bak-20261022-intl-usd`). International Pay now sends `region=intl` through to PayU as $1.99 USD. The leftover 3-arg `begin_checkout` wrapper still maps old callers to monthly INR. |
 | 2026-10-21 | - | International USD Pro ($1.99 / $19.99): IP `detectedRegion`, India / International toggle (`billing_region_override`), `start-checkout {region}`, USD Payment Links without SI, E.164 phone. Migration `20261021000000_intl_usd.sql` applied live (after yearly). |
 | 2026-10-10 | - | Yearly Pro at ₹999: Monthly/Yearly picker, yearly autopay mandate, switching between intervals at the end of the paid period (migration `20261017000000_yearly_plan.sql`, not yet applied). The Monthly and Yearly cards are the same height. |
 | 2026-10-10 | - | After checkout, `payu-return` serves the return page and opens the app through an intent link, instead of redirecting to autoomstudio.com, which showed the company website. |

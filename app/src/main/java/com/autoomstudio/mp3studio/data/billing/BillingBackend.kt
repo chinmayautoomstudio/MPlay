@@ -187,5 +187,5 @@ internal fun billingErrorOf(status: Int, body: String): BillingError {
 private val CODES = listOf(
     "phone_required", "invalid_phone", "invalid_interval", "payment_in_progress", "already_subscribed",
     "switch_not_yet", "mandate_active",
-    "mandate_update_pending", "rate_limited", "account_disabled", "payu_unavailable", "not_subscribed", "not_found",
+    "mandate_update_pending", "rate_limited", "account_disabled", "payu_unavailable", "cashfree_unavailable", "not_subscribed", "not_found",
 )

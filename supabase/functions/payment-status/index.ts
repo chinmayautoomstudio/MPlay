@@ -1,7 +1,7 @@
-// POST { txnId? } -> the caller's payment after checking it with PayU (payments PRD CK5-CK8, SV1). The app calls this
-// when it comes back from checkout (redirect or not); the answer comes from PayU's status API, never from the app.
+// POST { txnId? } -> the caller's payment after checking it with PayU or Cashfree (payments PRD CK5-CK8, SV1). The
+// app calls this when it comes back from checkout (redirect or not); the answer comes from the gateway, never the app.
 // Returns payment_summary(): { txnId, status, kind, failureReason, resolveUntil, amountPaise, completedAt, plan }.
-import { payuFromEnv, resolveAll, rpc } from "../_shared/billing.ts";
+import { cashfreeFromEnv, payuFromEnv, resolveAll, rpc } from "../_shared/billing.ts";
 import { parseStatusRequest } from "../_shared/checkout.ts";
 import { adminClient, caller, json, readJson } from "../_shared/server.ts";
 
@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
         p_txn: request.txnId,
         p_min_seconds: 5,
       });
-      await resolveAll(admin, env.payu, open);
+      await resolveAll(admin, env.payu, open, cashfreeFromEnv());
     }
     const summary = await rpc<{ error?: string }>(admin, "payment_summary", { p_user: user.id, p_txn: request.txnId });
     if (summary.error) return json(summary, 404);

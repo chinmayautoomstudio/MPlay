@@ -4,7 +4,7 @@
 // audit-logged in SQL first, then call PayU: reverify re-checks a payment or refund, refundPayment asks PayU for a
 // full refund (state changes only when PayU confirms it), cancelSubscription cancels the user's mandate (Pro stays
 // to the period end), revokeSubscription ends Pro now and cancels any mandate (nothing is refunded).
-import { confirmRevoked, payuFromEnv, resolvePayment, resolveRefund, rpc } from "../_shared/billing.ts";
+import { cashfreeFromEnv, confirmRevoked, payuFromEnv, resolvePayment, resolveRefund, rpc } from "../_shared/billing.ts";
 import { type AdminCall, parseAdminRequest, REFUSALS } from "../_shared/admin.ts";
 import { adminClient, caller, json, readJson } from "../_shared/server.ts";
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
@@ -48,7 +48,7 @@ async function payuStep(admin: SupabaseClient, call: AdminCall, info: ActionInfo
     if (info.status === "success" || info.status === "refunded") {
       return json({ result: "unchanged", status: info.status });
     }
-    return json(await resolvePayment(admin, env.payu, info.txnId!, info.si ?? false));
+    return json(await resolvePayment(admin, env.payu, info.txnId!, info.si ?? false, null, cashfreeFromEnv()));
   }
 
   if (call.payu === "refund") {

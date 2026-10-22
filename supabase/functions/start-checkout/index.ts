@@ -1,9 +1,11 @@
-// POST { phone?, interval?, region? } -> { url, txnId } (payments PRD CK2, CK3, CK13). Creates the PayU payment
-// link for one Pro payment attempt; interval is "month" (default) or "year". region is "in" or "intl"; omitted
-// uses the request IP. The amount is fixed on the server and the app only gets the link URL and our transaction ID.
+// POST { phone?, interval?, region? } -> { url, txnId } (payments PRD CK2, CK3, CK13). India uses PayU Payment Links;
+// International uses a Cashfree order and the cashfree-checkout launcher. interval is "month" (default) or "year".
+// region is "in" or "intl"; omitted uses the request IP.
+// The amount is fixed on the server and the app only gets the link URL and our transaction ID.
 // 409 {"error": phone_required | payment_in_progress | already_subscribed | switch_not_yet | mandate_update_pending},
-// 400 invalid_phone | invalid_interval | invalid_region, 403 account_disabled, 429 rate_limited, 503 payu_unavailable.
-import { payuFromEnv, startCheckout } from "../_shared/billing.ts";
+// 400 invalid_phone | invalid_interval | invalid_region, 403 account_disabled, 429 rate_limited,
+// 503 payu_unavailable | cashfree_unavailable.
+import { cashfreeFromEnv, payuFromEnv, startCheckout } from "../_shared/billing.ts";
 import { CHECKOUT_REFUSALS, parseCheckoutRequest } from "../_shared/checkout.ts";
 import { currencyOf, detectRegion } from "../_shared/geo.ts";
 import { adminClient, caller, json, readJson } from "../_shared/server.ts";
@@ -22,6 +24,8 @@ Deno.serve(async (req) => {
   try {
     const region = request.region ?? await detectRegion(req.headers);
     const currency = currencyOf(region);
+    const cashfree = cashfreeFromEnv();
+    if (region === "intl" && !cashfree) return json({ error: "cashfree_unavailable" }, 503);
     const outcome = await startCheckout(
       admin,
       env.payu,
@@ -30,8 +34,9 @@ Deno.serve(async (req) => {
       request.phone,
       request.interval,
       currency,
+      { cashfree, region },
     );
-    const mode = currency === "USD" ? "manual" : env.config.mode;
+    const mode = region === "intl" || currency === "USD" ? "manual" : env.config.mode;
     if (outcome.ok) return json({ url: outcome.url, txnId: outcome.txnId, mode });
     const status = CHECKOUT_REFUSALS[outcome.error] ?? 503;
     return json({ error: outcome.error, txnId: outcome.txnId }, status);

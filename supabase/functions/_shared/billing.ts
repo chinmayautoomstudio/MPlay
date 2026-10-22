@@ -1,8 +1,10 @@
 // Billing steps shared by the checkout, status, webhook, subscription, jobs, admin and delete-account functions.
-// PayU decides what happened; the SQL functions decide what that means for the subscription (payments PRD 6.2).
+// PayU (India) or Cashfree (International) decides what happened; the SQL functions decide what that means for
+// the subscription (payments PRD 6.2).
 import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import { CashfreeClient, cashfreeConfig, findTxnId, isCashfreeUrl } from "./cashfree.ts";
 import type { BillingInterval } from "./checkout.ts";
-import type { BillingCurrency } from "./geo.ts";
+import type { BillingCurrency, BillingRegion } from "./geo.ts";
 import { type Customer, PayuClient, type PayuConfig, payuConfig, type VerifiedPayment } from "./payu.ts";
 import { classifyWebhook, type WebhookEvent } from "./webhook.ts";
 
@@ -14,6 +16,16 @@ export function payuFromEnv(): { config: PayuConfig; payu: PayuClient } | null {
     return null;
   }
   return { config, payu: new PayuClient(config) };
+}
+
+/** The Cashfree client from the Edge Function secrets; null (logged) when they are not set. */
+export function cashfreeFromEnv(): CashfreeClient | null {
+  const config = cashfreeConfig();
+  if (!config) {
+    console.error("Cashfree secrets are not set");
+    return null;
+  }
+  return new CashfreeClient(config);
 }
 
 export async function rpc<T = Record<string, unknown>>(
@@ -31,8 +43,8 @@ function message(e: unknown): string {
 }
 
 /**
- * Verifies one transaction with PayU and applies the answer (SV1, SV4). payuTxnId is PayU's own txnid when a webhook
- * named one. Returns apply_payment_result's answer.
+ * Verifies one transaction with PayU or Cashfree (from the stored link URL) and applies the answer (SV1, SV4).
+ * payuTxnId is PayU's own txnid when a webhook named one. Returns apply_payment_result's answer.
  */
 export async function resolvePayment(
   admin: SupabaseClient,
@@ -40,7 +52,14 @@ export async function resolvePayment(
   txnId: string,
   si: boolean,
   payuTxnId: string | null = null,
+  cashfree: CashfreeClient | null = null,
 ): Promise<Record<string, unknown>> {
+  const { data } = await admin.from("payments").select("link_url").eq("txn_id", txnId).maybeSingle();
+  if (isCashfreeUrl(data?.link_url)) {
+    if (!cashfree) throw new Error("Cashfree secrets are not set");
+    const verified = await cashfree.checkOrder(txnId);
+    return await rpc(admin, "apply_payment_result", { p_txn: txnId, p_result: verified });
+  }
   let verified: VerifiedPayment = await payu.checkPayment(txnId, payuTxnId);
   // The first payment of an autopay link registers the mandate; confirm it when the status answer doesn't say.
   if (si && verified.status === "success" && !verified.mandateRef && verified.payuRef) {
@@ -55,12 +74,13 @@ export async function resolveAll(
   admin: SupabaseClient,
   payu: PayuClient,
   rows: { txnId: string; si: boolean }[],
+  cashfree: CashfreeClient | null = null,
 ): Promise<{ processed: number; failed: number }> {
   let processed = 0;
   let failed = 0;
   for (const row of rows) {
     try {
-      await resolvePayment(admin, payu, row.txnId, row.si);
+      await resolvePayment(admin, payu, row.txnId, row.si, null, cashfree);
       processed++;
     } catch (e) {
       failed++;
@@ -128,10 +148,15 @@ type BeginResult = {
   customer?: Customer;
 };
 
+export type CheckoutProviders = {
+  cashfree?: CashfreeClient | null;
+  region?: BillingRegion;
+};
+
 /**
- * Starts checkout for the user (CK2, CK3, CK9, 5.5): first settles their earlier attempts with PayU so an abandoned
- * expired link doesn't block a new one, cancels an old mandate when the new link replaces it, then creates the
- * PayU link for a new attempt.
+ * Starts checkout for the user (CK2, CK3, CK9, 5.5): first settles their earlier attempts so an abandoned
+ * expired link doesn't block a new one, cancels an old mandate when the new link replaces it, then creates
+ * a PayU link (India) or a Cashfree order (International).
  */
 export async function startCheckout(
   admin: SupabaseClient,
@@ -141,15 +166,19 @@ export async function startCheckout(
   phone: string | null,
   interval: BillingInterval,
   currency: BillingCurrency = "INR",
+  extras: CheckoutProviders = {},
 ): Promise<CheckoutOutcome> {
+  const gateway = extras.region === "intl" ? "cashfree" : "payu";
+  if (gateway === "cashfree" && !extras.cashfree) return { ok: false, error: "cashfree_unavailable" };
+
   const open = await rpc<{ txnId: string; si: boolean }[]>(admin, "payments_to_check", {
     p_user: userId,
     p_txn: null,
     p_min_seconds: 10,
   });
-  await resolveAll(admin, payu, open);
+  await resolveAll(admin, payu, open, extras.cashfree ?? null);
 
-  const mode = currency === "USD" ? "manual" : config.mode;
+  const mode = gateway === "cashfree" || currency === "USD" ? "manual" : config.mode;
   const begin = () =>
     rpc<BeginResult>(admin, "begin_checkout", {
       p_user: userId,
@@ -166,28 +195,46 @@ export async function startCheckout(
     started = await begin();
   }
   if (started.error) return { ok: false, error: started.error, txnId: started.txnId };
-  if (started.result === "existing" && started.url) return { ok: true, url: started.url, txnId: started.txnId! };
+  if (started.result === "existing" && started.url) {
+    const reusedWrongGateway = gateway === "cashfree" ? !isCashfreeUrl(started.url) : isCashfreeUrl(started.url);
+    if (reusedWrongGateway && started.txnId) {
+      await rpc(admin, "fail_checkout", { p_txn: started.txnId, p_reason: "wrong_gateway_retry" });
+      started = await begin();
+      if (started.error) return { ok: false, error: started.error, txnId: started.txnId };
+    } else {
+      return { ok: true, url: started.url, txnId: started.txnId! };
+    }
+  }
 
   const txnId = started.txnId!;
   try {
-    const link = await payu.createLink({
-      txnId,
-      amountPaise: started.amountPaise!,
-      expiresAt: new Date(started.linkExpiresAt!),
-      periodEnd: new Date(started.periodEnd!),
-      customer: started.customer!,
-      mode,
-      interval,
-      currency: started.currency ?? currency,
-      successUrl: withQuery(config.successUrl, txnId),
-      failureUrl: withQuery(config.failureUrl, txnId),
-    });
+    const link = gateway === "cashfree"
+      ? await extras.cashfree!.createOrder({
+        txnId,
+        amountPaise: started.amountPaise!,
+        currency: started.currency ?? currency,
+        customer: started.customer!,
+        customerId: userId,
+        purpose: interval === "year" ? "MP3 Studio Pro, 1 year" : "MP3 Studio Pro, 1 month",
+      })
+      : await payu.createLink({
+        txnId,
+        amountPaise: started.amountPaise!,
+        expiresAt: new Date(started.linkExpiresAt!),
+        periodEnd: new Date(started.periodEnd!),
+        customer: started.customer!,
+        mode,
+        interval,
+        currency: started.currency ?? currency,
+        successUrl: withQuery(config.successUrl, txnId),
+        failureUrl: withQuery(config.failureUrl, txnId),
+      });
     await rpc(admin, "attach_payment_link", { p_txn: txnId, p_url: link.url, p_link_ref: link.ref });
     return { ok: true, url: link.url, txnId };
   } catch (e) {
     console.error(`payment link for ${txnId} failed: ${message(e)}`);
     await rpc(admin, "fail_checkout", { p_txn: txnId, p_reason: "link_error" }).catch(() => null);
-    return { ok: false, error: "payu_unavailable" };
+    return { ok: false, error: gateway === "cashfree" ? "cashfree_unavailable" : "payu_unavailable" };
   }
 }
 
@@ -277,4 +324,23 @@ export async function processWebhook(
     default:
       return "ignored";
   }
+}
+
+/**
+ * Handles a Cashfree webhook. The body is only used to find our txn id; the payment is re-checked with Cashfree
+ * before apply_payment_result runs.
+ */
+export async function processCashfreeWebhook(
+  admin: SupabaseClient,
+  cashfree: CashfreeClient,
+  body: unknown,
+): Promise<"processed" | "ignored"> {
+  const txnId = findTxnId(body);
+  if (!txnId) return "ignored";
+  const { data } = await admin.from("payments").select("link_url").eq("txn_id", txnId).maybeSingle();
+  if (!data || !isCashfreeUrl(data.link_url)) return "ignored";
+  const verified = await cashfree.checkOrder(txnId);
+  if (verified.status === "pending" || verified.status === "not_found") return "ignored";
+  await rpc(admin, "apply_payment_result", { p_txn: txnId, p_result: verified });
+  return "processed";
 }

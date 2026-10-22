@@ -6,7 +6,17 @@
 //   expiry    hourly: period ends, grace ends, missed debits (RN5, RN6)
 //   notices   daily: billing emails (5.3)
 // Every run is recorded in job_runs (JB4). In manual mode (PAYU_BILLING_MODE=manual) no debits or notices are sent.
-import { confirmRevoked, payuFromEnv, processWebhook, resolveAll, resolveRefund, rpc } from "../_shared/billing.ts";
+import {
+  cashfreeFromEnv,
+  confirmRevoked,
+  payuFromEnv,
+  processCashfreeWebhook,
+  processWebhook,
+  resolveAll,
+  resolveRefund,
+  rpc,
+} from "../_shared/billing.ts";
+import type { CashfreeClient } from "../_shared/cashfree.ts";
 import { jobAuthorized, type JobAction, parseJobAction } from "../_shared/jobs.ts";
 import { LogNotifier, type Notice } from "../_shared/notifier.ts";
 import type { PayuClient } from "../_shared/payu.ts";
@@ -16,12 +26,15 @@ import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
 type Counts = { processed: number; failed: number; skipped: number };
 
-async function webhooks(admin: SupabaseClient, payu: PayuClient): Promise<Counts> {
+async function webhooks(admin: SupabaseClient, payu: PayuClient, cashfree: CashfreeClient | null): Promise<Counts> {
   const counts = { processed: 0, failed: 0, skipped: 0 };
   const rows = await rpc<{ id: number; body: Record<string, unknown> }[]>(admin, "claim_webhooks", { p_limit: 50 });
   for (const row of rows) {
     try {
-      const outcome = await processWebhook(admin, payu, row.body);
+      if (row.body._gateway === "cashfree" && !cashfree) throw new Error("Cashfree secrets are not set");
+      const outcome = row.body._gateway === "cashfree"
+        ? await processCashfreeWebhook(admin, cashfree!, row.body)
+        : await processWebhook(admin, payu, row.body);
       await rpc(admin, "finish_webhook", { p_id: row.id, p_status: outcome, p_error: null });
       if (outcome === "processed") counts.processed++;
       else counts.skipped++;
@@ -37,9 +50,9 @@ async function webhooks(admin: SupabaseClient, payu: PayuClient): Promise<Counts
   return counts;
 }
 
-async function sweep(admin: SupabaseClient, payu: PayuClient): Promise<Counts> {
+async function sweep(admin: SupabaseClient, payu: PayuClient, cashfree: CashfreeClient | null): Promise<Counts> {
   const open = await rpc<{ txnId: string; si: boolean }[]>(admin, "claim_open_payments", { p_limit: 100 });
-  const result = await resolveAll(admin, payu, open);
+  const result = await resolveAll(admin, payu, open, cashfree);
   const refunds = await rpc<{ txnId: string; refundRequestId: string }[]>(admin, "claim_pending_refunds", {
     p_limit: 50,
   });
@@ -115,8 +128,9 @@ async function run(action: JobAction, admin: SupabaseClient): Promise<Counts> {
   if (action === "notices") return await notices(admin);
   const env = payuFromEnv();
   if (!env) throw new Error("PayU secrets are not set");
-  if (action === "webhooks") return await webhooks(admin, env.payu);
-  if (action === "sweep") return await sweep(admin, env.payu);
+  const cashfree = cashfreeFromEnv();
+  if (action === "webhooks") return await webhooks(admin, env.payu, cashfree);
+  if (action === "sweep") return await sweep(admin, env.payu, cashfree);
   return await renewals(admin, env.payu, env.config.mode === "manual");
 }
 

@@ -3,17 +3,31 @@ export type BillingRegion = "in" | "intl";
 export type BillingCurrency = "INR" | "USD";
 
 export const PRICES_IN = { month: 9900, year: 99900 } as const;
-export const PRICES_INTL = { month: 199, year: 1999 } as const;
+/** Cashfree sandbox cannot settle USD, so International stays on India prices until CASHFREE_ENV=live. */
+export const PRICES_INTL = { month: 9900, year: 99900 } as const;
+export const PRICES_INTL_USD = { month: 199, year: 1999 } as const;
+
+export function isCashfreeLive(env: Record<string, string | undefined> = Deno.env.toObject()): boolean {
+  return env.CASHFREE_ENV === "live";
+}
 
 const cache = new Map<string, { country: string | null; until: number }>();
 const CACHE_MS = 10 * 60 * 1000;
 
-export function currencyOf(region: BillingRegion): BillingCurrency {
-  return region === "intl" ? "USD" : "INR";
+/** India is always INR. International is INR in Cashfree sandbox and USD when CASHFREE_ENV=live. */
+export function currencyOf(
+  region: BillingRegion,
+  env: Record<string, string | undefined> = Deno.env.toObject(),
+): BillingCurrency {
+  return region === "intl" && isCashfreeLive(env) ? "USD" : "INR";
 }
 
-export function pricesOf(region: BillingRegion): { month: number; year: number } {
-  return region === "intl" ? { ...PRICES_INTL } : { ...PRICES_IN };
+export function pricesOf(
+  region: BillingRegion,
+  env: Record<string, string | undefined> = Deno.env.toObject(),
+): { month: number; year: number } {
+  if (region !== "intl") return { ...PRICES_IN };
+  return isCashfreeLive(env) ? { ...PRICES_INTL_USD } : { ...PRICES_INTL };
 }
 
 /** First public address in X-Forwarded-For, else X-Real-IP / CF-Connecting-IP. */

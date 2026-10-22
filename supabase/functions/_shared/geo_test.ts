@@ -1,5 +1,26 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { clientIp, detectRegion, isPublicIp, lookupCountry, parseRegion } from "./geo.ts";
+import {
+  clientIp,
+  currencyOf,
+  detectRegion,
+  isPublicIp,
+  lookupCountry,
+  parseRegion,
+  PRICES_IN,
+  PRICES_INTL,
+  PRICES_INTL_USD,
+  pricesOf,
+} from "./geo.ts";
+
+Deno.test("International is INR in Cashfree sandbox and USD when CASHFREE_ENV=live", () => {
+  assertEquals(currencyOf("in", {}), "INR");
+  assertEquals(currencyOf("intl", {}), "INR");
+  assertEquals(currencyOf("intl", { CASHFREE_ENV: "sandbox" }), "INR");
+  assertEquals(currencyOf("intl", { CASHFREE_ENV: "live" }), "USD");
+  assertEquals(pricesOf("intl", {}), PRICES_INTL);
+  assertEquals(pricesOf("intl", { CASHFREE_ENV: "live" }), PRICES_INTL_USD);
+  assertEquals(PRICES_INTL, PRICES_IN);
+});
 
 Deno.test("Public IPv4 addresses are recognised", () => {
   assertEquals(isPublicIp("8.8.8.8"), true);

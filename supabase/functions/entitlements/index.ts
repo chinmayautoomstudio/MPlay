@@ -1,7 +1,7 @@
 // POST { deviceId } -> the caller's plan, trial, subscription, PayU billing state and separator usage (PRD PL2, US6),
 // plus billingMode ("autopay" or "manual") and paymentsEnabled (PayU secrets are set). Claims the 30-day trial the first
 // time a user without one asks (TR2), so a new account is on Trial right after its first sign-in.
-import { detectRegion, PRICES_IN, PRICES_INTL } from "../_shared/geo.ts";
+import { detectRegion, PRICES_IN, pricesOf } from "../_shared/geo.ts";
 import { billingMode, payuConfig } from "../_shared/payu.ts";
 import { adminClient, caller, claimTrial, entitlements, json, readDeviceId, usageSummary } from "../_shared/server.ts";
 
@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
       usage: await usageSummary(admin, user.id),
       detectedRegion,
       pricesIn: PRICES_IN,
-      pricesIntl: PRICES_INTL,
+      pricesIntl: pricesOf("intl"),
       billingMode: billingMode(Deno.env.get("PAYU_BILLING_MODE")),
       billingModeIntl: "manual",
       paymentsEnabled: payuConfig() !== null,

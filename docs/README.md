@@ -8,7 +8,7 @@ MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.au
 | minSdk / targetSdk / compileSdk | 26 / 37 / 37 |
 | Modules | `:app`, `:separation` (DSP + ONNX pipeline) |
 | Database | Room `mplay.db`, schema version 7 |
-| Network | Supabase Auth, PostgREST and Edge Functions only (`INTERNET`, `ACCESS_NETWORK_STATE`, no cleartext); PayU checkout opens in the browser. The build fails if any permission outside `ALLOWED_PERMISSIONS` is merged into the manifest. |
+| Network | Supabase Auth, PostgREST and Edge Functions only (`INTERNET`, `ACCESS_NETWORK_STATE`, no cleartext); PayU (India) and Cashfree (International) checkout open in the browser. The build fails if any permission outside `ALLOWED_PERMISSIONS` is merged into the manifest. |
 | Backend | Self-hosted Supabase, see [backend.md](backend.md) |
 
 ## How these docs are organised
@@ -41,7 +41,7 @@ MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.au
 | Accounts and Google sign-in | [features/accounts.md](features/accounts.md) | Unreleased |
 | Plans, trial and feature gates | [features/plans.md](features/plans.md) | Unreleased |
 | Admin (server functions for the website dashboard; no in-app screens) | [features/admin.md](features/admin.md) | Unreleased |
-| Payments (PayU Pro subscription, autopay, history, refunds) | [features/payments.md](features/payments.md) | Unreleased |
+| Payments (PayU India + Cashfree International, history, refunds) | [features/payments.md](features/payments.md) | Unreleased |
 
 ## Product requirement documents
 

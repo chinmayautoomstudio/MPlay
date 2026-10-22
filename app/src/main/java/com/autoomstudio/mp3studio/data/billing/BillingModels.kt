@@ -43,7 +43,7 @@ enum class BillingError {
             "mandate_update_pending" -> MandateUpdatePending
             "rate_limited" -> RateLimited
             "account_disabled" -> AccountDisabled
-            "payu_unavailable" -> Unavailable
+            "payu_unavailable", "cashfree_unavailable" -> Unavailable
             "not_subscribed" -> NotSubscribed
             "not_found" -> NotFound
             else -> Other

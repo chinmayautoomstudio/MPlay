@@ -42,7 +42,7 @@ enum class AutopayStatus {
     }
 }
 
-/** How long one Pro payment lasts (`billing_interval`): ₹99 / $1.99 a month or ₹999 / $19.99 a year. */
+/** How long one Pro payment lasts (`billing_interval`): ₹99 a month or ₹999 a year. */
 enum class BillingInterval(val wire: String) {
     Month("month"), Year("year");
 
@@ -53,11 +53,11 @@ enum class BillingInterval(val wire: String) {
     }
 }
 
-/** Catalog the Plans screen shows: India (INR) or International (USD). */
+/** Catalog the Plans screen shows: India or International. Both are INR until PayU USD is enabled. */
 enum class BillingRegion(val wire: String) {
     India("in"), International("intl");
 
-    val currency: BillingCurrency get() = if (this == International) BillingCurrency.Usd else BillingCurrency.Inr
+    val currency: BillingCurrency get() = BillingCurrency.Inr
 
     companion object {
         fun of(value: String?): BillingRegion = if (value == "intl") International else India
@@ -82,7 +82,7 @@ data class PriceList(val month: Int, val year: Int) {
 
     companion object {
         val India = PriceList(month = 9_900, year = 99_900)
-        val International = PriceList(month = 199, year = 1_999)
+        val International = PriceList(month = 9_900, year = 99_900)
     }
 }
 
