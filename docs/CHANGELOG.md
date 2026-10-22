@@ -15,6 +15,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 ### Fixed
 - The Plans Free card shows `$0` on International instead of a hardcoded `₹0`. ([plans](features/plans.md))
 - International checkout no longer ignores `region`. The live 10 Oct `start-checkout` always created monthly INR; it now reads `{interval, region}`. ([payments](features/payments.md), [backend](backend.md#edge-functions))
+- Website Google sign-in no longer lands on `https://securedbmp3.autoomstudio.com/?code=…`. A Coolify save had pointed Auth’s site URL back at Kong and dropped `mp3studio.in` from the redirect allow-list. Restored `GOTRUE_SITE_URL=https://mp3studio.in` and `https://mp3studio.in/**`. ([backend](backend.md#auth-settings))
 
 ## [1.0.1] - 2026-10-21
 
