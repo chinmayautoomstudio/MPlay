@@ -1,6 +1,6 @@
 # Backend (Supabase)
 
-> Last updated: 2026-10-22
+> Last updated: 2026-10-28
 
 MP3 Studio uses a self-hosted Supabase project for accounts, plans, trials, AI Vocal Separator usage and payments (PayU in India, Cashfree internationally). Music, playlists, stems and recordings never leave the phone; only the title of a song sent for separation is stored, in `ai_usage.song_ref`. The app talks to Supabase Auth (GoTrue) and PostgREST with the public anon key; everything privileged runs server-side as the service role.
 
@@ -25,6 +25,7 @@ Sign-in is Google only (PRD AU2). `config.toml` turns off email and phone sign-u
 On the self-hosted server, `config.toml` isn't applied automatically. Set these in the GoTrue environment as well:
 
 - `GOTRUE_EXTERNAL_GOOGLE_ENABLED=true`, `GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID=<Web client ID>` (the same ID as `google.webClientId`), `GOTRUE_EXTERNAL_GOOGLE_SECRET=<Web client secret>`.
+- `GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI` must be the public Auth callback. Without it, website `signInWithOAuth` fails with `Unsupported provider: missing redirect URI` (Android ID-token sign-in does not use this). On the new stack: `https://mp3studio-api.3.232.162.36.sslip.io/auth/v1/callback`. The same URI must be listed under Authorized redirect URIs on the Google Web client.
 - `GOTRUE_EXTERNAL_EMAIL_ENABLED=false` and `GOTRUE_EXTERNAL_PHONE_ENABLED=false`. As of 2026-10-07 `/auth/v1/settings` still reports email and phone as enabled.
 - Website Google login (`mp3studio.in`) uses `redirectTo` (for example `/studio-ops/auth/callback`). Coolify's template used to hardcode `GOTRUE_SITE_URL` to the Kong URL (`https://securedbmp3.autoomstudio.com`) and map `GOTRUE_URI_ALLOW_LIST` from `ADDITIONAL_REDIRECT_URLS`, so a `GOTRUE_URI_ALLOW_LIST` line in `.env` was ignored and Auth fell back to securedb. As of 2026-10-21 the live compose is:
 
@@ -40,7 +41,7 @@ GOTRUE_SITE_URL=https://mp3studio.in
 GOTRUE_URI_ALLOW_LIST=http://localhost:3000/**,http://127.0.0.1:3000/**,https://mp3studio.in/**,mp3studio://auth-callback
 ```
 
-  Google's authorized redirect URI stays `https://securedbmp3.autoomstudio.com/auth/v1/callback` (the provider hop). After Google, GoTrue must send the browser to an allow-listed `redirectTo`. A Coolify UI save regenerates `.env` and can rewrite compose from the template, so these three keys and the two compose lines must also exist in the Coolify UI. Recreate only Auth: `docker compose --project-name faifqncpzdrvhsf6zbvzwhvb -f docker-compose.yml --env-file .env up -d --no-deps --force-recreate supabase-auth`.
+  Google's authorized redirect URI is the GoTrue callback (`https://mp3studio-api.3.232.162.36.sslip.io/auth/v1/callback` on the new stack; the old stack used `https://securedbmp3.autoomstudio.com/auth/v1/callback`). After Google, GoTrue must send the browser to an allow-listed `redirectTo`. A Coolify UI save regenerates `.env` and can rewrite compose from the template, so these three keys and the two compose lines must also exist in the Coolify UI. Recreate only Auth: `docker compose --project-name faifqncpzdrvhsf6zbvzwhvb -f docker-compose.yml --env-file .env up -d --no-deps --force-recreate supabase-auth`.
 
   That revert happened again on 2026-10-22: compose was back to `GOTRUE_SITE_URL: '${SERVICE_URL_SUPABASEKONG}'` and `GOTRUE_URI_ALLOW_LIST: '${ADDITIONAL_REDIRECT_URLS}'` (only `http://localhost:3000/auth/callback`). Studio Ops (`mp3studio.in/studio-ops/login`) sends `redirectTo=https://mp3studio.in/studio-ops/auth/callback`; GoTrue rejected it and fell back to `https://securedbmp3.autoomstudio.com/?code=…`. Disk and Auth were restored the same day (backups `*.bak-20261022073438`).
 
@@ -278,3 +279,5 @@ Sign in once with the Google account, then run `supabase/seed/first_admin.sql` (
 | 2026-10-22 | - | Coolify Auth redirects drifted again (compose mapped site URL to Kong and the allow-list to localhost-only `ADDITIONAL_REDIRECT_URLS`). Restored `GOTRUE_SITE_URL=https://mp3studio.in` and `https://mp3studio.in/**` on the allow-list; Auth recreated (backups `*.bak-20261022073438`). |
 | 2026-10-22 | - | Cashfree International switched to Orders API + `cashfree-checkout` launcher. `isCashfreeUrl` treats that host path as Cashfree. Leftover Payment Link `MPE5DC7FF3695240AC9BDD` failed (`wrong_gateway_retry`). |
 | 2026-10-22 | - | Coolify Cashfree keys switched to live (`CASHFREE_ENV=live`, production App ID). International `currencyOf` / `pricesOf` are USD $1.99 / $19.99. |
+| 2026-10-28 | - | New stack: `GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI=https://mp3studio-api.3.232.162.36.sslip.io/auth/v1/callback` so website Google OAuth can start (`/auth/v1/authorize` had returned `missing redirect URI`). |
+| 2026-10-28 | - | India monthly `billing_price_paise` / `PRICES_IN.month` was ₹1 for a PayU test, then restored to ₹99 (9900 paise) the same day. |

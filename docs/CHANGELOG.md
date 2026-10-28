@@ -6,6 +6,12 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+### Changed
+- India monthly Pro was ₹1 for a PayU test, then restored to **₹99** the same day. Yearly stays ₹999. ([payments](features/payments.md), [plans](features/plans.md))
+
+### Fixed
+- Website Google login on the new API no longer returns `Unsupported provider: missing redirect URI`. GoTrue now has `GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI=https://mp3studio-api.3.232.162.36.sslip.io/auth/v1/callback` (the same URI must be on the Google Web client). Android ID-token sign-in was already working. ([backend](backend.md#auth-settings), [accounts](features/accounts.md))
+
 ## [1.0.2] - 2026-10-23
 
 ### Added

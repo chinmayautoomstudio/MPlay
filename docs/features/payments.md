@@ -1,6 +1,6 @@
 # Payments (PayU India + Cashfree International)
 
-> Status: Unreleased | Added in: next version after 3.2.3 | Last updated: 2026-10-22
+> Status: Unreleased | Added in: next version after 3.2.3 | Last updated: 2026-10-28
 
 ## Summary
 
@@ -151,6 +151,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-28 | - | India monthly was ₹1 for a PayU test, then restored to ₹99 the same day. |
 | 2026-10-23 | - | Play build 1.0.2 (`versionCode` 13) ships the Cashfree / $ Plans changes; 1.0.1 used INR fallbacks. |
 | 2026-10-22 | - | Live Cashfree keys (`CASHFREE_ENV=live`). International catalog is $1.99 / $19.99 (`PriceList.International` 199 / 1999, `BillingRegion.International` is USD). |
 | 2026-10-22 | - | International Cashfree switched from Payment Links to Orders + hosted Checkout (`cashfree-checkout` JS launcher, `POST /pg/orders`, `GET /pg/orders/{order_id}`). Leftover Payment Link `MPE5DC7FF3695240AC9BDD` failed so retry is unblocked. |

@@ -1,6 +1,6 @@
 # Accounts and Google sign-in
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-22
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-28
 
 ## Summary
 
@@ -111,7 +111,7 @@ Delete account (at the bottom of the Edit page, in the error color) opens a dial
 - An **Android** OAuth client per signing key, all with package `com.autoomstudio.mp3studio`: the debug keystore, the release keystore, and the Play App Signing key once the app is on Play. The app never uses these IDs; they authorise the package and key to get tokens for the Web client.
 - While the consent screen (Audience) is External and in Testing, every account that signs in must be listed under Test users. Publish to Production before release.
 
-The Android app signs in with a Google ID token (no browser redirect). The website uses the Google OAuth redirect flow; GoTrue's site URL and allow-list are on the Coolify Auth service ([backend](../backend.md#auth-settings)).
+The Android app signs in with a Google ID token (no browser redirect). The website uses the Google OAuth redirect flow; GoTrue needs `GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI` (public `/auth/v1/callback`), `GOTRUE_SITE_URL=https://mp3studio.in`, and the redirect allow-list ([backend](../backend.md#auth-settings)).
 
 ## Manifest, permissions and notifications
 
@@ -164,5 +164,6 @@ The Android app signs in with a Google ID token (no browser redirect). The websi
 | 2026-10-21 | - | Profile no longer shows an Admin card; invited emails still become Admin on first sign-in for the website dashboard ([admin](admin.md)). |
 | 2026-10-21 | - | Two-device limit: a third sign-in asks which phone to log out of; Profile lists logged-in devices; `user_devices` and the `devices` Edge Function; Admins can remove a device from the user page. |
 | 2026-10-21 | - | Device-limit hold and a stuck session load now leave `SignedOut` so the splash can dismiss; `verifyDevice` only treats an explicit `device_revoked` as a revoke. |
+| 2026-10-28 | - | New-stack GoTrue now sets `GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI` so website OAuth can start; Android ID-token sign-in unchanged. |
 | 2026-10-22 | - | `devices` register claims the 30-day trial on first sign-in so a missed entitlements call cannot leave a new account on Free. |
 | 2026-10-21 | - | Live `devices` function and `user_devices` SQL deployed so Google sign-in can finish after the ID token (the missing entrypoint had been signing the new session out). |

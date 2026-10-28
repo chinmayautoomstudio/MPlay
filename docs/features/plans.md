@@ -1,6 +1,6 @@
 # Plans, trial and feature gates
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-22
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-28
 
 
 
@@ -114,6 +114,7 @@ None. Uses the existing `INTERNET` permission.
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-28 | - | India monthly was ₹1 for a PayU test, then restored to ₹99 the same day. |
 | 2026-10-22 | - | Free card price follows the India / International toggle (`₹0` / `$0`) instead of a hardcoded `₹0`. |
 | 2026-10-22 | - | International prices are $1.99 / $19.99 with live Cashfree keys. |
 | 2026-10-22 | - | International prices match India (₹99 / ₹999) until PayU USD is enabled. |
