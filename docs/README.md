@@ -4,7 +4,7 @@ MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.au
 
 | Item | Value |
 |---|---|
-| Version | 1.0.1 (`versionCode = 12`), see [`app/build.gradle.kts`](../app/build.gradle.kts) |
+| Version | 1.0.2 (`versionCode = 13`), see [`app/build.gradle.kts`](../app/build.gradle.kts) |
 | minSdk / targetSdk / compileSdk | 26 / 37 / 37 |
 | Modules | `:app`, `:separation` (DSP + ONNX pipeline) |
 | Database | Room `mplay.db`, schema version 7 |

@@ -1,6 +1,6 @@
 # Settings, About, theme and shared components
 
-> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-21
+> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-23
 
 ## Summary
 
@@ -113,3 +113,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-21 | - | Removed the Admin card, `ProfilePage.Admin` and unused Admin DataStore keys (`admin_activity_seen_at`, `admin_notifications_enabled`, `admin_activity_notified_at`). Admin lives on the website ([admin](admin.md)). |
 | 2026-10-21 | - | Profile Logged-in devices card (`1 of 2` / `2 of 2`) to log another phone out ([accounts](accounts.md)). |
 | 2026-10-21 | - | About version 1.0.1 (`versionCode` 12). |
+| 2026-10-23 | - | About version 1.0.2 (`versionCode` 13). |

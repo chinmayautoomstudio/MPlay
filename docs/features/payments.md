@@ -143,7 +143,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 - `pay.returnHost` (autoomstudio.com) doesn't serve `/pay/return` or `assetlinks.json`, so a plain `https://autoomstudio.com/pay/return` link opens the company website, not the app. Only the intent link from the return page opens the app. Some browsers may block the automatic open, in which case the user taps the button.
 - Billing emails are only logged; GST invoices, partial refunds from the app and a web checkout are out of scope (PRD phase 6).
 - Switching interval with autopay on cancels the old mandate before the new link is paid; an abandoned switch leaves autopay off until the user sets it up again. PayU's `YEARLY` billing cycle hasn't been tried in the sandbox yet.
-- Live Cashfree keys are set (`CASHFREE_ENV=live`). Sandbox still cannot create USD orders. A missing or private client IP defaults to India; Coolify must pass `X-Forwarded-For`. The installed 1.0.1 app used INR fallbacks until this change; a new build is needed to show $ on Plans.
+- Live Cashfree keys are set (`CASHFREE_ENV=live`). Sandbox still cannot create USD orders. A missing or private client IP defaults to India; Coolify must pass `X-Forwarded-For`. The installed 1.0.1 app used INR fallbacks until this change; 1.0.2 (`versionCode` 13) shows $ on Plans.
 - Catalog prices come from the entitlements payload; changing a price is a server change only.
 - Receipts are in-app only (transaction ID, amount, date, method); there is no PDF.
 
@@ -151,6 +151,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-23 | - | Play build 1.0.2 (`versionCode` 13) ships the Cashfree / $ Plans changes; 1.0.1 used INR fallbacks. |
 | 2026-10-22 | - | Live Cashfree keys (`CASHFREE_ENV=live`). International catalog is $1.99 / $19.99 (`PriceList.International` 199 / 1999, `BillingRegion.International` is USD). |
 | 2026-10-22 | - | International Cashfree switched from Payment Links to Orders + hosted Checkout (`cashfree-checkout` JS launcher, `POST /pg/orders`, `GET /pg/orders/{order_id}`). Leftover Payment Link `MPE5DC7FF3695240AC9BDD` failed so retry is unblocked. |
 | 2026-10-22 | - | International checkout routed to Cashfree (`_shared/cashfree.ts`, `cashfree-webhook`, `cashfree-return`). Sandbox INR ₹99 / ₹999; `CASHFREE_ENV=live` uses USD $1.99 / $19.99. India stays on PayU. |

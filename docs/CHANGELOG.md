@@ -6,10 +6,13 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-23
+
 ### Added
 - International checkout uses Cashfree Orders + hosted Checkout (`cashfree-checkout`, `cashfree-webhook`, `cashfree-return`). Live keys are on: International is **$1.99 / $19.99**. India stays PayU at ₹99 / ₹999. ([payments](features/payments.md), [backend](backend.md#billing-payu))
 
 ### Changed
+- `versionName` 1.0.1 to 1.0.2 and `versionCode` 12 to 13 so Play Console accepts a new AAB. ([settings](features/settings-and-about.md))
 - International Pro is ₹99 a month or ₹999 a year (INR) in Cashfree sandbox because that merchant cannot settle USD. Switching Coolify to live Cashfree keys charges USD. ([payments](features/payments.md), [plans](features/plans.md))
 
 ### Fixed
