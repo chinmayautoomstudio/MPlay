@@ -162,6 +162,44 @@ class AuthRepositoryTest {
     }
 
     @Test
+    fun aNewGoogleSignInClearsThenLoadsThePlan() = runBlocking {
+        val backend = FakeBackend(current = user)
+        backend.status.value = BackendStatus.NotAuthenticated
+        val events = mutableListOf<String>()
+        val repository = AuthRepository(
+            backend,
+            scope,
+            AccountDeletionBackend {},
+            onSignInStarted = { events += "clear" },
+            onSignedIn = { events += "refresh:${it}" },
+        )
+        repository.start()
+        withTimeout(5_000) { repository.state.first { it is AuthState.SignedOut } }
+        repository.signInWithGoogleIdToken("token", "nonce")
+        assertEquals(listOf("clear", "refresh:u1"), events)
+        assertEquals(AuthState.SignedIn(user), repository.state.value)
+    }
+
+    @Test
+    fun finishSignInWaitsForOnSignedInBeforeSignedIn() = runBlocking {
+        val backend = FakeBackend(current = user)
+        backend.status.value = BackendStatus.NotAuthenticated
+        lateinit var repository: AuthRepository
+        var stateWhenPlanLoaded = AuthState.Loading as AuthState
+        repository = AuthRepository(
+            backend,
+            scope,
+            AccountDeletionBackend {},
+            onSignedIn = { stateWhenPlanLoaded = repository.state.value },
+        )
+        repository.start()
+        withTimeout(5_000) { repository.state.first { it is AuthState.SignedOut } }
+        repository.signInWithGoogleIdToken("token", "nonce")
+        assertEquals(AuthState.SignedOut, stateWhenPlanLoaded)
+        assertEquals(AuthState.SignedIn(user), repository.state.value)
+    }
+
+    @Test
     fun deviceRegisterRetriesThenSignsIn() = runBlocking {
         val backend = FakeBackend(current = user, registerFails = 2)
         val repository = signedOutRepository(backend)

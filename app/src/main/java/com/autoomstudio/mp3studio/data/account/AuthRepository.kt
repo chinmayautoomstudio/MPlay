@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The single source of truth for whether someone is signed in. Sign-in is mandatory (PRD AU1): while [state] is not
@@ -18,6 +19,8 @@ class AuthRepository(
     private val scope: CoroutineScope,
     private val deletion: AccountDeletionBackend,
     private val loadingTimeoutMs: Long = LOADING_TIMEOUT_MS,
+    private val onSignInStarted: suspend () -> Unit = {},
+    private val onSignedIn: suspend (userId: String) -> Unit = {},
 ) {
     private val _state = MutableStateFlow<AuthState>(AuthState.Loading)
     val state: StateFlow<AuthState> = _state.asStateFlow()
@@ -69,6 +72,7 @@ class AuthRepository(
         awaitingDeviceCheck = true
         pendingUser = null
         _pendingDeviceLimit.value = null
+        runCatching { onSignInStarted() }
         try {
             backend.signInWithGoogleIdToken(idToken, rawNonce)
             when (val result = registerDeviceRetrying()) {
@@ -183,17 +187,25 @@ class AuthRepository(
 
     private suspend fun finishSignIn(devices: List<LoggedInDevice>) {
         val user = pendingUser ?: backend.currentUser()
-        awaitingDeviceCheck = false
         pendingUser = null
         _pendingDeviceLimit.value = null
         _devices.value = devices
-        _state.value = if (user != null) AuthState.SignedIn(user) else AuthState.SignedOut
+        if (user != null) {
+            // Load the plan before the main UI so a new trial is not shown as Free.
+            withTimeoutOrNull(PLAN_REFRESH_TIMEOUT_MS) { onSignedIn(user.id) }
+            awaitingDeviceCheck = false
+            _state.value = AuthState.SignedIn(user)
+        } else {
+            awaitingDeviceCheck = false
+            _state.value = AuthState.SignedOut
+        }
     }
 
     companion object {
         const val LOADING_TIMEOUT_MS = 8_000L
         const val REGISTER_ATTEMPTS = 3
         const val REGISTER_RETRY_DELAY_MS = 400L
+        const val PLAN_REFRESH_TIMEOUT_MS = 8_000L
 
         /** Offline refresh failures keep the last known user signed in; only the server can end a session. */
         fun reduce(current: AuthState, status: BackendStatus): AuthState = when (status) {

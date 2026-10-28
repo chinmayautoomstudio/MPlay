@@ -46,7 +46,7 @@ class AuthEffects(private val context: Context, private val container: AppContai
     }
 
     private suspend fun onSignedIn(userId: String) {
-        scope.launch { container.entitlementsRepository.refresh(userId) }
+        container.entitlementsRepository.refresh(userId)
         UsageSyncWorker.schedule(context)
         container.separationController.onSignedIn()
     }

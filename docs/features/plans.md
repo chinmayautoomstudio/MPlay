@@ -55,7 +55,7 @@ sequenceDiagram
 
 ### App
 
-- Claim on sign-in: the `devices` register that finishes Google sign-in calls `claim_trial` with the phone's device ID. `entitlements` claims again if there is still no trial (and waits briefly for the profile if `handle_new_user` has not finished). Refresh: `AuthEffects` on sign-in, `AuthViewModel.verifyAccount()` on every foreground, and Refresh on the Plans screen (which also refreshes when opened). A failed entitlements call keeps the cache but does not undo a trial already written at register.
+- Claim on sign-in: every successful Google sign-in (any new or returning account) runs this on that phone: drop the previous account's cached plan, `devices` register calls `claim_trial`, then wait up to 8 s for `entitlements` (three attempts) before `SignedIn`. A first-time email is granted the 30-day trial; a returning email gets `existing`. `entitlements` claims again if there is still no trial (and waits briefly for the profile if `handle_new_user` has not finished). Refresh: `AuthEffects` on every `SignedIn`, `AuthViewModel.verifyAccount()` on every foreground, and Refresh on the Plans screen (which also refreshes when opened). A failed entitlements call keeps the cache but does not undo a trial already written at register. Profile shows “Checking your plan…” until the first successful check, not “Free”.
 - `EntitlementPolicy.effectivePlan` uses the cached plan, but:
   - more than 7 days since the last successful check, or a phone clock more than an hour behind it, makes the cache stale and everything is Free until the next check (PL4);
   - trial and subscription end dates are compared with server time (`serverTime` plus time elapsed on the phone), so an ended trial locks offline.
@@ -91,7 +91,7 @@ None. Uses the existing `INTERNET` permission.
 ## Tests
 
 - `data/plan/EntitlementPolicyTest.kt`: access table for Free, Trial and Pro, no cache, ended trial, expired subscription with and without a trial, 7-day grace boundary, clock turned back, server time deciding end dates, days-left rounding, usage shown only on Free and rolled over after the reset.
-- `data/plan/EntitlementsRepositoryTest.kt`: refresh stores and maps the server answer, offline refresh keeps the cache, another account's cache unlocks nothing, clear, unknown plan values.
+- `data/plan/EntitlementsRepositoryTest.kt`: refresh stores and maps the server answer, retries a flaky fetch then stores Trial, a new userId drops the previous account's cached Free plan, offline refresh keeps the cache, another account's cache unlocks nothing, clear, unknown plan values.
 - `data/plan/EntitlementsResponseTest.kt`: billing state, pending and last payment, billing mode, `paymentsEnabled`, `detectedRegion` and both price lists are mapped, unknown statuses become `Unknown`. The app no longer maps `role` to `isAdmin`.
 - `ui/plans/BillingStatusRulesTest.kt` (`theProCardButtonFollowsTheToggle`, `pricesMatchTheServer`) and `BillingViewModelTest.kt` (`thePlansToggleSetsTheStartingIntervalExceptForASwitch`, region default and override): the Pro card button and price for each plan, Monthly/Yearly and India/International position.
 - `data/tempo/TempoDetectionGateTest.kt`: cached tempo on Free, locked new detection, detection with BPM Detector.
@@ -115,6 +115,7 @@ None. Uses the existing `INTERNET` permission.
 | Date | Commit | Change |
 |---|---|---|
 | 2026-10-28 | - | India monthly was ₹1 for a PayU test, then restored to ₹99 the same day. |
+| 2026-10-28 | - | Every Google sign-in clears the previous plan, claims trial, and waits for `entitlements` (retried) before the main UI; Profile no longer labels an unchecked plan as Free. |
 | 2026-10-22 | - | Free card price follows the India / International toggle (`₹0` / `$0`) instead of a hardcoded `₹0`. |
 | 2026-10-22 | - | International prices are $1.99 / $19.99 with live Cashfree keys. |
 | 2026-10-22 | - | International prices match India (₹99 / ₹999) until PayU USD is enabled. |

@@ -207,6 +207,8 @@ class AppContainer(context: Context) {
             ),
             applicationScope,
             SupabaseAccountDeletionBackend(supabase),
+            onSignInStarted = { entitlementsRepository.clear() },
+            onSignedIn = { entitlementsRepository.refresh(it) },
         )
     }
 

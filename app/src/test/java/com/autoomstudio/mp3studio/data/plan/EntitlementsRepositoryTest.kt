@@ -100,6 +100,35 @@ class EntitlementsRepositoryTest {
     }
 
     @Test
+    fun refreshForANewUserDropsThePreviousPlan() = runBlocking {
+        val previous = Entitlements(userId = "old", plan = Plan.Free, serverTime = now, checkedAt = now)
+        val cache = MemoryCache(previous)
+        val repository = EntitlementsRepository({ trialResponse() }, cache, scope, clock = { now })
+        assertTrue(repository.refresh("u1"))
+        assertEquals("u1", repository.entitlements.value?.userId)
+        assertEquals(Plan.Trial, repository.entitlements.value?.plan)
+        assertEquals("u1", cache.stored?.userId)
+    }
+
+    @Test
+    fun refreshRetriesThenStoresTheAnswer() = runBlocking {
+        var calls = 0
+        val repository = EntitlementsRepository(
+            backend = {
+                calls++
+                if (calls < 3) throw IOException("flaky")
+                trialResponse()
+            },
+            cache = MemoryCache(),
+            scope = scope,
+            clock = { now },
+        )
+        assertTrue(repository.refresh("u1"))
+        assertEquals(3, calls)
+        assertEquals(Plan.Trial, repository.entitlements.value?.plan)
+    }
+
+    @Test
     fun unknownPlansAndClaimsMapToFree() {
         val response = EntitlementsResponse(
             plan = "platinum",

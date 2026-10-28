@@ -3,6 +3,7 @@ package com.autoomstudio.mp3studio.data.plan
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -39,17 +40,30 @@ class EntitlementsRepository(
     /** Fetches from the server for [userId]. Offline or failing calls keep the cached answer; returns success. */
     suspend fun refresh(userId: String): Boolean {
         loaded.await()
-        return try {
-            val fresh = backend.fetch().toEntitlements(userId, clock())
-            _entitlements.value = fresh
-            cache.write(fresh)
-            true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            onRefreshFailed(e)
-            false
+        if (_entitlements.value?.userId != null && _entitlements.value?.userId != userId) {
+            _entitlements.value = null
+            cache.write(null)
         }
+        var last: Exception? = null
+        repeat(REFRESH_ATTEMPTS) { attempt ->
+            try {
+                val fresh = backend.fetch().toEntitlements(userId, clock())
+                _entitlements.value = fresh
+                cache.write(fresh)
+                return true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                last = e
+                if (attempt == REFRESH_ATTEMPTS - 1) {
+                    onRefreshFailed(e)
+                    return false
+                }
+                delay(REFRESH_RETRY_DELAY_MS * (attempt + 1))
+            }
+        }
+        onRefreshFailed(last ?: return false)
+        return false
     }
 
     /** Whether [feature] is unlocked for [userId] right now; a cache for another account counts as none. */
@@ -73,5 +87,10 @@ class EntitlementsRepository(
         loaded.await()
         _entitlements.value = null
         cache.write(null)
+    }
+
+    companion object {
+        const val REFRESH_ATTEMPTS = 3
+        const val REFRESH_RETRY_DELAY_MS = 400L
     }
 }

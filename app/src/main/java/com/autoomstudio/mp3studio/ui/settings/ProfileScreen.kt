@@ -363,7 +363,11 @@ private fun SubscriptionCard(plan: PlanUiState, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 val appName = stringResource(R.string.profile_subscription_app)
-                val planName = planName(plan.plan)
+                val planName = if (plan.checkedAt == null) {
+                    stringResource(R.string.plan_checking)
+                } else {
+                    planName(plan.plan)
+                }
                 Text(
                     buildAnnotatedString {
                         append(appName)
