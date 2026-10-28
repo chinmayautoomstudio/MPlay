@@ -162,6 +162,27 @@ class AuthRepositoryTest {
     }
 
     @Test
+    fun deviceRegisterRetriesThenSignsIn() = runBlocking {
+        val backend = FakeBackend(current = user, registerFails = 2)
+        val repository = signedOutRepository(backend)
+        repository.signInWithGoogleIdToken("token", "nonce")
+        assertEquals(AuthState.SignedIn(user), repository.state.value)
+        assertEquals(3, backend.registerCalls)
+        assertEquals(0, backend.signOuts)
+    }
+
+    @Test
+    fun deviceRegisterGivesUpAndSignsOut() = runBlocking {
+        val backend = FakeBackend(current = user, registerFails = 5)
+        val repository = signedOutRepository(backend)
+        val error = runCatching { repository.signInWithGoogleIdToken("token", "nonce") }.exceptionOrNull()
+        assertTrue(error is DeviceRegisterException)
+        assertEquals(AuthState.SignedOut, repository.state.value)
+        assertEquals(3, backend.registerCalls)
+        assertEquals(1, backend.signOuts)
+    }
+
+    @Test
     fun signingOutAnotherDeviceUpdatesTheList() = runBlocking {
         val backend = FakeBackend(listed = listOf(phoneA, thisPhone))
         val repository = signedInRepository(backend)
@@ -199,11 +220,13 @@ class AuthRepositoryTest {
         var verification: DeviceVerificationResult = DeviceVerificationResult.Ok(emptyList()),
         var listed: List<LoggedInDevice> = emptyList(),
         private val current: AccountUser? = null,
+        var registerFails: Int = 0,
     ) : AuthBackend {
         override val status = MutableStateFlow<BackendStatus>(BackendStatus.Initializing)
         var signOuts = 0
         var localSignOuts = 0
         var lastReplaceId: String? = null
+        var registerCalls = 0
         val removed = mutableListOf<String>()
 
         override suspend fun signInWithGoogleIdToken(idToken: String, rawNonce: String) {
@@ -227,6 +250,11 @@ class AuthRepositoryTest {
 
         override suspend fun registerDevice(replaceDeviceId: String?): DeviceRegistrationResult {
             lastReplaceId = replaceDeviceId
+            registerCalls++
+            if (registerFails > 0) {
+                registerFails--
+                throw DeviceRegisterException()
+            }
             return registration
         }
 

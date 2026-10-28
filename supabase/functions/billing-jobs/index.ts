@@ -20,9 +20,9 @@ import type { CashfreeClient } from "../_shared/cashfree.ts";
 import { jobAuthorized, type JobAction, parseJobAction } from "../_shared/jobs.ts";
 import { LogNotifier, type Notice } from "../_shared/notifier.ts";
 import type { PayuClient } from "../_shared/payu.ts";
-import { pickSecret, vaultSecret } from "../_shared/secrets.ts";
+import { envOrVault, vaultSecret } from "../_shared/secrets.ts";
 import { adminClient, json, readJson } from "../_shared/server.ts";
-import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import type { SupabaseClient } from "../_shared/supabase.ts";
 
 type Counts = { processed: number; failed: number; skipped: number };
 
@@ -137,9 +137,9 @@ async function run(action: JobAction, admin: SupabaseClient): Promise<Counts> {
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   const admin = adminClient();
-  const jobSecret = pickSecret(
+  const jobSecret = await envOrVault(
     Deno.env.get("BILLING_JOBS_SECRET"),
-    await vaultSecret(admin, "billing_jobs_secret"),
+    () => vaultSecret(admin, "billing_jobs_secret"),
   );
   if (!jobAuthorized(req.headers.get("x-billing-job-secret"), jobSecret)) {
     return json({ error: "unauthorized" }, 401);

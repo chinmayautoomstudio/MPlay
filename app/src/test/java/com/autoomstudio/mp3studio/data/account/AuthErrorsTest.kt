@@ -35,6 +35,7 @@ class AuthErrorsTest {
         assertEquals(AuthError.AccountDisabled, AuthErrors.classify(AccountDisabledException()))
         assertEquals(AuthError.NotConfigured, AuthErrors.classify(AuthNotConfiguredException()))
         assertEquals(AuthError.AccountDisabled, AuthErrors.classify(AuthCodeException("user_banned")))
+        assertEquals(AuthError.DeviceRegisterFailed, AuthErrors.classify(DeviceRegisterException()))
     }
 
     @Test
@@ -60,5 +61,13 @@ class AuthErrorsTest {
         assertTrue(AuthErrors.endsSession(AuthError.SessionRevoked))
         AuthError.entries.filterNot { it == AuthError.AccountDisabled || it == AuthError.SessionRevoked }
             .forEach { assertFalse(it.name, AuthErrors.endsSession(it)) }
+    }
+
+    @Test
+    fun deviceRegisterFailuresAreRetryable() {
+        assertTrue(AuthErrors.isRetryableDeviceRegister(DeviceRegisterException()))
+        assertTrue(AuthErrors.isRetryableDeviceRegister(IOException("timeout")))
+        assertTrue(AuthErrors.isRetryableDeviceRegister(IllegalStateException("wrap", DeviceRegisterException())))
+        assertFalse(AuthErrors.isRetryableDeviceRegister(AuthCodeException("device_unknown")))
     }
 }

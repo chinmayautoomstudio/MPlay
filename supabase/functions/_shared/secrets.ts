@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import type { SupabaseClient } from "./supabase.ts";
 
 export type AppSecretName = "trial_hash_pepper" | "billing_jobs_secret";
 
@@ -9,6 +9,19 @@ export function pickSecret(...candidates: Array<string | null | undefined>): str
     if (trimmed) return trimmed;
   }
   return undefined;
+}
+
+/**
+ * Env first, Vault only if env is empty. Do not `await vaultSecret(...)` as a `pickSecret`
+ * argument: JS evaluates both args, so that always hits Vault on a cold isolate.
+ */
+export async function envOrVault(
+  envValue: string | null | undefined,
+  fromVault: () => Promise<string | undefined>,
+): Promise<string | undefined> {
+  const fromEnv = pickSecret(envValue);
+  if (fromEnv) return fromEnv;
+  return await fromVault();
 }
 
 /** Reads an allow-listed Vault secret through `app_secret`. */

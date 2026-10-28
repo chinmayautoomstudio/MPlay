@@ -1,5 +1,5 @@
 import { assertEquals, assertNotEquals } from "jsr:@std/assert@1";
-import { pickSecret } from "./secrets.ts";
+import { envOrVault, pickSecret } from "./secrets.ts";
 import { normalizeEmail, pepperedHash, validDeviceId } from "./trial.ts";
 
 Deno.test("Gmail dots, plus aliases and case collapse to one address", () => {
@@ -34,6 +34,21 @@ Deno.test("Env secrets win; Vault is used when the env var is empty", () => {
   assertEquals(pickSecret("  ", "from-vault"), "from-vault");
   assertEquals(pickSecret(undefined, "from-vault"), "from-vault");
   assertEquals(pickSecret(undefined, ""), undefined);
+});
+
+Deno.test("envOrVault does not call Vault when the env var is set", async () => {
+  let vaultCalls = 0;
+  const value = await envOrVault("pepper", async () => {
+    vaultCalls++;
+    return "from-vault";
+  });
+  assertEquals(value, "pepper");
+  assertEquals(vaultCalls, 0);
+});
+
+Deno.test("envOrVault uses Vault when the env var is empty", async () => {
+  const value = await envOrVault("  ", async () => "from-vault");
+  assertEquals(value, "from-vault");
 });
 
 Deno.test("Hashes depend on the pepper and are stable", async () => {

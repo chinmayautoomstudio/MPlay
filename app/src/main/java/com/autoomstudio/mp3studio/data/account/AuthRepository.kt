@@ -71,7 +71,7 @@ class AuthRepository(
         _pendingDeviceLimit.value = null
         try {
             backend.signInWithGoogleIdToken(idToken, rawNonce)
-            when (val result = backend.registerDevice()) {
+            when (val result = registerDeviceRetrying()) {
                 is DeviceRegistrationResult.Registered -> finishSignIn(result.devices)
                 is DeviceRegistrationResult.LimitReached -> holdForDeviceChoice(result.devices)
             }
@@ -87,7 +87,7 @@ class AuthRepository(
 
     /** Logs the chosen phone out on the server and finishes the held sign-in on this one. */
     suspend fun completeSignInByReplacingDevice(removeDeviceId: String) {
-        when (val result = backend.registerDevice(replaceDeviceId = removeDeviceId)) {
+        when (val result = registerDeviceRetrying(replaceDeviceId = removeDeviceId)) {
             is DeviceRegistrationResult.Registered -> finishSignIn(result.devices)
             is DeviceRegistrationResult.LimitReached -> holdForDeviceChoice(result.devices)
         }
@@ -162,6 +162,20 @@ class AuthRepository(
         _devices.value = backend.removeDevice(deviceId)
     }
 
+    private suspend fun registerDeviceRetrying(replaceDeviceId: String? = null): DeviceRegistrationResult {
+        var last: Exception? = null
+        repeat(REGISTER_ATTEMPTS) { attempt ->
+            try {
+                return backend.registerDevice(replaceDeviceId)
+            } catch (e: Exception) {
+                last = e
+                if (!AuthErrors.isRetryableDeviceRegister(e) || attempt == REGISTER_ATTEMPTS - 1) throw e
+                delay(REGISTER_RETRY_DELAY_MS * (attempt + 1))
+            }
+        }
+        throw last ?: error("registerDevice retry exhausted")
+    }
+
     private fun holdForDeviceChoice(devices: List<LoggedInDevice>) {
         _pendingDeviceLimit.value = devices
         _state.value = AuthState.SignedOut
@@ -178,6 +192,8 @@ class AuthRepository(
 
     companion object {
         const val LOADING_TIMEOUT_MS = 8_000L
+        const val REGISTER_ATTEMPTS = 3
+        const val REGISTER_RETRY_DELAY_MS = 400L
 
         /** Offline refresh failures keep the last known user signed in; only the server can end a session. */
         fun reduce(current: AuthState, status: BackendStatus): AuthState = when (status) {

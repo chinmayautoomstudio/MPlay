@@ -10,6 +10,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 - India monthly Pro was ₹1 for a PayU test, then restored to **₹99** the same day. Yearly stays ₹999. ([payments](features/payments.md), [plans](features/plans.md))
 
 ### Fixed
+- New Google sign-in no longer fails after a successful token exchange with a generic “Couldn’t sign in”. The `devices` function boots from a vendored `supabase-js` (no JSR fetch), `claimTrial` uses `TRIAL_HASH_PEPPER` without always calling Vault, isolate wall-clock is raised, and the app retries `registerDevice` on 5xx then shows `auth_error_device_register`. The new-stack dump had also left `on_auth_user_created` disabled, so the first new Gmail had no profile; the trigger is enabled again. ([accounts](features/accounts.md), [backend](backend.md#edge-functions))
 - Website Google login on the new API no longer returns `Unsupported provider: missing redirect URI`. GoTrue now has `GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI=https://mp3studio-api.3.232.162.36.sslip.io/auth/v1/callback` (the same URI must be on the Google Web client). Android ID-token sign-in was already working. ([backend](backend.md#auth-settings), [accounts](features/accounts.md))
 
 ## [1.0.2] - 2026-10-23

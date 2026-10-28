@@ -79,6 +79,7 @@ class SupabaseAuthBackend(
             if (e.statusCode == 409 && "device_limit_reached" in deviceErrorText(e)) {
                 return DeviceRegistrationResult.LimitReached(listDevices())
             }
+            if (e.statusCode in 500..599) throw DeviceRegisterException(e)
             throw e
         }
         val dto = json.decodeFromString<DevicesResponse>(text)

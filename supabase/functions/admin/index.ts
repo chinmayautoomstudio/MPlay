@@ -7,7 +7,7 @@
 import { cashfreeFromEnv, confirmRevoked, payuFromEnv, resolvePayment, resolveRefund, rpc } from "../_shared/billing.ts";
 import { type AdminCall, parseAdminRequest, REFUSALS } from "../_shared/admin.ts";
 import { adminClient, caller, json, readJson } from "../_shared/server.ts";
-import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import type { SupabaseClient } from "../_shared/supabase.ts";
 
 type ActionInfo = {
   txnId?: string;

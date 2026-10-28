@@ -23,6 +23,9 @@ enum class AuthError {
 
     /** The build has no Supabase or Google client settings. */
     NotConfigured,
+
+    /** GoTrue succeeded, but registering this phone on `devices` failed after retries (5xx). */
+    DeviceRegisterFailed,
     Unknown,
 }
 
@@ -34,6 +37,9 @@ class AccountDisabledException : Exception("Account disabled")
 
 /** Supabase URL or key, or the Google Web client ID, is missing from the build. */
 class AuthNotConfiguredException : Exception("Sign-in is not configured in this build")
+
+/** The `devices` Edge Function returned a server error after retries. */
+class DeviceRegisterException(cause: Throwable? = null) : Exception("Could not register this device", cause)
 
 object AuthErrors {
 
@@ -59,9 +65,16 @@ object AuthErrors {
             AuthError.PlayServicesUnavailable
         is AccountDisabledException -> AuthError.AccountDisabled
         is AuthNotConfiguredException -> AuthError.NotConfigured
+        is DeviceRegisterException -> AuthError.DeviceRegisterFailed
         is AuthCodeException -> classifyCode(error.code)
         is IOException -> AuthError.Network
         else -> error.cause?.let(::classify) ?: AuthError.Unknown
+    }
+
+    fun isRetryableDeviceRegister(error: Throwable): Boolean = when (error) {
+        is DeviceRegisterException -> true
+        is IOException -> true
+        else -> error.cause?.let(::isRetryableDeviceRegister) ?: false
     }
 
     private fun isReauthFailure(message: String?): Boolean =

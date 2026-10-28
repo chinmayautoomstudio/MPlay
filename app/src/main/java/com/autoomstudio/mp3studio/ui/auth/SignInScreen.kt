@@ -450,6 +450,7 @@ fun AuthError.messageRes(): Int = when (this) {
     AuthError.AccountDisabled -> R.string.auth_error_disabled
     AuthError.SessionRevoked -> R.string.auth_error_session
     AuthError.NotConfigured -> R.string.auth_error_not_configured
+    AuthError.DeviceRegisterFailed -> R.string.auth_error_device_register
     AuthError.Cancelled, AuthError.Unknown -> R.string.auth_error_unknown
 }
 

@@ -1,7 +1,7 @@
 // Billing steps shared by the checkout, status, webhook, subscription, jobs, admin and delete-account functions.
 // PayU (India) or Cashfree (International) decides what happened; the SQL functions decide what that means for
 // the subscription (payments PRD 6.2).
-import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
+import type { SupabaseClient } from "./supabase.ts";
 import { CashfreeClient, cashfreeConfig, findTxnId, isCashfreeUrl } from "./cashfree.ts";
 import type { BillingInterval } from "./checkout.ts";
 import type { BillingCurrency, BillingRegion } from "./geo.ts";
