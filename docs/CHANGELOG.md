@@ -6,7 +6,11 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-10-30
+
 ### Changed
+- `versionName` 1.0.2 to 1.0.3 and `versionCode` 13 to 14 for Play Console. ([settings](features/settings-and-about.md))
+- App points at the new API host `https://mp3studio-api.3.232.162.36.sslip.io`. ([backend](backend.md), [accounts](features/accounts.md))
 - India monthly Pro was ₹1 for a PayU test, then restored to **₹99** the same day. Yearly stays ₹999. ([payments](features/payments.md), [plans](features/plans.md))
 
 ### Docs
