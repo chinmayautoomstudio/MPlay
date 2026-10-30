@@ -257,6 +257,7 @@ Sign in once with the Google account, then run `supabase/seed/first_admin.sql` (
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-30 | - | Ops sync: copied 8 post-cutover `auth.users` (+ identities, profiles, trials, trial_claims, user_devices) from old `securedbmp3` into new Postgres; bumped shared `last_sign_in_at` where old was newer. New-stack Chinmay billing test rows and `mailme…` kept. Users 41→49. |
 | 2026-10-30 | - | `has_indian_phone_null`: coalesce `hasIndianPhone` so Plans refresh works without a stored phone. |
 | 2026-10-07 | - | Project folder, foundation migration, RLS tests, first-Admin snippet; live database migrated. |
 | 2026-10-08 | - | M2: `plans` migration (applied live, checks run in a rolled-back block), `entitlements` and `claim-trial` Edge Functions, `plans_test.sql`. |

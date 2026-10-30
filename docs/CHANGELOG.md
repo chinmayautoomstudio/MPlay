@@ -9,6 +9,9 @@ Each entry should say what changed and link to the feature doc. Use these groups
 ### Changed
 - India monthly Pro was ₹1 for a PayU test, then restored to **₹99** the same day. Yearly stays ₹999. ([payments](features/payments.md), [plans](features/plans.md))
 
+### Docs
+- Synced eight post-cutover accounts (and their identities, profiles, trials, trial claims, and devices) from old `securedbmp3` into the new stack on 2026-10-30; new-stack test billing and `mailme…` were left alone. ([backend](backend.md))
+
 ### Fixed
 - Samsung (and other OEM) notification-shade mini-player play/pause works again. Platform/legacy MediaSession controllers get transport access when signed in, and `onConnectAsync` / `onPlaybackResumption` no longer complete on the main thread (which deadlocked System UI waiting on the connection). ([playback](features/playback.md))
 - Plans refresh no longer fails with “Couldn't reach the server” when the account has no phone number. `compute_entitlements` returned JSON `null` for `hasIndianPhone` (SQL `phone ~ regex` is null), and the app rejected that boolean field. Server now coalesces to `false`; the app also treats null phone flags as false. ([plans](features/plans.md), [backend](backend.md#migrations))
