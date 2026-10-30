@@ -1,6 +1,7 @@
 package com.autoomstudio.mp3studio.playback
 
 import androidx.media3.common.Player
+import androidx.media3.session.MediaSession
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -12,6 +13,10 @@ class ControllerAccessTest {
     fun `nobody connects while signed out`() {
         assertEquals(ControllerAccess.Rejected, controllerAccess(signedIn = false, ownPackage = true, trusted = true))
         assertEquals(ControllerAccess.Rejected, controllerAccess(signedIn = false, ownPackage = false, trusted = true))
+        assertEquals(
+            ControllerAccess.Rejected,
+            controllerAccess(signedIn = false, ownPackage = false, trusted = false, legacy = true),
+        )
     }
 
     @Test
@@ -25,8 +30,29 @@ class ControllerAccessTest {
     }
 
     @Test
+    fun `legacy platform controllers get transport when signed in`() {
+        assertEquals(
+            ControllerAccess.Transport,
+            controllerAccess(signedIn = true, ownPackage = false, trusted = false, legacy = true),
+        )
+    }
+
+    @Test
     fun `other apps are refused`() {
         assertEquals(ControllerAccess.Rejected, controllerAccess(signedIn = true, ownPackage = false, trusted = false))
+        assertEquals(
+            ControllerAccess.Rejected,
+            controllerAccess(signedIn = true, ownPackage = false, trusted = false, legacy = false),
+        )
+    }
+
+    @Test
+    fun `legacy package name is recognized`() {
+        assertEquals(
+            MediaSession.ControllerInfo.LEGACY_CONTROLLER_PACKAGE_NAME,
+            "android.media.session.MediaController",
+        )
+        assertEquals(0, MediaSession.ControllerInfo.LEGACY_CONTROLLER_VERSION)
     }
 
     @Test

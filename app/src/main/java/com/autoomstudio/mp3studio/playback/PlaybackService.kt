@@ -43,6 +43,7 @@ import com.autoomstudio.mp3studio.widget.WidgetStatePublisher
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -341,37 +342,72 @@ class PlaybackService : MediaSessionService() {
         /**
          * Nothing controls playback while signed out (PRD AU4). Signed in, MPlay's own controllers get everything,
          * trusted system controllers get playback controls without changing the queue, and other apps are refused.
+         *
+         * Platform/legacy controllers (Samsung shade, lock screen) may block the main thread waiting on this
+         * future, so it must not complete on Main — use an immediate result when auth is ready, otherwise Default.
          */
         @OptIn(UnstableApi::class)
         override fun onConnectAsync(
             session: MediaSession,
             controller: MediaSession.ControllerInfo,
-        ): ListenableFuture<MediaSession.ConnectionResult> = serviceScope.future {
+        ): ListenableFuture<MediaSession.ConnectionResult> {
+            val ready = authRepository.state.value
+            return if (ready !is AuthState.Loading) {
+                Futures.immediateFuture(connectionResult(session, controller, ready is AuthState.SignedIn))
+            } else {
+                // Off Main: completing on MainScope deadlocks when System UI blocks the main thread.
+                serviceScope.future(Dispatchers.Default) {
+                    connectionResult(
+                        session,
+                        controller,
+                        authRepository.awaitReady() is AuthState.SignedIn,
+                    )
+                }
+            }
+        }
+
+        @OptIn(UnstableApi::class)
+        private fun connectionResult(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            signedIn: Boolean,
+        ): MediaSession.ConnectionResult {
+            val legacy = isLegacyPlatformController(controller)
             val access = controllerAccess(
-                signedIn = authRepository.awaitReady() is AuthState.SignedIn,
+                signedIn = signedIn,
                 ownPackage = controller.packageName == packageName,
                 trusted = controller.isTrusted ||
                     session.isMediaNotificationController(controller) ||
                     session.isAutoCompanionController(controller) ||
                     session.isAutomotiveController(controller),
+                legacy = legacy,
             )
-            val result = MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
-                .setSessionExtras(session.sessionExtras)
             when (access) {
                 ControllerAccess.Rejected -> {
-                    Log.d(TAG, "Refused controller ${controller.packageName}")
-                    return@future MediaSession.ConnectionResult.reject()
+                    Log.w(
+                        TAG,
+                        "Refused controller package=${controller.packageName} " +
+                            "trusted=${controller.isTrusted} version=${controller.controllerVersion} legacy=$legacy",
+                    )
+                    return MediaSession.ConnectionResult.reject()
                 }
-                ControllerAccess.Transport -> result.setAvailablePlayerCommands(
-                    transportPlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS),
-                )
+                ControllerAccess.Transport -> {
+                    return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
+                        .setSessionExtras(session.sessionExtras)
+                        .setAvailablePlayerCommands(
+                            transportPlayerCommands(MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS),
+                        )
+                        .build()
+                }
                 ControllerAccess.Full -> {
                     val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
                     PlaybackCommands.all.forEach(commands::add)
-                    result.setAvailableSessionCommands(commands.build())
+                    return MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
+                        .setSessionExtras(session.sessionExtras)
+                        .setAvailableSessionCommands(commands.build())
+                        .build()
                 }
             }
-            result.build()
         }
 
         override fun onCustomCommand(
@@ -399,13 +435,15 @@ class PlaybackService : MediaSessionService() {
         /**
          * Rebuilds the last saved queue when play is requested with nothing loaded, for example from the
          * widget, a headset button or the system's media resumption controls after the app was killed.
+         *
+         * Completes off Main so platform/legacy controllers waiting on the main thread cannot deadlock.
          */
         @OptIn(UnstableApi::class)
         override fun onPlaybackResumption(
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo,
             isForPlayback: Boolean,
-        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = serviceScope.future {
+        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> = serviceScope.future(Dispatchers.Default) {
             if (authRepository.awaitReady() !is AuthState.SignedIn) throw UnsupportedOperationException("Signed out")
             val saved = sessionStore.load() ?: throw UnsupportedOperationException("No saved session")
             val restored = restoreQueue(saved, songRepository.loadSongs(), Song::id)

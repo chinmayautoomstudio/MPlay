@@ -1,6 +1,9 @@
 package com.autoomstudio.mp3studio.playback
 
+import androidx.annotation.OptIn
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.session.MediaSession
 
 /** What a controller connecting to the exported [PlaybackService] may do. */
 internal enum class ControllerAccess {
@@ -13,10 +16,24 @@ internal enum class ControllerAccess {
     Rejected,
 }
 
-internal fun controllerAccess(signedIn: Boolean, ownPackage: Boolean, trusted: Boolean): ControllerAccess = when {
+/**
+ * Platform / legacy MediaControllers often report [MediaSession.ControllerInfo.LEGACY_CONTROLLER_PACKAGE_NAME]
+ * and may look untrusted even though only privileged clients can hold the session token (Samsung shade, etc.).
+ */
+@OptIn(UnstableApi::class)
+internal fun isLegacyPlatformController(controller: MediaSession.ControllerInfo): Boolean =
+    controller.controllerVersion == MediaSession.ControllerInfo.LEGACY_CONTROLLER_VERSION ||
+        controller.packageName == MediaSession.ControllerInfo.LEGACY_CONTROLLER_PACKAGE_NAME
+
+internal fun controllerAccess(
+    signedIn: Boolean,
+    ownPackage: Boolean,
+    trusted: Boolean,
+    legacy: Boolean = false,
+): ControllerAccess = when {
     !signedIn -> ControllerAccess.Rejected
     ownPackage -> ControllerAccess.Full
-    trusted -> ControllerAccess.Transport
+    trusted || legacy -> ControllerAccess.Transport
     else -> ControllerAccess.Rejected
 }
 

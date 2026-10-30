@@ -1,6 +1,6 @@
 # Playback
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-13
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-30
 
 ## Summary
 
@@ -31,7 +31,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `ui/playback/MiniPlayer.kt` | Title/artist, play/pause, next, scrub strip, metronome indicator. |
 | `ui/playback/NowPlayingScreen.kt` | Artwork, seek bar (white thumb), outlined circular transport, `StemModeSelector`, five feature tiles (lofi, equalizer, metronome, separator, sing-along), Up Next sheet, other sheets. |
 | `ui/playback/PlayPauseIcon.kt` | Lottie play/pause morph with icon fallback. |
-| `playback/ControllerAccess.kt` | `ControllerAccess` (Full, Transport, Rejected), `controllerAccess()` and `transportPlayerCommands()` for controllers of the exported service. |
+| `playback/ControllerAccess.kt` | `ControllerAccess` (Full, Transport, Rejected), `controllerAccess()`, `isLegacyPlatformController()` and `transportPlayerCommands()` for controllers of the exported service. |
 | `ui/playback/SwipeToSkip.kt` | `swipeToSkip` modifier, `SwipeSkipState` and `swipeDecision()`: swipe the album art or mini player to change song. |
 | `ui/playback/SleepTimerSheet.kt` | Presets, end of song, 1-180 min slider, remaining-time chip. |
 
@@ -45,9 +45,9 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 - The session activity `PendingIntent` opens `MainActivity` with `EXTRA_OPEN_NOW_PLAYING`. Notifications use Media3's default provider.
 - The session's bitmap loader is `CacheBitmapLoader(AlbumArtBitmapLoader(...))`. Album-art URIs go through `AlbumArtLoader`, so songs in `Download/` (where MediaProvider refuses thumbnails) get their embedded cover in the notification. Other URIs go to `DataSourceBitmapLoader`. When a song has no art, `AlbumArtBitmapLoader` falls back to `AppLogoArtwork` (the app logo) so the notification still has a large icon. See [library](library.md#album-art).
 - `SessionCallback`:
-  - `onConnectAsync` waits for `AuthRepository.awaitReady()` and rejects every controller (app, notification, system UI, Bluetooth) while signed out (PRD AU4). Signed in, `controllerAccess()` decides: the app's own package (app, widget) gets `Full` (default commands plus `PlaybackCommands.all`); a trusted controller (`isTrusted`, the media notification controller, Android Auto companion or Automotive) gets `Transport` (`transportPlayerCommands()`: default player commands minus `NON_TRANSPORT_COMMANDS`, so no queue, volume, speed or track changes); any other app is rejected and logged at debug level.
+  - `onConnectAsync` rejects every controller (app, notification, system UI, Bluetooth) while signed out (PRD AU4). Signed in, `controllerAccess()` decides: the app's own package (app, widget) gets `Full` (default commands plus `PlaybackCommands.all`); a trusted controller (`isTrusted`, the media notification controller, Android Auto companion or Automotive) or a platform/legacy controller (`isLegacyPlatformController`: `LEGACY_CONTROLLER_VERSION` or `LEGACY_CONTROLLER_PACKAGE_NAME`, used by Samsung shade and similar) gets `Transport` (`transportPlayerCommands()`: default player commands minus `NON_TRANSPORT_COMMANDS`, so no queue, volume, speed or track changes); any other app is rejected and logged at warn with package, trust and version. When auth is already known the result is an `immediateFuture`; if still loading it completes on `Dispatchers.Default`, never Main — platform clients can block the main thread waiting on the future.
   - `onCustomCommand` handles the commands below; anything else returns `ERROR_NOT_SUPPORTED`.
-  - `onPlaybackResumption` rebuilds the saved queue for play requests from the widget, headset or system UI. It throws while signed out.
+  - `onPlaybackResumption` rebuilds the saved queue for play requests from the widget, headset or system UI (future completes on `Dispatchers.Default`). It throws while signed out.
   - `onAddMediaItems` refuses items from any other package (failed future) and maps the app's own items through `resolve()` so the current `StemMode` applies.
 - After a sign-in, a collector on `AuthRepository.state` waits for `SignedOut`, then `stopForSignOut()` saves the queue, cancels the sleep timer, stops and clears the player and calls `stopSelf()`. The saved queue (DataStore `playback_session`) is kept, so the next sign-in can resume it.
 - `onTaskRemoved` (app swiped away from recents) always saves the queue, cancels the sleep timer, calls `TaskRemoval.onTaskRemoved()` (stops the metronome, sing-along and separation, see [architecture](../architecture.md#removal-from-recents)) and calls Media3's `pauseAllPlayersAndStopSelf()`, which pauses, dismisses the notification and stops the service, so music never keeps playing without the app. A plain `stopSelf()` isn't enough: Media3 re-posts the notification for the loaded queue and restarts the service. The saved queue lets the next launch, the widget or a headset press resume it. `onDestroy` clears `musicPlaying`, saves, publishes a paused widget state and releases.
@@ -118,7 +118,7 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 - `playback/SleepTimerTest.kt`: start, clamp, extend, expiry, fade curve, speed-adjusted end of song.
 - `playback/PlaybackQueueTest.kt`: `playbackQueueOf` clamping, `upNext` slice, `clampQueueMove`.
 - `ui/playback/SwipeToSkipTest.kt`: swipe threshold, fling, blocked directions.
-- `playback/ControllerAccessTest.kt`: access per controller kind, transport keeps playback controls and drops queue changes.
+- `playback/ControllerAccessTest.kt`: access per controller kind (including legacy platform → Transport), transport keeps playback controls and drops queue changes.
 - No tests for the service, controller, runner or the rest of the UI.
 
 ## Known limitations and TODOs
@@ -154,3 +154,4 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 | 2026-10-13 | - | Now Playing restyle: white seek thumb, outlined circular shuffle/prev/next/repeat, five equal feature tiles instead of the chip `FlowRow`. |
 | 2026-10-13 | - | Up Next nested sheet on Now Playing (`UpNextSheet`, `PlaybackQueue`): swipe up for current + upcoming, tap to jump, drag reorder, remove. |
 | 2026-10-13 | - | Shared Now Playing artwork fades with `UpNextSheetState.expandProgress` so it no longer overlays the Up Next list. |
+| 2026-10-30 | - | Platform/legacy controllers get Transport when signed in; `onConnectAsync` / `onPlaybackResumption` complete off Main so Samsung shade play/pause works. |
