@@ -62,6 +62,7 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.functions.Functions
 import io.github.jan.supabase.postgrest.Postgrest
 import io.ktor.client.engine.okhttp.OkHttp
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -177,7 +178,14 @@ class AppContainer(context: Context) {
             supabaseUrl = BuildConfig.SUPABASE_URL.ifBlank { "https://not-configured.invalid" },
             supabaseKey = BuildConfig.SUPABASE_KEY.ifBlank { "not-configured" },
         ) {
-            httpEngine = OkHttp.create()
+            httpEngine = OkHttp.create {
+                config {
+                    // Cold Edge Functions can take several seconds on first hit after idle.
+                    connectTimeout(30, TimeUnit.SECONDS)
+                    readTimeout(30, TimeUnit.SECONDS)
+                    writeTimeout(30, TimeUnit.SECONDS)
+                }
+            }
             install(Auth) {
                 sessionManager = sessionStore
                 autoLoadFromStorage = true
@@ -193,7 +201,13 @@ class AppContainer(context: Context) {
             backend = SupabaseEntitlementsBackend(supabase) { DeviceId.of(appContext) },
             cache = DataStoreEntitlementsCache(appContext),
             scope = applicationScope,
-            onRefreshFailed = { Log.w("Entitlements", "Could not refresh entitlements", it) },
+            onRefreshFailed = {
+                Log.w(
+                    "Entitlements",
+                    "Could not refresh entitlements: ${it.javaClass.simpleName}: ${it.message}",
+                    it,
+                )
+            },
         )
     }
 

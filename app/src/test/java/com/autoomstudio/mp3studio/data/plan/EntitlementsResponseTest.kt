@@ -104,4 +104,19 @@ class EntitlementsResponseTest {
         assertTrue(e.needsPhone(BillingRegion.India))
         assertFalse(e.needsPhone(BillingRegion.International))
     }
+
+    @Test
+    fun nullPhoneFlagsDecodeAsFalse() {
+        val json = Json { ignoreUnknownKeys = true }
+        val body = """
+            {"plan":"trial","hasPhone":null,"hasIndianPhone":null,"paymentsEnabled":null,
+             "trial":{"startedAt":"2026-10-28T00:00:00+00:00","endsAt":"2026-11-27T00:00:00+00:00"},
+             "serverTime":"2026-10-30T10:00:00+00:00"}
+        """.trimIndent()
+        val e = json.decodeFromString<EntitlementsResponse>(body).toEntitlements("u", 0)
+        assertEquals(Plan.Trial, e.plan)
+        assertFalse(e.hasPhone)
+        assertFalse(e.hasIndianPhone)
+        assertFalse(e.paymentsEnabled)
+    }
 }

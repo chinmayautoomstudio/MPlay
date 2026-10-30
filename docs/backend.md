@@ -1,6 +1,6 @@
 # Backend (Supabase)
 
-> Last updated: 2026-10-28
+> Last updated: 2026-10-30
 
 MP3 Studio uses a self-hosted Supabase project for accounts, plans, trials, AI Vocal Separator usage and payments (PayU in India, Cashfree internationally). Music, playlists, stems and recordings never leave the phone; only the title of a song sent for separation is stored, in `ai_usage.song_ref`. The app talks to Supabase Auth (GoTrue) and PostgREST with the public anon key; everything privileged runs server-side as the service role.
 
@@ -70,7 +70,7 @@ Functions:
 
 - `handle_new_user()` (security definer, `search_path = ''`): inserts the profile with the email, `full_name`/`name` (cut to 80) and `avatar_url`/`picture` from the Google metadata. `role` is `admin` when the email has a row in `admin_invites` (the invite is deleted and an `invite_accepted` audit row written), otherwise `user`. Not executable by API roles.
 - `is_admin()` (security definer): true when the caller's profile is an enabled Admin. Executable by `authenticated` only.
-- `compute_entitlements(p_user)` (security definer, `service_role` only): `{plan, role, disabled, trial, subscription, billing, pendingPayment, lastPayment, hasPhone, serverTime}`. Pro when `is_pro_sub()` holds for a subscription: `active` before `expires_at` (one more day when autopay is on, so the hourly debit can run), `cancelled` before `expires_at`, `past_due` before `grace_end`. Otherwise Trial while `trials.ends_at` is in the future, otherwise Free. Returns null when there is no profile. `plan_of()` uses the same rule.
+- `compute_entitlements(p_user)` (security definer, `service_role` only): `{plan, role, disabled, trial, subscription, billing, pendingPayment, lastPayment, hasPhone, hasIndianPhone, serverTime}`. `hasIndianPhone` is always a boolean (`coalesce(phone ~ Indian-mobile regex, false)`). Pro when `is_pro_sub()` holds for a subscription: `active` before `expires_at` (one more day when autopay is on, so the hourly debit can run), `cancelled` before `expires_at`, `past_due` before `grace_end`. Otherwise Trial while `trials.ends_at` is in the future, otherwise Free. Returns null when there is no profile. `plan_of()` uses the same rule.
 - `claim_trial(p_user, p_email_hash, p_device_hash)` (security definer, `service_role` only): per-user advisory lock; `existing` when the user has a trial, `denied` with reason `account` (disabled), `email` or `device` (hash already in `trial_claims`), otherwise inserts the claim and a 30-day trial and returns `granted`.
 - `usage_week_start(ts)` (immutable): the Monday, India Standard Time, of the week containing `ts`. The weekly reset needs no scheduled job (US8).
 - `usage_summary(p_user)` (`service_role` only): `{limit: 10, used, reserved, remaining, weekStart, resetsAt, unlimited}`. `used` counts this week's `completed` rows; `reserved` counts `reserved` rows younger than 48 hours (older ones stop holding a use); `unlimited` is true on Trial and Pro.
@@ -228,6 +228,7 @@ Supabase's security advisor reports "RLS enabled, no policy" for `trial_claims`,
 | `20261021000000` | `20261021000000_intl_usd.sql` | USD Pro: `subscriptions.currency` and `payments.currency` (`INR`/`USD`), `billing_price_paise(interval, currency)`, E.164 phones, `begin_checkout(..., p_currency)`. Applied live on 2026-10-21 as MCP `intl_usd` plus follow-ups (`20261021061619` … `20261021061726`). A 3-argument `begin_checkout` wrapper still maps any leftover old caller to monthly INR; live `start-checkout` now passes `p_interval` and `p_currency`. |
 | `20261021180000` | `20261021180000_app_secrets.sql` | `app_secret(name)` reads Vault `trial_hash_pepper` and `billing_jobs_secret` for the Edge Functions when Coolify has dropped the env vars. |
 | `20261022000000` | `20261022000000_user_devices.sql` | `user_devices` (two phones per account), `register_device()`, `verify_device()`, `remove_device()`, `admin_remove_device()`, devices on `admin_user_detail()` (web-admin fields kept). Applied live on 2026-10-21 as MCP `user_devices` (`20261021125431`). |
+| `20261030000000` | `20261030000000_has_indian_phone_null.sql` | `compute_entitlements.hasIndianPhone` uses `coalesce(... , false)` so a missing phone is JSON `false`, not `null`. Applied live on 2026-10-30 (new stack + MCP `has_indian_phone_null`). |
 The live database was migrated on 2026-10-07 through the Supabase MCP `apply_migration` tool with the name `foundation`, so its recorded version is the apply time rather than `20261007000000`. `plans` and `usage` were applied the same way on 2026-10-08, and `admin`, `account_deletion` and `admin_activity` too. Before running `supabase db push` against it, run `supabase migration repair --status applied 20261007000000 20261008000000 20261009000000 20261010000000 20261011000000 20261012000000` so the CLI doesn't apply the files twice.
 
 The four billing migrations were applied on 2026-10-10 with `psql` as `supabase_admin`, each file in one transaction together with its `supabase_migrations.schema_migrations` row. They are recorded under their repo versions (`20261013000000`, `20261013100000`, `20261014000000`, `20261015000000`), so they need no repair. `20261016000000_admin_revoke_subscription` was applied the same way later that day. Yearly and international USD were applied on 2026-10-21 through the Supabase MCP `apply_migration` tool (recorded as `yearly_plan`, `yearly_plan_checkout`, `intl_usd` and the `intl_usd_*` follow-ups). Before `supabase db push`, repair those file versions as applied so the CLI does not run the SQL twice.
@@ -256,6 +257,7 @@ Sign in once with the Google account, then run `supabase/seed/first_admin.sql` (
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-30 | - | `has_indian_phone_null`: coalesce `hasIndianPhone` so Plans refresh works without a stored phone. |
 | 2026-10-07 | - | Project folder, foundation migration, RLS tests, first-Admin snippet; live database migrated. |
 | 2026-10-08 | - | M2: `plans` migration (applied live, checks run in a rolled-back block), `entitlements` and `claim-trial` Edge Functions, `plans_test.sql`. |
 | 2026-10-08 | - | M3: `usage` migration (applied live, checks run in a rolled-back block), `reserve-separation` and `finish-separation`, `usage` in the `entitlements` answer, `usage_test.sql`, admin usage SQL. |

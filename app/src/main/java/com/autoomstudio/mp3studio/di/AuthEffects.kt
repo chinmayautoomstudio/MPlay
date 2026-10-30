@@ -46,7 +46,13 @@ class AuthEffects(private val context: Context, private val container: AppContai
     }
 
     private suspend fun onSignedIn(userId: String) {
-        container.entitlementsRepository.refresh(userId)
+        val cached = container.entitlementsRepository.entitlements.value
+        if (cached?.userId == userId) {
+            // Already loaded during Google sign-in; refresh again in the background.
+            scope.launch { container.entitlementsRepository.refresh(userId) }
+        } else {
+            container.entitlementsRepository.refresh(userId)
+        }
         UsageSyncWorker.schedule(context)
         container.separationController.onSignedIn()
     }

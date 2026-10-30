@@ -100,6 +100,10 @@ fun ProfileScreen(
     var confirmingLogOut by rememberSaveable { mutableStateOf(false) }
     var confirmingDeviceLogOut by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) { accountViewModel.refreshDevices() }
+    // If sign-in's plan fetch timed out or failed, don't leave "Checking your plan…" forever.
+    LaunchedEffect(plan.checkedAt) {
+        if (plan.checkedAt == null) plansViewModel.refresh()
+    }
 
     Column(
         modifier = modifier

@@ -42,13 +42,14 @@ data class EntitlementsResponse(
     val billing: BillingDto? = null,
     val pendingPayment: PendingPaymentDto? = null,
     val lastPayment: LastPaymentDto? = null,
-    val hasPhone: Boolean = false,
-    val hasIndianPhone: Boolean = false,
+    // Server may send JSON null when profile.phone is null (SQL `phone ~ regex` is null, not false).
+    val hasPhone: Boolean? = null,
+    val hasIndianPhone: Boolean? = null,
     val billingMode: String? = null,
     val detectedRegion: String? = null,
     val pricesIn: PriceListDto? = null,
     val pricesIntl: PriceListDto? = null,
-    val paymentsEnabled: Boolean = false,
+    val paymentsEnabled: Boolean? = null,
     val serverTime: String,
 ) {
     @Serializable
@@ -146,14 +147,14 @@ data class EntitlementsResponse(
         lastPayment = lastPayment?.let {
             LastPayment(it.txnId, it.status, it.amountPaise, epochMillis(it.at), BillingCurrency.of(it.currency))
         },
-        hasPhone = hasPhone,
-        hasIndianPhone = hasIndianPhone,
+        hasPhone = hasPhone ?: false,
+        hasIndianPhone = hasIndianPhone ?: false,
         billingMode = BillingMode.of(billingMode),
         detectedRegion = BillingRegion.of(detectedRegion),
         pricesIn = pricesIn?.toList() ?: PriceList.India,
         pricesIntl = pricesIntl?.toList() ?: PriceList.International,
         subscriptionCurrency = subscription?.takeIf { it.provider == "payu" }?.currency?.let(BillingCurrency::of),
-        paymentsEnabled = paymentsEnabled,
+        paymentsEnabled = paymentsEnabled ?: false,
         serverTime = epochMillis(serverTime),
         checkedAt = checkedAt,
     )

@@ -205,7 +205,8 @@ class AuthRepository(
         const val LOADING_TIMEOUT_MS = 8_000L
         const val REGISTER_ATTEMPTS = 3
         const val REGISTER_RETRY_DELAY_MS = 400L
-        const val PLAN_REFRESH_TIMEOUT_MS = 8_000L
+        /** Warm entitlements is ~0.2 s; allow a cold functions isolate without blocking sign-in for long. */
+        const val PLAN_REFRESH_TIMEOUT_MS = 5_000L
 
         /** Offline refresh failures keep the last known user signed in; only the server can end a session. */
         fun reduce(current: AuthState, status: BackendStatus): AuthState = when (status) {

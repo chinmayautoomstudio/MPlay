@@ -1,6 +1,6 @@
 # Plans, trial and feature gates
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-28
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-30
 
 
 
@@ -48,14 +48,14 @@ sequenceDiagram
 
 ### Server
 
-- `compute_entitlements`: Pro when a `pro` subscription counts as Pro (`is_pro_sub()`, shared with `plan_of()`): `active` before `expires_at` (plus one day when autopay is on, so the hourly renewal can debit), `cancelled` before `expires_at`, or `past_due` before `grace_end`; else Trial while `trials.ends_at` is in the future; else Free. It also returns the profile `role` (used by the website Admin, not the app) and the billing fields `billing`, `pendingPayment`, `lastPayment` and `hasPhone`. The `entitlements` function adds `billingMode` (from `PAYU_BILLING_MODE`) and `paymentsEnabled` (all PayU secrets set). See [payments](payments.md).
+- `compute_entitlements`: Pro when a `pro` subscription counts as Pro (`is_pro_sub()`, shared with `plan_of()`): `active` before `expires_at` (plus one day when autopay is on, so the hourly renewal can debit), `cancelled` before `expires_at`, or `past_due` before `grace_end`; else Trial while `trials.ends_at` is in the future; else Free. It also returns the profile `role` (used by the website Admin, not the app) and the billing fields `billing`, `pendingPayment`, `lastPayment`, `hasPhone` and `hasIndianPhone` (`false` when phone is null — never JSON null). The `entitlements` function adds `billingMode` (from `PAYU_BILLING_MODE`) and `paymentsEnabled` (all PayU secrets set). See [payments](payments.md). `EntitlementsResponse` maps null `hasPhone` / `hasIndianPhone` / `paymentsEnabled` to false so an older server cannot break refresh.
 - Admin Pro grants (M5): an Admin can grant Pro until a date (at most 5 years ahead) or remove it. That is a `subscriptions` row with `provider = 'admin'`, `payment_status = 'granted'` and `expires_at` as the end, so the rule above needs no special case; removing it marks the row `expired`. See [admin](admin.md).
 - `claim_trial`: serialised per user with an advisory lock. Returns `existing` if the user has a trial row, `denied` (`account`) for a disabled profile, `denied` (`email` or `device`) when `trial_claims` already holds that hash, otherwise inserts the claim and a 30-day `trials` row and returns `granted`.
 - The Edge Function takes the email from the verified token, normalizes it (lowercase, no `+alias`, Gmail dots removed, `googlemail.com` as `gmail.com`) and HMAC-SHA256s it and the device ID with `TRIAL_HASH_PEPPER`. Only hashes are stored.
 
 ### App
 
-- Claim on sign-in: every successful Google sign-in (any new or returning account) runs this on that phone: drop the previous account's cached plan, `devices` register calls `claim_trial`, then wait up to 8 s for `entitlements` (three attempts) before `SignedIn`. A first-time email is granted the 30-day trial; a returning email gets `existing`. `entitlements` claims again if there is still no trial (and waits briefly for the profile if `handle_new_user` has not finished). Refresh: `AuthEffects` on every `SignedIn`, `AuthViewModel.verifyAccount()` on every foreground, and Refresh on the Plans screen (which also refreshes when opened). A failed entitlements call keeps the cache but does not undo a trial already written at register. Profile shows “Checking your plan…” until the first successful check, not “Free”.
+- Claim on sign-in: every successful Google sign-in (any new or returning account) runs this on that phone: drop the previous account's cached plan, `devices` register calls `claim_trial`, then wait up to 3 s for `entitlements` (three attempts) before `SignedIn`. A first-time email is granted the 30-day trial; a returning email gets `existing`. `entitlements` claims again if there is still no trial (and waits briefly for the profile if `handle_new_user` has not finished). Refresh: `AuthEffects` on every `SignedIn` (skips a blocking second wait when sign-in already loaded the plan), `AuthViewModel.verifyAccount()` on every foreground, Profile when the plan is still unchecked, and Refresh on the Plans screen (which also refreshes when opened). A failed entitlements call keeps the cache but does not undo a trial already written at register. Profile shows “Checking your plan…” until the first successful check, not “Free”.
 - `EntitlementPolicy.effectivePlan` uses the cached plan, but:
   - more than 7 days since the last successful check, or a phone clock more than an hour behind it, makes the cache stale and everything is Free until the next check (PL4);
   - trial and subscription end dates are compared with server time (`serverTime` plus time elapsed on the phone), so an ended trial locks offline.
@@ -114,8 +114,10 @@ None. Uses the existing `INTERNET` permission.
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-10-30 | - | Refresh no longer dies on JSON null `hasIndianPhone` when the profile has no phone (`20261030000000_has_indian_phone_null` + nullable decode). |
 | 2026-10-28 | - | India monthly was ₹1 for a PayU test, then restored to ₹99 the same day. |
 | 2026-10-28 | - | Every Google sign-in clears the previous plan, claims trial, and waits for `entitlements` (retried) before the main UI; Profile no longer labels an unchecked plan as Free. |
+| 2026-10-30 | - | Plan wait cut to 3 s; Profile auto-refreshes while still checking; AuthEffects skips a blocking second fetch when sign-in already loaded Trial. |
 | 2026-10-22 | - | Free card price follows the India / International toggle (`₹0` / `$0`) instead of a hardcoded `₹0`. |
 | 2026-10-22 | - | International prices are $1.99 / $19.99 with live Cashfree keys. |
 | 2026-10-22 | - | International prices match India (₹99 / ₹999) until PayU USD is enabled. |
