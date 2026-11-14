@@ -4,6 +4,7 @@
 import type { SupabaseClient } from "./supabase.ts";
 import { CashfreeClient, cashfreeConfig, findTxnId, isCashfreeUrl } from "./cashfree.ts";
 import type { BillingInterval } from "./checkout.ts";
+import { firstName, formatEmailDate, formatMoney, sendTemplatedEmail } from "./email.ts";
 import type { BillingCurrency, BillingRegion } from "./geo.ts";
 import { type Customer, PayuClient, type PayuConfig, payuConfig, type VerifiedPayment } from "./payu.ts";
 import { classifyWebhook, type WebhookEvent } from "./webhook.ts";
@@ -58,7 +59,9 @@ export async function resolvePayment(
   if (isCashfreeUrl(data?.link_url)) {
     if (!cashfree) throw new Error("Cashfree secrets are not set");
     const verified = await cashfree.checkOrder(txnId);
-    return await rpc(admin, "apply_payment_result", { p_txn: txnId, p_result: verified });
+    const applied = await rpc(admin, "apply_payment_result", { p_txn: txnId, p_result: verified });
+    void maybeSendPaymentReceipt(admin, txnId, applied).catch((e) => console.error("receipt email failed", e));
+    return applied;
   }
   let verified: VerifiedPayment = await payu.checkPayment(txnId, payuTxnId);
   // The first payment of an autopay link registers the mandate; confirm it when the status answer doesn't say.
@@ -66,7 +69,48 @@ export async function resolvePayment(
     const state = await payu.mandateStatus(verified.payuRef).catch(() => "unknown" as const);
     if (state === "active") verified = { ...verified, mandateRef: verified.payuRef };
   }
-  return await rpc(admin, "apply_payment_result", { p_txn: txnId, p_result: verified });
+  const applied = await rpc(admin, "apply_payment_result", { p_txn: txnId, p_result: verified });
+  void maybeSendPaymentReceipt(admin, txnId, applied).catch((e) => console.error("receipt email failed", e));
+  return applied;
+}
+
+/** Sends payment_receipt once when apply_payment_result first records success. */
+export async function maybeSendPaymentReceipt(
+  admin: SupabaseClient,
+  txnId: string,
+  applyResult: Record<string, unknown>,
+): Promise<void> {
+  if (applyResult.result !== "applied" || applyResult.status !== "success") return;
+  const { data: payment } = await admin
+    .from("payments")
+    .select("user_id, amount_paise, currency, method, billing_interval, completed_at")
+    .eq("txn_id", txnId)
+    .maybeSingle();
+  if (!payment?.user_id) return;
+  const { data: profile } = await admin.from("profiles").select("email, display_name").eq("id", payment.user_id)
+    .maybeSingle();
+  const email = profile?.email as string | undefined;
+  if (!email) return;
+  const currency = (payment.currency as string | undefined) || "INR";
+  const interval = payment.billing_interval === "year" ? "Yearly" : "Monthly";
+  const name = (profile?.display_name as string | undefined)?.trim() || email.split("@")[0] || "there";
+  await sendTemplatedEmail(admin, {
+    templateKey: "payment_receipt",
+    to: email,
+    userId: payment.user_id as string,
+    txnId,
+    vars: {
+      name,
+      first_name: firstName(name),
+      email,
+      amount: formatMoney(Number(payment.amount_paise) || 0, currency),
+      date: formatEmailDate(payment.completed_at as string | undefined) || formatEmailDate(new Date().toISOString()),
+      txn_id: txnId,
+      method: (payment.method as string | undefined) || "—",
+      plan: `Pro · ${interval}`,
+    },
+    dedupeKey: `receipt:${txnId}`,
+  });
 }
 
 /** Resolves each {txnId, si} and counts the outcomes. Errors are logged without bodies and counted as failed. */
@@ -341,6 +385,7 @@ export async function processCashfreeWebhook(
   if (!data || !isCashfreeUrl(data.link_url)) return "ignored";
   const verified = await cashfree.checkOrder(txnId);
   if (verified.status === "pending" || verified.status === "not_found") return "ignored";
-  await rpc(admin, "apply_payment_result", { p_txn: txnId, p_result: verified });
+  const applied = await rpc(admin, "apply_payment_result", { p_txn: txnId, p_result: verified });
+  void maybeSendPaymentReceipt(admin, txnId, applied).catch((e) => console.error("receipt email failed", e));
   return "processed";
 }

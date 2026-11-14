@@ -1,6 +1,6 @@
 # Payments (PayU India + Cashfree International)
 
-> Status: Unreleased | Added in: next version after 3.2.3 | Last updated: 2026-10-28
+> Status: Unreleased | Added in: next version after 3.2.3 | Last updated: 2026-11-14
 
 ## Summary
 
@@ -27,7 +27,8 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/` unless the
 | `ui/plans/PaymentText.kt` | `formatPrice` / `formatAmount` for INR and USD, date formatting, error and status text. |
 | `supabase/functions/admin/` | Server-side Admin payment list, refund and revoke; see [admin](admin.md). No in-app Admin screens. |
 | `supabase/functions/start-checkout/`, `payment-status/`, `payu-webhook/`, `payu-return/`, `cashfree-checkout/`, `cashfree-webhook/`, `cashfree-return/`, `subscription/`, `billing-jobs/` | Billing Edge Functions; see [backend](../backend.md#billing-payu). |
-| `supabase/functions/_shared/payu.ts`, `cashfree.ts`, `billing.ts`, `checkout.ts`, `geo.ts`, `webhook.ts`, `jobs.ts`, `notifier.ts` | PayU and Cashfree clients, IP country lookup, checkout parse (`region`), shared billing flows. |
+| `supabase/functions/_shared/payu.ts`, `cashfree.ts`, `billing.ts`, `checkout.ts`, `geo.ts`, `webhook.ts`, `jobs.ts`, `notifier.ts`, `email.ts` | PayU and Cashfree clients, IP country lookup, checkout parse (`region`), shared billing flows, SendGrid templated mail. |
+| `supabase/migrations/20261114120000_email_notifications.sql` | `email_templates` / `email_outbox` and seeded receipt, pre-debit and billing-notice templates. |
 | `supabase/migrations/20261013000000_payu_billing.sql` to `20261015000000_billing_admin.sql` | Schema, verification, scheduled jobs and admin billing. |
 | `supabase/migrations/20261017000000_yearly_plan.sql` | `billing_interval` on subscriptions and payments, `billing_price_paise(interval)`, `billing_period_end()`, the switch rule in `begin_checkout()`, and yearly-aware verification, renewals, entitlements and admin detail. |
 | `supabase/migrations/20261021000000_intl_usd.sql` | `payments.currency` / `subscriptions.currency`, dual `billing_price_paise(interval, currency)`, E.164 phones, `begin_checkout(..., p_currency)`, currency check in `apply_payment_result`. |
@@ -121,7 +122,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 - `MainActivity` has an `android:autoVerify="true"` intent filter for `https://${payReturnHost}/pay/return`. The host comes from `pay.returnHost` in `local.properties` (default `autoomstudio.com`) and is also `BuildConfig.PAY_RETURN_HOST`.
 - The App Link verifies only after `web/.well-known/assetlinks.json` is published on that host with the release and debug signing SHA-256 fingerprints (the file in the repo has placeholders). The return page's intent link doesn't need it, and the resume check still confirms payments.
 - No new permissions; the PayU page runs in the browser, not in the app.
-- Billing emails (renewal failed, grace ending, expired, autopay ending) are only logged for now (`LogNotifier`); no email provider is chosen.
+- Billing and account emails go through SendGrid (`SENDGRID_API_KEY`, optional `EMAIL_FROM`): welcome on first trial grant, `payment_receipt` after a successful apply, `pre_debit` after a successful PayU SI pre-debit, and the daily notice types (`renewal_failed`, `grace_ending`, `expired`, `mandate_ending`) via `SendGridNotifier`. Copy lives in `email_templates` (`body` / `body_html`) as dark MP3 Studio HTML (logo, cyan/purple palette, gradient CTA to the Play Store); each send is logged in `email_outbox` with a `dedupe_key`. Greetings use `{{first_name}}`. Without the API key, sends fail as `provider_unconfigured` and the notices job falls back to `LogNotifier`.
 
 ## Tests
 
@@ -132,7 +133,7 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 - `ui/plans/BillingStatusRulesTest.kt`: the notice and buttons for each state, admin grants, the manual renewal window, and return-link parsing (host, scheme, path, transaction format).
 - `data/plan/EntitlementsResponseTest.kt`: billing fields and enums from the `entitlements` JSON.
 - Admin payment list, refund and revoke are covered in pgTAP (`billing_flow_test.sql`) and Deno `admin_test.ts`; the in-app `AdminViewModelTest` was removed.
-- Deno, `supabase/functions/_shared/`: `payu_test.ts` (hashes, IST dates, INR and USD link payloads, parsers, config, the client against a fake fetch: token reuse, signed commands, the salt never sent; payment-link lookups by `udf1`, the link's transactions and `checkPayment`), `checkout_test.ts` (Indian and E.164 phones, `region` `in`/`intl`, status requests, job auth), `geo_test.ts` (public vs private IP, `X-Forwarded-For`, IN vs US vs failed lookup, `parseRegion`), `webhook_test.ts` (classification including payment-link postbacks, redaction, form and JSON bodies), `admin_test.ts` (billing actions).
+- Deno, `supabase/functions/_shared/`: `payu_test.ts` (hashes, IST dates, INR and USD link payloads, parsers, config, the client against a fake fetch: token reuse, signed commands, the salt never sent; payment-link lookups by `udf1`, the link's transactions and `checkPayment`), `checkout_test.ts` (Indian and E.164 phones, `region` `in`/`intl`, status requests, job auth), `geo_test.ts` (public vs private IP, `X-Forwarded-For`, IN vs US vs failed lookup, `parseRegion`), `webhook_test.ts` (classification including payment-link postbacks, redaction, form and JSON bodies), `admin_test.ts` (billing actions), `email_test.ts` (template render/escape, SendGrid request shape, dedupe skip, missing API key).
 - pgTAP: `supabase/tests/payments_test.sql` and `billing_flow_test.sql` (checkout rules, payment results, renewals, expiry, grace, cancellation, refunds, disputes, admin billing), run live with the new migrations rolled back (`run_live.ps1 -Pending`).
 - Gaps: no end-to-end test against PayU's sandbox yet; no UI tests for the sheet, result screen or history.
 
@@ -141,16 +142,18 @@ Only Admins can refund, from the Admin payments list or a user's page, and only 
 - PayU endpoint paths, command names and field names follow PayU's documentation as of 2026-10 and must be checked against the sandbox before going live (`payu.ts` header).
 - Deployed on 2026-10-10 with PayU **test** credentials and `PAYU_BILLING_MODE=manual`; real payments need the live credentials and `PAYU_ENV=live`. Whenever any PayU secret is missing, `paymentsEnabled` is false and the Plans screen shows "Payments aren't available yet." with Go Pro disabled.
 - `pay.returnHost` (autoomstudio.com) doesn't serve `/pay/return` or `assetlinks.json`, so a plain `https://autoomstudio.com/pay/return` link opens the company website, not the app. Only the intent link from the return page opens the app. Some browsers may block the automatic open, in which case the user taps the button.
-- Billing emails are only logged; GST invoices, partial refunds from the app and a web checkout are out of scope (PRD phase 6).
+- GST invoices, partial refunds from the app and a web checkout are out of scope (PRD phase 6). SendGrid must have `mp3studio.in` (or `EMAIL_FROM`) authenticated; set `SENDGRID_API_KEY` on the functions service.
 - Switching interval with autopay on cancels the old mandate before the new link is paid; an abandoned switch leaves autopay off until the user sets it up again. PayU's `YEARLY` billing cycle hasn't been tried in the sandbox yet.
 - Live Cashfree keys are set (`CASHFREE_ENV=live`). Sandbox still cannot create USD orders. A missing or private client IP defaults to India; Coolify must pass `X-Forwarded-For`. The installed 1.0.1 app used INR fallbacks until this change; 1.0.2 (`versionCode` 13) shows $ on Plans.
 - Catalog prices come from the entitlements payload; changing a price is a server change only.
-- Receipts are in-app only (transaction ID, amount, date, method); there is no PDF.
+- Receipts are emailed (`payment_receipt`) and shown in-app (transaction ID, amount, date, method); there is no PDF.
 
 ## Change history
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-11-14 | - | SendGrid automated emails: welcome, payment receipt, pre-debit, and billing notices (`email_templates` / `email_outbox`, `_shared/email.ts`). |
+| 2026-11-14 | - | Email templates restyled to dark MP3 Studio brand (shared shell, feature/info cards, Play Store CTA). |
 | 2026-10-28 | - | India monthly was ₹1 for a PayU test, then restored to ₹99 the same day. |
 | 2026-10-23 | - | Play build 1.0.2 (`versionCode` 13) ships the Cashfree / $ Plans changes; 1.0.1 used INR fallbacks. |
 | 2026-10-22 | - | Live Cashfree keys (`CASHFREE_ENV=live`). International catalog is $1.99 / $19.99 (`PriceList.International` 199 / 1999, `BillingRegion.International` is USD). |

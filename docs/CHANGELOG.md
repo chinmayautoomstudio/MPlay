@@ -6,8 +6,17 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+### Added
+- Automated user emails through SendGrid with app-owned templates in Postgres: welcome (first trial grant), payment receipt, upcoming AutoPay debit, renewal failed, grace ending, subscription expired, and AutoPay mandate ending. Delivery is logged in `email_outbox`. ([payments](features/payments.md), [backend](backend.md))
+
+### Changed
+- Transactional email HTML uses the dark MP3 Studio brand (logo, cyan/purple accents, gradient CTA, Play Store deep link) for all seven templates. ([payments](features/payments.md))
+
 ### Fixed
 - Studio Ops Admin RPCs work again on the Coolify Postgres stack. Website tables were present, but `admin_web_action` callees and extended overloads (`admin_tickets`, `admin_webhooks`, `admin_trial_action`, filtered `admin_audit` / `admin_usage` / `admin_list_payments` / `admin_billing_action`, and related helpers) were missing after cutover. Restored from the pre-cutover dump as migration `20261102000000_web_admin_rpcs.sql`. ([admin](features/admin.md), [backend](backend.md#migrations))
+
+### Database
+- Migration `20261114120000_email_notifications.sql`: `email_templates` and `email_outbox` (idempotent create/alter) and seed of the seven transactional templates. ([backend](backend.md#migrations))
 
 ## [1.0.3] - 2026-10-30
 

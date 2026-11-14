@@ -18,7 +18,8 @@ import {
 } from "../_shared/billing.ts";
 import type { CashfreeClient } from "../_shared/cashfree.ts";
 import { jobAuthorized, type JobAction, parseJobAction } from "../_shared/jobs.ts";
-import { LogNotifier, type Notice } from "../_shared/notifier.ts";
+import { firstName, formatEmailDate, formatMoney, sendTemplatedEmail, sendgridApiKey } from "../_shared/email.ts";
+import { LogNotifier, SendGridNotifier, type Notice } from "../_shared/notifier.ts";
 import type { PayuClient } from "../_shared/payu.ts";
 import { envOrVault, vaultSecret } from "../_shared/secrets.ts";
 import { adminClient, json, readJson } from "../_shared/server.ts";
@@ -82,13 +83,38 @@ async function renewals(admin: SupabaseClient, payu: PayuClient, manual: boolean
   }
   if (manual) return counts;
 
-  type PreDebit = { subscriptionId: string; mandateRef: string; debitDate: string; amountPaise: number };
+  type PreDebit = {
+    subscriptionId: string;
+    mandateRef: string;
+    debitDate: string;
+    amountPaise: number;
+    customer?: { name?: string; email?: string; phone?: string };
+  };
   for (const notice of await rpc<PreDebit[]>(admin, "claim_pre_debits", { p_limit: 100 })) {
     const sent = await payu.preDebit(notice.mandateRef, new Date(notice.debitDate), notice.amountPaise)
       .catch(() => false);
     await rpc(admin, "mark_pre_debit", { p_sub: notice.subscriptionId, p_sent: sent });
-    if (sent) counts.processed++;
-    else counts.failed++;
+    if (sent) {
+      counts.processed++;
+      const email = notice.customer?.email;
+      if (email) {
+        const name = notice.customer?.name?.trim() || email.split("@")[0] || "there";
+        void sendTemplatedEmail(admin, {
+          templateKey: "pre_debit",
+          to: email,
+          vars: {
+            name,
+            first_name: firstName(name),
+            email,
+            amount: formatMoney(notice.amountPaise, "INR"),
+            debit_date: formatEmailDate(notice.debitDate),
+          },
+          dedupeKey: `pre_debit:${notice.subscriptionId}:${notice.debitDate}`,
+        }).catch((e) => console.error("pre_debit email failed", e));
+      }
+    } else {
+      counts.failed++;
+    }
   }
 
   type Renewal = {
@@ -111,7 +137,7 @@ async function renewals(admin: SupabaseClient, payu: PayuClient, manual: boolean
 }
 
 async function notices(admin: SupabaseClient): Promise<Counts> {
-  const notifier = new LogNotifier();
+  const notifier = sendgridApiKey() ? new SendGridNotifier(admin) : new LogNotifier();
   const counts = { processed: 0, failed: 0, skipped: 0 };
   for (const notice of await rpc<Notice[]>(admin, "claim_notices", { p_limit: 200 })) {
     if (await notifier.send(notice).catch(() => false)) counts.processed++;

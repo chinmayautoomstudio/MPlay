@@ -1,3 +1,4 @@
+import { firstName, formatEmailDate, sendTemplatedEmail } from "./email.ts";
 import { envOrVault, vaultSecret } from "./secrets.ts";
 import { createClient, type SupabaseClient, type User } from "./supabase.ts";
 import { normalizeEmail, pepperedHash, validDeviceId } from "./trial.ts";
@@ -61,7 +62,33 @@ export async function claimTrial(
     console.error("claim_trial failed", error);
     return { result: "unavailable" };
   }
-  return data as ClaimResult;
+  const claim = data as ClaimResult;
+  if (claim.result === "granted" && user.email) {
+    void sendWelcomeEmail(admin, user).catch((e) => console.error("welcome email failed", e));
+  }
+  return claim;
+}
+
+async function sendWelcomeEmail(admin: SupabaseClient, user: User): Promise<void> {
+  const { data: profile } = await admin.from("profiles").select("display_name, email").eq("id", user.id)
+    .maybeSingle();
+  const { data: trial } = await admin.from("trials").select("ends_at").eq("user_id", user.id).maybeSingle();
+  const email = (profile?.email as string | undefined) || user.email!;
+  const name = (profile?.display_name as string | undefined)?.trim()
+    || email.split("@")[0]
+    || "there";
+  await sendTemplatedEmail(admin, {
+    templateKey: "welcome",
+    to: email,
+    userId: user.id,
+    vars: {
+      name,
+      first_name: firstName(name),
+      email,
+      trial_ends: formatEmailDate(trial?.ends_at as string | undefined) || "in 30 days",
+    },
+    dedupeKey: `welcome:${user.id}`,
+  });
 }
 
 export async function entitlements(admin: SupabaseClient, userId: string) {

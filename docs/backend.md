@@ -1,6 +1,6 @@
 # Backend (Supabase)
 
-> Last updated: 2026-11-02
+> Last updated: 2026-11-14
 
 MP3 Studio uses a self-hosted Supabase project for accounts, plans, trials, AI Vocal Separator usage and payments (PayU in India, Cashfree internationally). Music, playlists, stems and recordings never leave the phone; only the title of a song sent for separation is stored, in `ai_usage.song_ref`. The app talks to Supabase Auth (GoTrue) and PostgREST with the public anon key; everything privileged runs server-side as the service role.
 
@@ -132,7 +132,7 @@ The live stack is the Coolify service `faifqncpzdrvhsf6zbvzwhvb` on `54.163.241.
 
 Deployed on 2026-10-08: all four functions, with a checked trial claim, reserve, complete, partial grant, release and limit from the app. `admin` was deployed the same day and checked from the app (overview, last-admin refusal, invite and revoke, Pro grant and removal, audit log). `delete-account` too: last-admin refusal from the app, and a full deletion with a throwaway user (wrong word 400, delete 200, rows gone, claim and audit kept, a second call 401).
 
-Tests: `deno test supabase/functions/_shared/` (`devices_test.ts`: request parsing and JWT `session_id`; `trial_test.ts`: normalization, device ID validation, hashing, env-vs-Vault `pickSecret` / `envOrVault` (Vault is not called when env is set); `usage_test.ts`: reserve and finish body validation; `admin_test.ts`: admin request parsing, including billing actions; `account_test.ts`: the delete confirmation; `payu_test.ts`: SHA-512 command and reverse hashes, India-time dates, INR and USD link payloads (USD has no SI), PayU response parsers, config, and the client against a fake `fetch` (token reuse, signed commands, the salt never sent, payment-link lookups); `checkout_test.ts`: Indian and E.164 phones, `region` `in`/`intl` (garbage rejected, omitted stays null for IP fallback), status requests, job secret check; `geo_test.ts`: public vs private IP, `X-Forwarded-For`, IN vs US vs failed lookup, `parseRegion`, sandbox INR vs live USD; `cashfree_test.ts`: order payload (`{order_id}` return URL), hosts, signature, checkout-launcher URL detection, fake-fetch client; `webhook_test.ts`: form and JSON bodies, redaction, classification, payment-link postbacks). On 2026-10-10 all 33 tests passed in a throwaway `denoland/deno:alpine` container on the server.
+Tests: `deno test supabase/functions/_shared/` (`email_test.ts`: template render/escape, SendGrid payload, outbox dedupe and missing API key; `devices_test.ts`: request parsing and JWT `session_id`; `trial_test.ts`: normalization, device ID validation, hashing, env-vs-Vault `pickSecret` / `envOrVault` (Vault is not called when env is set); `usage_test.ts`: reserve and finish body validation; `admin_test.ts`: admin request parsing, including billing actions; `account_test.ts`: the delete confirmation; `payu_test.ts`: SHA-512 command and reverse hashes, India-time dates, INR and USD link payloads (USD has no SI), PayU response parsers, config, and the client against a fake `fetch` (token reuse, signed commands, the salt never sent, payment-link lookups); `checkout_test.ts`: Indian and E.164 phones, `region` `in`/`intl` (garbage rejected, omitted stays null for IP fallback), status requests, job secret check; `geo_test.ts`: public vs private IP, `X-Forwarded-For`, IN vs US vs failed lookup, `parseRegion`, sandbox INR vs live USD; `cashfree_test.ts`: order payload (`{order_id}` return URL), hosts, signature, checkout-launcher URL detection, fake-fetch client; `webhook_test.ts`: form and JSON bodies, redaction, classification, payment-link postbacks). On 2026-10-10 all 33 tests passed in a throwaway `denoland/deno:alpine` container on the server.
 
 ## Billing (PayU + Cashfree)
 
@@ -153,7 +153,7 @@ Scheduled jobs (pg_cron, through `run_billing_job()`, which posts to `billing-jo
 | `billing-sweep` | every 15 minutes | Check expired links and pending payments with PayU; check pending refunds. |
 | `billing-renewals` | hourly at :07 | Retry unconfirmed mandate cancellations; send pre-debit notices; start due debits (autopay mode only). |
 | `billing-expiry` | hourly at :37 | Period ends, grace ends, missed debits (`expire_subscriptions()`). |
-| `billing-notices` | daily 03:30 | Billing emails (renewal failed, grace ending, expired, autopay ending); only logged until an email provider is chosen. |
+| `billing-notices` | daily 03:30 | Billing emails (renewal failed, grace ending, expired, autopay ending) via SendGrid and `email_templates` / `email_outbox`. |
 
 `run_billing_job()` reads the URL and secret from Supabase Vault and does nothing (with a warning) until both exist.
 
@@ -171,6 +171,10 @@ Edge Function secrets (functions service environment, like `TRIAL_HASH_PEPPER`):
 | `CASHFREE_ENV` | `live` for production USD; anything else uses `https://sandbox.cashfree.com/pg` and INR International prices. |
 | `CASHFREE_CLIENT_ID`, `CASHFREE_CLIENT_SECRET` | Orders API (`x-client-id` / `x-client-secret`, `x-api-version` `2025-01-01`). The webhook HMAC uses the same secret. |
 | `CASHFREE_RETURN_URL`, `CASHFREE_NOTIFY_URL`, `CASHFREE_CHECKOUT_URL` | Optional overrides; default `.../functions/v1/cashfree-return`, `.../cashfree-webhook` and `.../cashfree-checkout`. |
+| `SENDGRID_API_KEY` | SendGrid API key for transactional mail (`_shared/email.ts`). Without it, welcome/receipt/pre-debit/notice sends mark the outbox `failed` with `provider_unconfigured` (billing notices fall back to `LogNotifier`). |
+| `EMAIL_FROM` | Optional From header; default `MP3 Studio <noreply@mp3studio.in>` (domain must be authenticated in SendGrid). |
+
+Transactional email tables (`20261114120000_email_notifications.sql`): `email_templates` (key, subject, `body_html`, version) seeds `welcome`, `payment_receipt`, `pre_debit`, `renewal_failed`, `grace_ending`, `expired`, `mandate_ending`. `email_outbox` logs each send (`queued` / `sent` / `failed`) with a unique `dedupe_key`. Shared helpers: `_shared/email.ts`, `SendGridNotifier` in `_shared/notifier.ts`. Triggers: welcome on `claimTrial` `granted`; receipt after successful `apply_payment_result` in `billing.ts`; pre-debit email after a successful PayU SI pre-debit in `billing-jobs`; daily notices via `claim_notices`.
 
 When any of the seven required PayU variables is missing, `entitlements` returns `paymentsEnabled: false`, the app shows "Payments aren't available yet.", and checkout answers `503 payu_unavailable`.
 
@@ -231,6 +235,7 @@ Supabase's security advisor reports "RLS enabled, no policy" for `trial_claims`,
 | `20261022000000` | `20261022000000_user_devices.sql` | `user_devices` (two phones per account), `register_device()`, `verify_device()`, `remove_device()`, `admin_remove_device()`, devices on `admin_user_detail()` (web-admin fields kept). Applied live on 2026-10-21 as MCP `user_devices` (`20261021125431`). |
 | `20261030000000` | `20261030000000_has_indian_phone_null.sql` | `compute_entitlements.hasIndianPhone` uses `coalesce(... , false)` so a missing phone is JSON `false`, not `null`. Applied live on 2026-10-30 (new stack + MCP `has_indian_phone_null`). |
 | `20261102000000` | `20261102000000_web_admin_rpcs.sql` | Restores Studio Ops `admin_web_action` callees and extended overloads that the Coolify cutover left out (support tickets, webhooks, trial actions, filtered audit/payments/usage, billing-action extras, delete-account admin wrapper). Applied live on 2026-11-02 on `phxi1vd0jowglgech3aqh1a4`. |
+| `20261114120000` | `20261114120000_email_notifications.sql` | `email_templates` / `email_outbox` (IF NOT EXISTS + column alters) and seed of the seven SendGrid user-notification templates. |
 
 The live database was migrated on 2026-10-07 through the Supabase MCP `apply_migration` tool with the name `foundation`, so its recorded version is the apply time rather than `20261007000000`. `plans` and `usage` were applied the same way on 2026-10-08, and `admin`, `account_deletion` and `admin_activity` too. Before running `supabase db push` against it, run `supabase migration repair --status applied 20261007000000 20261008000000 20261009000000 20261010000000 20261011000000 20261012000000` so the CLI doesn't apply the files twice.
 
@@ -260,6 +265,7 @@ Sign in once with the Google account, then run `supabase/seed/first_admin.sql` (
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-11-14 | - | SendGrid transactional email: migration `20261114120000_email_notifications.sql`, `_shared/email.ts`, welcome / receipt / pre-debit / billing-notice triggers. |
 | 2026-11-02 | - | Restored Studio Ops web Admin RPCs (`admin_web_action` callees / overloads) on Coolify Postgres; tracked as `20261102000000_web_admin_rpcs.sql`. |
 | 2026-10-30 | - | Ops sync: copied 8 post-cutover `auth.users` (+ identities, profiles, trials, trial_claims, user_devices) from old `securedbmp3` into new Postgres; bumped shared `last_sign_in_at` where old was newer. New-stack Chinmay billing test rows and `mailme…` kept. Users 41→49. |
 | 2026-10-30 | - | `has_indian_phone_null`: coalesce `hasIndianPhone` so Plans refresh works without a stored phone. |
