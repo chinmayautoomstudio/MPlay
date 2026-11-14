@@ -13,6 +13,7 @@ Each entry should say what changed and link to the feature doc. Use these groups
 - Transactional email HTML uses the dark MP3 Studio brand (logo, cyan/purple accents, gradient CTA, Play Store deep link) for all seven templates. ([payments](features/payments.md))
 
 ### Fixed
+- Welcome email after first trial grant no longer stalls `claim-trial`: SendGrid calls time out at 12s, and the mail is scheduled with `EdgeRuntime.waitUntil` when available. ([payments](features/payments.md))
 - Studio Ops Admin RPCs work again on the Coolify Postgres stack. Website tables were present, but `admin_web_action` callees and extended overloads (`admin_tickets`, `admin_webhooks`, `admin_trial_action`, filtered `admin_audit` / `admin_usage` / `admin_list_payments` / `admin_billing_action`, and related helpers) were missing after cutover. Restored from the pre-cutover dump as migration `20261102000000_web_admin_rpcs.sql`. ([admin](features/admin.md), [backend](backend.md#migrations))
 
 ### Database

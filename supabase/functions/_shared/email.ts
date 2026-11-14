@@ -95,24 +95,34 @@ export async function sendViaSendGrid(
   apiKey: string,
   fetchImpl: FetchLike = fetch,
 ): Promise<{ ok: true; messageId: string | null } | { ok: false; error: string }> {
-  const res = await fetchImpl("https://api.sendgrid.com/v3/mail/send", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      personalizations: [{ to: [{ email: mail.to }] }],
-      from: parseFrom(mail.from),
-      subject: mail.subject,
-      content: [{ type: "text/html", value: mail.html }],
-    }),
-  });
-  if (res.status === 202 || res.status === 200) {
-    return { ok: true, messageId: res.headers.get("x-message-id") };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const res = await fetchImpl("https://api.sendgrid.com/v3/mail/send", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: mail.to }] }],
+        from: parseFrom(mail.from),
+        subject: mail.subject,
+        content: [{ type: "text/html", value: mail.html }],
+      }),
+      signal: controller.signal,
+    });
+    if (res.status === 202 || res.status === 200) {
+      return { ok: true, messageId: res.headers.get("x-message-id") };
+    }
+    const body = await res.text().catch(() => "");
+    return { ok: false, error: `sendgrid_${res.status}:${body.slice(0, 300)}` };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg.includes("abort") ? "sendgrid_timeout" : msg.slice(0, 300) };
+  } finally {
+    clearTimeout(timer);
   }
-  const body = await res.text().catch(() => "");
-  return { ok: false, error: `sendgrid_${res.status}:${body.slice(0, 300)}` };
 }
 
 function parseFrom(from: string): { email: string; name?: string } {

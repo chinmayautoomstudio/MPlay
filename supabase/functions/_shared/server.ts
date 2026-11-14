@@ -64,7 +64,12 @@ export async function claimTrial(
   }
   const claim = data as ClaimResult;
   if (claim.result === "granted" && user.email) {
-    void sendWelcomeEmail(admin, user).catch((e) => console.error("welcome email failed", e));
+    const pending = sendWelcomeEmail(admin, user).catch((e) => console.error("welcome email failed", e));
+    // Keep the HTTP response fast; finish mail in the background when the runtime supports it.
+    const waitUntil = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } })
+      .EdgeRuntime?.waitUntil;
+    if (waitUntil) waitUntil(pending);
+    else void pending;
   }
   return claim;
 }
