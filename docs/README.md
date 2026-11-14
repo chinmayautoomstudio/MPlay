@@ -42,6 +42,7 @@ MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.au
 | Plans, trial and feature gates | [features/plans.md](features/plans.md) | Unreleased |
 | Admin (server functions for the website dashboard; no in-app screens) | [features/admin.md](features/admin.md) | Unreleased |
 | Payments (PayU India + Cashfree International, history, refunds) | [features/payments.md](features/payments.md) | Unreleased |
+| In-app Play Store rating prompt | [features/in-app-review.md](features/in-app-review.md) | Unreleased |
 
 ## Product requirement documents
 

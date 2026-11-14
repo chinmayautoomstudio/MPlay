@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.autoomstudio.mp3studio.MPlayApp
 import com.autoomstudio.mp3studio.data.model.Song
+import com.autoomstudio.mp3studio.data.review.ReviewPromptRepository
 import com.autoomstudio.mp3studio.data.settings.AppSettings
 import com.autoomstudio.mp3studio.data.settings.SeparationSettings
 import com.autoomstudio.mp3studio.data.stems.JobState
@@ -90,6 +91,7 @@ class SeparationViewModel(
     private val settings: AppSettings,
     private val exporter: StemExporter,
     private val modelImporter: ModelImporter,
+    private val reviewPrompt: ReviewPromptRepository,
 ) : ViewModel() {
 
     val state: StateFlow<SeparationUiState> = combine(
@@ -193,8 +195,14 @@ class SeparationViewModel(
 
     private suspend fun report(result: EnqueueResult, songs: List<Song>?) {
         val message = when (result) {
-            is EnqueueResult.Queued -> SeparationMessage.Queued(result.count)
-            is EnqueueResult.PartiallyQueued -> SeparationMessage.PartiallyQueued(result.count, result.skipped)
+            is EnqueueResult.Queued -> {
+                if (result.count > 0) reviewPrompt.recordFeatureUse()
+                SeparationMessage.Queued(result.count)
+            }
+            is EnqueueResult.PartiallyQueued -> {
+                if (result.count > 0) reviewPrompt.recordFeatureUse()
+                SeparationMessage.PartiallyQueued(result.count, result.skipped)
+            }
             is EnqueueResult.LimitReached -> {
                 _limitReachedAt.value = result.resetsAt
                 return
@@ -322,6 +330,7 @@ class SeparationViewModel(
                     container.appSettings,
                     StemExporter(app),
                     ModelImporter(app),
+                    container.reviewPromptRepository,
                 )
             }
         }

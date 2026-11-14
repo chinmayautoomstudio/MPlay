@@ -68,6 +68,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.autoomstudio.mp3studio.MPlayApp
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.library.SongSortOrder
 import com.autoomstudio.mp3studio.data.model.Playlist
@@ -77,6 +78,7 @@ import com.autoomstudio.mp3studio.data.settings.ThemeMode
 import com.autoomstudio.mp3studio.data.stems.StemMode
 import com.autoomstudio.mp3studio.data.settings.ThemeSettings
 import com.autoomstudio.mp3studio.data.library.SongDeleter
+import com.autoomstudio.mp3studio.singalong.SingAlongState
 import com.autoomstudio.mp3studio.ui.common.rememberWithLegacyStorage
 import com.autoomstudio.mp3studio.ui.components.MPlayTopBar
 import com.autoomstudio.mp3studio.ui.components.MetronomeIcons
@@ -92,6 +94,7 @@ import com.autoomstudio.mp3studio.ui.library.SongActions
 import com.autoomstudio.mp3studio.ui.library.SongInfoHost
 import com.autoomstudio.mp3studio.ui.library.rememberSongSelection
 import com.autoomstudio.mp3studio.data.plan.Feature
+import com.autoomstudio.mp3studio.ui.plans.BillingViewModel
 import com.autoomstudio.mp3studio.ui.plans.PlansScreen
 import com.autoomstudio.mp3studio.ui.plans.PaymentHistoryScreen
 import com.autoomstudio.mp3studio.ui.plans.PlansViewModel
@@ -110,6 +113,8 @@ import com.autoomstudio.mp3studio.ui.playlist.AddToPlaylistSheet
 import com.autoomstudio.mp3studio.ui.playlist.PlaylistActions
 import com.autoomstudio.mp3studio.ui.playlist.PlaylistMessage
 import com.autoomstudio.mp3studio.ui.playlist.PlaylistNameDialog
+import com.autoomstudio.mp3studio.ui.review.ReviewPromptDialog
+import com.autoomstudio.mp3studio.ui.review.ReviewPromptViewModel
 import com.autoomstudio.mp3studio.ui.theme.fadeThrough
 import com.autoomstudio.mp3studio.ui.playlist.PlaylistsScreen
 import com.autoomstudio.mp3studio.separation.ModelState
@@ -324,7 +329,10 @@ fun MainScreen(
                 showMessage(resources.getString(R.string.message_added_to_queue))
             },
             onCutAndSave = { context.startActivity(TrimEditorActivity.intent(context, it, TrimMode.Cut)) },
-            onSetAsRingtone = { context.startActivity(TrimEditorActivity.intent(context, it, TrimMode.Ringtone)) },
+            onSetAsRingtone = {
+                playbackViewModel.recordRingtoneMakerOpened()
+                context.startActivity(TrimEditorActivity.intent(context, it, TrimMode.Ringtone))
+            },
             onShowInfo = { infoSongId = it.id },
             onDelete = { deleteSongIds = longArrayOf(it.id) },
             onSeparate = if (canSeparate) {
@@ -781,6 +789,33 @@ fun MainScreen(
         ModelMissingDialog(state = missingModel, viewModel = separationViewModel)
     }
     SingAlongOverlay()
+
+    val reviewPromptViewModel: ReviewPromptViewModel = viewModel(factory = ReviewPromptViewModel.Factory)
+    val reviewSoftPrompt by reviewPromptViewModel.softPromptVisible.collectAsStateWithLifecycle()
+    val billingViewModel: BillingViewModel = viewModel(factory = BillingViewModel.Factory)
+    val billingState by billingViewModel.state.collectAsStateWithLifecycle()
+    val singAlongState by (LocalContext.current.applicationContext as MPlayApp)
+        .container.singAlongSession.state.collectAsStateWithLifecycle()
+    val singAlongBlocking = singAlongState !is SingAlongState.Idle &&
+        singAlongState !is SingAlongState.Saved &&
+        singAlongState !is SingAlongState.Failed
+    val billingBlocking = billingState.checkout != null ||
+        billingState.result != null ||
+        billingState.cancel != null
+    val blockingOverlay = noticeRequest != null ||
+        limitReachedAt != null ||
+        (modelRequest != null && missingModel != null) ||
+        singAlongBlocking ||
+        sheetExpanded ||
+        billingBlocking
+    if (reviewSoftPrompt && !blockingOverlay) {
+        ReviewPromptDialog(
+            onShown = reviewPromptViewModel::onSoftPromptShown,
+            onRate = reviewPromptViewModel::onRate,
+            onNotNow = reviewPromptViewModel::onNotNow,
+            onDismissRequest = reviewPromptViewModel::onNotNow,
+        )
+    }
 }
 
 private enum class ProfilePage {

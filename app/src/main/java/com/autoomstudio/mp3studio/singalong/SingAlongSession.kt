@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import com.autoomstudio.mp3studio.data.library.CoverArtEmbedder
 import com.autoomstudio.mp3studio.data.model.Song
+import com.autoomstudio.mp3studio.data.review.ReviewPromptRepository
 import com.autoomstudio.mp3studio.data.stems.StemMode
 import com.autoomstudio.mp3studio.data.stems.StemRepository
 import com.autoomstudio.mp3studio.metronome.MetronomeController
@@ -66,6 +67,7 @@ class SingAlongSession(
     private val metronome: MetronomeController,
     private val createPlayback: (CoroutineScope) -> PlaybackController,
     private val coverArtEmbedder: CoverArtEmbedder,
+    private val reviewPrompt: ReviewPromptRepository,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val tempDir = File(context.cacheDir, TEMP_DIR)
@@ -132,6 +134,7 @@ class SingAlongSession(
         this.options = options
         _mix.value = MixSettings()
         startService()
+        reviewPrompt.recordFeatureUse()
         sessionJob = scope.launch { record(fixedStartMs = null) }
     }
 

@@ -304,6 +304,8 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
+    implementation(libs.play.review)
+    implementation(libs.play.review.ktx)
     implementation(libs.tink.android)
     implementation(libs.jaudiotagger)
     debugImplementation(libs.androidx.compose.ui.tooling)

@@ -119,6 +119,11 @@ class MainActivity : ComponentActivity() {
         authViewModel.verifyAccount()
     }
 
+    override fun onUserInteraction() {
+        super.onUserInteraction()
+        (application as MPlayApp).container.reviewPromptRepository.noteInteraction()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
@@ -168,6 +173,15 @@ private fun MPlayRoot(
     LifecycleResumeEffect(viewModel) {
         viewModel.onAppForeground()
         onPauseOrDispose { }
+    }
+
+    val reviewPrompt = (LocalContext.current.applicationContext as MPlayApp).container.reviewPromptRepository
+    LaunchedEffect(reviewPrompt) {
+        reviewPrompt.noteInteraction()
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            reviewPrompt.maybeShowForIdle()
+        }
     }
 
     var showNowPlaying by rememberSaveable { mutableStateOf(false) }

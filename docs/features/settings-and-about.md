@@ -1,6 +1,6 @@
 # Settings, About, theme and shared components
 
-> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-10-30
+> Status: Shipped | Added in: 1.0 (About in 3.1, Profile tab unreleased) | Last updated: 2026-11-14
 
 ## Summary
 
@@ -62,6 +62,10 @@ All keys in DataStore `app_settings`:
 | `metronome_sound` | String | `Classic` | Metronome |
 | `metronome_volume` | Float | 0.8 (0-1) | Metronome |
 | `singalong_note_seen` | Boolean | `false` | [Sing-along](sing-along.md) |
+| `review_feature_use_count` | Int | `0` | [In-app review](in-app-review.md) |
+| `review_prompt_completed` | Boolean | `false` | In-app review |
+| `review_prompt_dismissed_at_ms` | Long | `0` | In-app review |
+| `review_soft_prompt_shown_count` | Int | `0` | In-app review |
 
 Other DataStores: `playback_session`, `library_prefs` (`sort_order`; `excluded_folders` string set — see [library](library.md)), `widget_state`, and `auth_session` (key `session`: the Supabase session, encrypted with Tink, excluded from backup; see [accounts](accounts.md)). The Tink keyset lives in SharedPreferences `auth_keyset_prefs`. DataStore `entitlements` (key `entitlements_json`: the last plan answer from the server, cleared on sign-out; see [plans](plans.md)). DataStore `billing` (keys `pending_payment_user`, `pending_payment_txn`: the PayU payment the app is waiting for; `billing_region_override`: `in` or `intl` when the user picked a catalog on Plans; all cleared on sign-out; see [payments](payments.md)). DataStore `equalizer_settings` (equalizer on/off, bands, presets and switches; see [equalizer](equalizer.md)).
 
@@ -115,3 +119,4 @@ Settings pages are Compose screens inside `MainActivity`. `POST_NOTIFICATIONS` i
 | 2026-10-21 | - | About version 1.0.1 (`versionCode` 12). |
 | 2026-10-30 | - | About version 1.0.3 (`versionCode` 15); release `ndk.debugSymbolLevel = SYMBOL_TABLE` and Play `native-debug-symbols.zip`. |
 | 2026-10-23 | - | About version 1.0.2 (`versionCode` 13). |
+| 2026-11-14 | - | Keys `review_feature_use_count`, `review_prompt_completed`, `review_prompt_dismissed_at_ms`, `review_soft_prompt_shown_count` for the soft Play Store rating prompt ([in-app-review](in-app-review.md)). |

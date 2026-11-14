@@ -498,6 +498,11 @@
     <string name="write_settings_open">Open settings</string>
     <string name="write_settings_not_now">Not now</string>
 
+    <string name="review_prompt_title">Enjoying MP3 Studio?</string>
+    <string name="review_prompt_message">Give us a rating on the Play Store!</string>
+    <string name="review_prompt_rate">Rate</string>
+    <string name="review_prompt_not_now">Not now</string>
+
     <string name="action_undo">Undo</string>
     <string name="message_clip_saved">Saved to Music/MP3 Studio Clips</string>
     <string name="message_sound_set_ringtone">Set as phone ringtone</string>

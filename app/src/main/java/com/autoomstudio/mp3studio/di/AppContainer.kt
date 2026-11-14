@@ -34,6 +34,8 @@ import com.autoomstudio.mp3studio.data.plan.Feature
 import com.autoomstudio.mp3studio.data.plan.SupabaseEntitlementsBackend
 import com.autoomstudio.mp3studio.data.playlist.MPlayDatabase
 import com.autoomstudio.mp3studio.data.playlist.PlaylistRepository
+import com.autoomstudio.mp3studio.data.review.InAppReviewLauncher
+import com.autoomstudio.mp3studio.data.review.ReviewPromptRepository
 import com.autoomstudio.mp3studio.playback.PlaybackController
 import com.autoomstudio.mp3studio.data.equalizer.EqualizerRepository
 import com.autoomstudio.mp3studio.data.settings.AppSettings
@@ -167,6 +169,12 @@ class AppContainer(context: Context) {
 
     val appSettings: AppSettings by lazy { AppSettings(appContext) }
 
+    val reviewPromptRepository: ReviewPromptRepository by lazy {
+        ReviewPromptRepository(appSettings, applicationScope)
+    }
+
+    val inAppReviewLauncher: InAppReviewLauncher by lazy { InAppReviewLauncher() }
+
     val equalizerRepository: EqualizerRepository by lazy {
         EqualizerRepository(appContext, applicationScope)
     }
@@ -268,6 +276,7 @@ class AppContainer(context: Context) {
             metronomeController,
             ::createPlaybackController,
             coverArtEmbedder,
+            reviewPromptRepository,
         )
     }
 

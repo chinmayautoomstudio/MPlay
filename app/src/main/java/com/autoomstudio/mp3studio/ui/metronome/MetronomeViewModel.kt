@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.autoomstudio.mp3studio.MPlayApp
 import com.autoomstudio.mp3studio.data.model.Song
 import com.autoomstudio.mp3studio.data.plan.Feature
+import com.autoomstudio.mp3studio.data.review.ReviewPromptRepository
 import com.autoomstudio.mp3studio.data.tempo.GatedDetection
 import com.autoomstudio.mp3studio.data.tempo.TempoDetectionGate
 import com.autoomstudio.mp3studio.metronome.BeatGrid
@@ -66,6 +67,7 @@ data class MeterApplied(
 class MetronomeViewModel(
     private val controller: MetronomeController,
     private val tempoGate: TempoDetectionGate,
+    private val reviewPrompt: ReviewPromptRepository,
 ) : ViewModel() {
 
     val state: StateFlow<MetronomeState> = controller.state
@@ -129,6 +131,7 @@ class MetronomeViewModel(
                 _detection.value = done
             }
             follow(_detection.value as TempoDetection.Done)
+            reviewPrompt.recordFeatureUse()
         }
     }
 
@@ -204,6 +207,7 @@ class MetronomeViewModel(
                     TempoDetectionGate(container.tempoAnalyzer) {
                         container.entitlementsRepository.canUse(Feature.BpmDetector, container.signedInUserId())
                     },
+                    container.reviewPromptRepository,
                 )
             }
         }

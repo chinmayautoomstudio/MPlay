@@ -30,6 +30,7 @@ Feature area to doc mapping:
 | `metronome/`, `data/tempo/`, `ui/metronome/` | `features/metronome.md` |
 | `singalong/`, `ui/singalong/` | `features/sing-along.md` |
 | `widget/` | `features/widget.md` |
+| `data/review/`, `ui/review/` | `features/in-app-review.md` |
 | `data/settings/`, `ui/settings/`, `ui/theme/`, `ui/components/` | `features/settings-and-about.md` |
 | `di/`, `MPlayApp.kt`, `MainActivity.kt`, `ui/main/`, `AndroidManifest.xml` | `architecture.md` |
 

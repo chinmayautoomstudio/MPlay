@@ -7,8 +7,10 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.autoomstudio.mp3studio.data.review.ReviewPromptSettings
 import com.autoomstudio.mp3studio.data.stems.StemMode
 import com.autoomstudio.mp3studio.metronome.MetronomeSettings
 import com.autoomstudio.mp3studio.separation.SeparationEstimate
@@ -41,7 +43,7 @@ fun themeSettingsOf(storedMode: String?, storedDynamicColor: Boolean?): ThemeSet
 
 private val Context.appSettingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "app_settings")
 
-class AppSettings(context: Context) {
+class AppSettings(context: Context) : ReviewPromptSettings {
 
     private val dataStore = context.applicationContext.appSettingsDataStore
 
@@ -160,7 +162,44 @@ class AppSettings(context: Context) {
         dataStore.edit { it[KEY_SINGALONG_NOTE_SEEN] = true }
     }
 
+    /** Cumulative studio feature uses that can trigger the soft Play Store rating prompt. */
+    override suspend fun reviewFeatureUseCount(): Int =
+        dataStore.data.first()[KEY_REVIEW_FEATURE_USE_COUNT] ?: 0
+
+    override suspend fun setReviewFeatureUseCount(count: Int) {
+        dataStore.edit { it[KEY_REVIEW_FEATURE_USE_COUNT] = count.coerceAtLeast(0) }
+    }
+
+    /** True after the user tapped Rate and the In-App Review flow was launched. */
+    override suspend fun reviewPromptCompleted(): Boolean =
+        dataStore.data.first()[KEY_REVIEW_PROMPT_COMPLETED] ?: false
+
+    override suspend fun setReviewPromptCompleted() {
+        dataStore.edit { it[KEY_REVIEW_PROMPT_COMPLETED] = true }
+    }
+
+    /** Epoch ms of the last Not now; 0 if never dismissed. */
+    override suspend fun reviewPromptDismissedAtMs(): Long =
+        dataStore.data.first()[KEY_REVIEW_PROMPT_DISMISSED_AT_MS] ?: 0L
+
+    override suspend fun setReviewPromptDismissedAtMs(epochMs: Long) {
+        dataStore.edit { it[KEY_REVIEW_PROMPT_DISMISSED_AT_MS] = epochMs }
+    }
+
+    suspend fun reviewSoftPromptShownCount(): Int =
+        dataStore.data.first()[KEY_REVIEW_SOFT_PROMPT_SHOWN_COUNT] ?: 0
+
+    override suspend fun incrementReviewSoftPromptShownCount() {
+        dataStore.edit {
+            it[KEY_REVIEW_SOFT_PROMPT_SHOWN_COUNT] = (it[KEY_REVIEW_SOFT_PROMPT_SHOWN_COUNT] ?: 0) + 1
+        }
+    }
+
     private companion object {
+        val KEY_REVIEW_FEATURE_USE_COUNT = intPreferencesKey("review_feature_use_count")
+        val KEY_REVIEW_PROMPT_COMPLETED = booleanPreferencesKey("review_prompt_completed")
+        val KEY_REVIEW_PROMPT_DISMISSED_AT_MS = longPreferencesKey("review_prompt_dismissed_at_ms")
+        val KEY_REVIEW_SOFT_PROMPT_SHOWN_COUNT = intPreferencesKey("review_soft_prompt_shown_count")
         val KEY_SINGALONG_NOTE_SEEN = booleanPreferencesKey("singalong_note_seen")
         val KEY_METRONOME_BPM = intPreferencesKey("metronome_bpm")
         val KEY_METRONOME_BEATS = intPreferencesKey("metronome_beats")

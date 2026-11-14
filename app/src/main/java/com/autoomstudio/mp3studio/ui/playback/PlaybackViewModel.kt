@@ -23,6 +23,7 @@ class PlaybackViewModel(container: AppContainer) : ViewModel(), PlayerActions {
 
     private val controller = container.createPlaybackController(viewModelScope).also { it.connect() }
     private val appSettings = container.appSettings
+    private val reviewPrompt = container.reviewPromptRepository
 
     val state: StateFlow<NowPlayingState?> = controller.state
     val queue: StateFlow<PlaybackQueue> = controller.queue
@@ -68,7 +69,13 @@ class PlaybackViewModel(container: AppContainer) : ViewModel(), PlayerActions {
     override fun setSleepTimerEndOfSong() = controller.setSleepTimerEndOfSong()
     override fun extendSleepTimer(minutes: Int) = controller.extendSleepTimer(minutes)
     override fun cancelSleepTimer() = controller.cancelSleepTimer()
-    override fun setLofi(enabled: Boolean) = controller.setLofi(enabled)
+    override fun setLofi(enabled: Boolean) {
+        controller.setLofi(enabled)
+        if (enabled) reviewPrompt.recordFeatureUse()
+    }
+
+    /** Counts opening the ringtone trim editor toward the soft Play Store rating prompt. */
+    fun recordRingtoneMakerOpened() = reviewPrompt.recordFeatureUse()
     override fun setStemMode(mode: StemMode) = controller.setStemMode(mode)
     override fun playQueueIndex(index: Int) = controller.playQueueIndex(index)
     override fun moveQueueItem(from: Int, to: Int) = controller.moveQueueItem(from, to)

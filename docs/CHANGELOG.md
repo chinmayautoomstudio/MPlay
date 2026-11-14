@@ -7,14 +7,17 @@ Each entry should say what changed and link to the feature doc. Use these groups
 ## [Unreleased]
 
 ### Added
+- Soft Play Store rating prompt after three studio feature uses or 10 minutes of idle time; Rate tries Play In-App Review then opens the store listing, Not now waits 10 days. ([in-app-review](features/in-app-review.md))
 - Automated user emails through SendGrid with app-owned templates in Postgres: welcome (first trial grant), payment receipt, upcoming AutoPay debit, renewal failed, grace ending, subscription expired, and AutoPay mandate ending. Delivery is logged in `email_outbox`. ([payments](features/payments.md), [backend](backend.md))
 
 ### Changed
+- Soft Play Store rating prompt shows a decorative looping five-star Lottie above the message (not a custom star picker). ([in-app-review](features/in-app-review.md))
 - Transactional email HTML uses the dark MP3 Studio brand (logo, cyan/purple accents, gradient CTA, Play Store deep link) for all seven templates. ([payments](features/payments.md))
 - Performance on mid/low-end devices: album art reads are capped and decoded to request size; albums/artists keep song ids instead of nested full song lists; library folder rescans run every 5 minutes (foreground rescan every 30 s); full Now Playing is not composed while the mini player is collapsed; player state/queue collection is isolated from the library scaffold; duplicate fingerprinting and stem reconcile skip unchanged libraries. ([library](features/library.md), [playback](features/playback.md), [duplicates](features/duplicates.md), [vocal-separation](features/vocal-separation.md))
 - Equalizer DSP smooths gains once per audio buffer (not per sample). Playback queue snapshots rebuild only on timeline/metadata changes. Metronome beat watcher polls every 16 ms; sing-along level and trim playhead polls every 100 ms. ([equalizer](features/equalizer.md), [playback](features/playback.md), [metronome](features/metronome.md), [sing-along](features/sing-along.md), [clips](features/clips-and-ringtones.md))
 
 ### Fixed
+- Soft prompt **Rate** always opens the Play Store listing after the In-App Review attempt, so quota / emulator silent success no longer looks like a no-op. ([in-app-review](features/in-app-review.md))
 - Welcome email after first trial grant no longer stalls `claim-trial`: SendGrid calls time out at 12s, and the mail is scheduled with `EdgeRuntime.waitUntil` when available. ([payments](features/payments.md))
 - Scrolling the library and using the mini player is smoother: uncapped cover loads, always-composed Now Playing, and root recomposition from every player event no longer dominate the main thread. ([library](features/library.md), [playback](features/playback.md))
 - Studio Ops Admin RPCs work again on the Coolify Postgres stack. Website tables were present, but `admin_web_action` callees and extended overloads (`admin_tickets`, `admin_webhooks`, `admin_trial_action`, filtered `admin_audit` / `admin_usage` / `admin_list_payments` / `admin_billing_action`, and related helpers) were missing after cutover. Restored from the pre-cutover dump as migration `20261102000000_web_admin_rpcs.sql`. ([admin](features/admin.md), [backend](backend.md#migrations))
