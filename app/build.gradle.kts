@@ -40,7 +40,7 @@ android {
         applicationId = "com.autoomstudio.mp3studio"
         minSdk = 26
         targetSdk = 37
-        versionCode = 14
+        versionCode = 15
         versionName = "1.0.3"
         // An imported model file must match the same export the build bundles.
         val modelHash = rootProject.file("models/htdemucs.onnx.sha256").readText().trim().substringBefore(' ').lowercase()
@@ -71,6 +71,11 @@ android {
         release {
             buildConfigField("String", "SEPARATION_ABIS", "\"${separationAbis(debug = false).joinToString(",")}\"")
             signingConfig = signingConfigs.findByName("release")
+            // Play Console: AAB ships ONNX Runtime / AndroidX JNI .so files; upload the
+            // generated native-debug-symbols.zip with the bundle (or re-upload symbols).
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
             // Scope R8 to AndroidX only. Including kotlin.** made R8 repackage
             // StringsKt__StringBuilderKt outside kotlin.text while it still extended a
             // package-private kotlin.text class, which crashed WorkManager at process start
@@ -307,4 +312,19 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
+}
+
+// Prebuilt JNI (ONNX Runtime, AndroidX) often has no DWARF for AGP to extract; zip the
+// merged .so tree so Play Console can still accept a native-debug-symbols upload.
+tasks.register<Zip>("packageReleaseNativeDebugSymbols") {
+    group = "build"
+    description = "Zip release JNI libs for Play Console native debug symbols"
+    val libs = layout.buildDirectory.dir("intermediates/merged_native_libs/release/mergeReleaseNativeLibs/out/lib")
+    from(libs)
+    destinationDirectory.set(layout.buildDirectory.dir("outputs/native-debug-symbols/release"))
+    archiveFileName.set("native-debug-symbols.zip")
+    dependsOn("mergeReleaseNativeLibs")
+}
+tasks.configureEach {
+    if (name == "bundleRelease") finalizedBy("packageReleaseNativeDebugSymbols")
 }

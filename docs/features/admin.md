@@ -1,12 +1,12 @@
 # Admin
 
-> Status: Unreleased | Added in: Unreleased | Last updated: 2026-10-21
+> Status: Unreleased | Added in: Unreleased | Last updated: 2026-11-02
 
 ## Summary
 
-Admin operations run on the server and are meant for the website dashboard ([web Admin PRD](../../MP3-Studio-PRD-Web-Admin-Dashboard.md)). The Android app has no Admin screens, no Admin card on Profile, and no Admin background worker or notifications. An Admin Google account in the app is a normal user: playback, plans and gates work the same. Privileged actions still go through `assert_admin()` and the `admin` Edge Function.
+Admin operations run on the server and are meant for the website dashboard ([web Admin PRD](../../MP3-Studio-PRD-Web-Admin-Dashboard.md)). The Android app has no Admin screens, no Admin card on Profile, and no Admin background worker or notifications. An Admin Google account in the app is a normal user: playback, plans and gates work the same. Privileged actions still go through `assert_admin()` and either the `admin` Edge Function (mobile-era actions) or `admin_web_action` (Studio Ops).
 
-The server still lets an enabled Admin look up users, change roles, disable accounts, grant or remove Pro, add other admins (by email, as an invite if they have not signed in yet), read the audit log and activity feed, list PayU payments, re-check a payment, refund it, cancel or revoke a subscription, and remove a logged-in device. Every change is checked and logged in Postgres.
+The server still lets an enabled Admin look up users, change roles, disable accounts, grant or remove Pro, add other admins (by email, as an invite if they have not signed in yet), read the audit log and activity feed, list PayU payments, re-check a payment, refund it, cancel or revoke a subscription, and remove a logged-in device. Studio Ops also reaches support tickets, webhooks, job runs, trial grants, and CMS/email helpers through `admin_web_action`. Every change is checked and logged in Postgres.
 
 ## Key files
 
@@ -20,6 +20,7 @@ Paths are relative to `supabase/` unless they start with `app/`.
 | `migrations/20261015000000_billing_admin.sql` | `admin_list_payments()`, `admin_billing_health()`, `admin_billing_action()`, payments in `admin_user_detail()`. |
 | `migrations/20261016000000_admin_revoke_subscription.sql` | `revoke_subscription` admin action. |
 | `migrations/20261022000000_user_devices.sql` | `user_devices`, `admin_remove_device()`, devices on `admin_user_detail()`. |
+| `migrations/20261102000000_web_admin_rpcs.sql` | Studio Ops `admin_web_action` plus support/webhook/trial/billing overloads restored after Coolify cutover. |
 | `seed/first_admin.sql` | First Admin, run by hand. |
 | `app/src/main/java/com/autoomstudio/mp3studio/di/AuthEffects.kt` | On startup, cancels leftover WorkManager work named `"admin-activity"` from older installs. |
 
@@ -27,7 +28,7 @@ The Android packages `data/admin/` and `ui/admin/` are gone.
 
 ## How it works
 
-- **Who can call it.** The `admin` Edge Function verifies the user token and calls `admin_*` with `p_actor` set to the caller. Each function starts with `assert_admin(p_actor)`, which refuses non-admins and disabled admins (403 `forbidden`). See [backend.md](../backend.md) for the action list.
+- **Who can call it.** The `admin` Edge Function verifies the user token and calls `admin_*` with `p_actor` set to the caller (`service_role` only). Studio Ops calls `admin_web_action(action, payload)` as `authenticated`; that dispatcher uses `auth.uid()`, runs `assert_admin`, and routes to the same family of `admin_*` functions (including web-only overloads). Each function refuses non-admins and disabled admins (403 `forbidden`). See [backend.md](../backend.md) for the action list.
 - **App.** The app does not call `admin`. `Entitlements` no longer maps `role` to `isAdmin`. Profile has no Admin card. `AuthEffects` only cancels the old `"admin-activity"` unique work so an upgrade does not keep polling.
 - **Adding admins.** `admin_add_admin` takes an email. If that email already has an account it is promoted (or reported as already an admin). Otherwise it is saved in `admin_invites`; when that Google account first signs in, `handle_new_user()` makes it an admin and removes the invite. Pending invites can be revoked.
 - **Granting Pro.** Writes a `subscriptions` row with `provider = 'admin'`, `provider_ref = 'admin:<user id>'`, `status = 'active'`, `payment_status = 'granted'` and the chosen end date (end of that day, local time). Changing the end date updates the same row. Removing Pro marks it `expired` now. The user's plan follows from the normal entitlement rules ([plans](plans.md)). The app still shows that Pro after the next entitlements refresh.
@@ -62,6 +63,7 @@ No Admin notification channel. `POST_NOTIFICATIONS` remains for playback, separa
 
 | Date | Commit | Change |
 |---|---|---|
+| 2026-11-02 | | Restored Studio Ops `admin_web_action` callees and extended overloads on Coolify Postgres (`20261102000000_web_admin_rpcs.sql`) after the cutover left website tables without those RPCs. |
 | 2026-10-21 | | Removed the in-app Admin screens, `data/admin/`, `ui/admin/`, Admin DataStore keys, `AdminActivityWorker` and phone notifications. Server `admin` functions stay for the website dashboard. `AuthEffects` cancels leftover `"admin-activity"` work. |
 | 2026-10-21 | | `admin_user_detail` includes `devices`; `removeDevice` / `admin_remove_device` logs a user out of a chosen phone. |
 | 2026-10-21 | | `user_devices` and `devices` deployed live. `admin_user_detail` keeps web-admin `phone`, `trialClaim` and mandate fields. |

@@ -6,10 +6,14 @@ Each entry should say what changed and link to the feature doc. Use these groups
 
 ## [Unreleased]
 
+### Fixed
+- Studio Ops Admin RPCs work again on the Coolify Postgres stack. Website tables were present, but `admin_web_action` callees and extended overloads (`admin_tickets`, `admin_webhooks`, `admin_trial_action`, filtered `admin_audit` / `admin_usage` / `admin_list_payments` / `admin_billing_action`, and related helpers) were missing after cutover. Restored from the pre-cutover dump as migration `20261102000000_web_admin_rpcs.sql`. ([admin](features/admin.md), [backend](backend.md#migrations))
+
 ## [1.0.3] - 2026-10-30
 
 ### Changed
-- `versionName` 1.0.2 to 1.0.3 and `versionCode` 13 to 14 for Play Console. ([settings](features/settings-and-about.md))
+- Release builds emit `native-debug-symbols.zip` (`ndk.debugSymbolLevel = SYMBOL_TABLE`) so Play Console can symbolicate native crashes/ANRs. ([settings](features/settings-and-about.md))
+- `versionName` 1.0.2 to 1.0.3 and `versionCode` 13 to 15 for Play Console (`14` was already used on an earlier upload). ([settings](features/settings-and-about.md))
 - App points at the new API host `https://mp3studio-api.3.232.162.36.sslip.io`. ([backend](backend.md), [accounts](features/accounts.md))
 - India monthly Pro was ₹1 for a PayU test, then restored to **₹99** the same day. Yearly stays ₹999. ([payments](features/payments.md), [plans](features/plans.md))
 
