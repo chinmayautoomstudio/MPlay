@@ -181,14 +181,19 @@ private fun LibraryRouteContent(
         )
 
         is LibraryRoute.AlbumRoute -> {
+            val songById = remember(allSongs) { allSongs.associateBy { it.id } }
             val album = remember(allSongs, route.albumId) {
                 LibraryQueries.groupAlbums(allSongs.filter { it.albumId == route.albumId }).firstOrNull()
             }
             if (album == null) {
                 LaunchedEffect(route) { pop() }
             } else {
+                val songs = remember(album, songById) {
+                    LibraryQueries.resolveSongs(album.songIds, songById)
+                }
                 AlbumDetailScreen(
                     album = album,
+                    songs = songs,
                     currentSongId = currentSongId,
                     isPlaying = isPlaying,
                     onBack = pop,
@@ -202,14 +207,19 @@ private fun LibraryRouteContent(
         }
 
         is LibraryRoute.ArtistRoute -> {
+            val songById = remember(allSongs) { allSongs.associateBy { it.id } }
             val artist = remember(allSongs, route.name) {
                 LibraryQueries.groupArtists(allSongs.filter { it.artist == route.name }).firstOrNull()
             }
             if (artist == null) {
                 LaunchedEffect(route) { pop() }
             } else {
+                val songs = remember(artist, songById) {
+                    LibraryQueries.resolveSongs(artist.songIds, songById)
+                }
                 ArtistDetailScreen(
                     artist = artist,
+                    songs = songs,
                     currentSongId = currentSongId,
                     isPlaying = isPlaying,
                     onBack = pop,

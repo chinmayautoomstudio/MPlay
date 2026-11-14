@@ -1,6 +1,6 @@
 # Clips and ringtones
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-13
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-11-14
 
 ## Summary
 
@@ -30,7 +30,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 1. `MainScreen` launches `TrimEditorActivity.intent(context, song, TrimMode.Cut | TrimMode.Ringtone)`. Ringtone mode starts with the first 30 s; Cut mode with the full track.
 2. **Waveform:** decodes the whole file to 500 peak buckets, sending partial results about every 300 ms. A failure disables editing.
-3. **Preview:** a private `ExoPlayer` loops the range (polls every 50 ms). It stops on `ON_STOP` and on audio focus loss.
+3. **Preview:** a private `ExoPlayer` loops the range (polls every 100 ms). It stops on `ON_STOP` and on audio focus loss.
 4. **Export:** Media3 Transformer with `ClippingConfiguration`, video removed, AAC at 192 kbps, `InAppMp4Muxer` (non-streamable to avoid a ~400 KB reservation). Output `cacheDir/clip-<millis>.m4a`. Cancellable.
 5. **Space check:** estimated clip size x2 plus 5 MB margin against the smaller of cache and external free space.
 6. **Cover art:** after export, `CoverArtEmbedder.embedLogo` writes `ic_mp3studio_logo` as MP4 `covr` (always, even if the source track had art).
@@ -75,3 +75,4 @@ Constants (`TrimRange`): `MIN_CLIP_MS = 1000`, `NUDGE_MS = 100`, `RINGTONE_DEFAU
 | 2026-10-02 | `23e2ee1` | Clip editing, trim editor, ringtone setting. |
 | 2026-10-07 | - | Clips folder renamed to `Music/MP3 Studio Clips` (`ClipStore.CLIPS_FOLDER`); `LEGACY_CLIPS_RELATIVE_PATH` keeps old clips exempt from the 30 s minimum. `TrimEditorActivity` finishes on sign-out. |
 | 2026-10-13 | - | Saved clips get the app logo as embedded cover art (`CoverArtEmbedder`); scoped MediaStore rows set album `MP3 Studio Clips`. |
+| 2026-11-14 | - | Trim preview playhead poll slowed from 50 ms to 100 ms. |

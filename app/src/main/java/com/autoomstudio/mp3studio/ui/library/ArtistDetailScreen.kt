@@ -21,6 +21,7 @@ import com.autoomstudio.mp3studio.data.model.Song
 @Composable
 fun ArtistDetailScreen(
     artist: Artist,
+    songs: List<Song>,
     currentSongId: Long?,
     isPlaying: Boolean,
     onBack: () -> Unit,
@@ -31,15 +32,13 @@ fun ArtistDetailScreen(
     selection: SongSelection,
     modifier: Modifier = Modifier,
 ) {
-    val songs = artist.songs
-
     LazyColumn(modifier = modifier, contentPadding = PaddingValues(bottom = 8.dp)) {
         item(key = "back") { DetailBackButton(onBack = onBack) }
         item(key = "header") {
             DetailHeader(
                 title = artist.name,
                 subtitle = songAndAlbumCountText(songs.size, artist.albums.size),
-                onPlay = { onPlay(songs, songs.first()) },
+                onPlay = { if (songs.isNotEmpty()) onPlay(songs, songs.first()) },
                 onShuffle = { onShuffle(songs) },
             ) {
                 ArtistInitial(name = artist.name, size = 160.dp)

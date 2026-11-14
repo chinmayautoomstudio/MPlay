@@ -1,6 +1,6 @@
 # Sing-along recording
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-13
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-11-14
 
 ## Summary
 
@@ -142,3 +142,4 @@ The sheet warns when no headphones are connected (music will leak into the mic) 
 | 2026-10-08 | - | Sing Along needs Trial or Pro: the chip opens the upgrade sheet on Free. See [plans](plans.md). |
 | 2026-10-08 | - | A session is discarded when the app is swiped away from recents (`RecordingService.onTaskRemoved`, `TaskRemoval`). |
 | 2026-10-13 | - | Saved recordings get the app logo as embedded cover art (`CoverArtEmbedder`); scoped MediaStore rows set album `MP3 Studio Recordings`. |
+| 2026-11-14 | - | Mic level Compose poll slowed from 50 ms to 100 ms. |

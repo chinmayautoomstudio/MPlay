@@ -77,6 +77,8 @@ class AppContainer(context: Context) {
 
     val libraryPreferences: LibraryPreferences by lazy { LibraryPreferences(appContext) }
 
+    val albumArtLoader: AlbumArtLoader by lazy { AlbumArtLoader(appContext) }
+
     val songRepository: SongRepository by lazy {
         val scanner = AudioFolderScanner(appContext)
         SongRepository(
@@ -85,10 +87,9 @@ class AppContainer(context: Context) {
             scanner = scanner,
             watcher = AudioFolderWatcher(scanner.folders()),
             libraryPreferences = libraryPreferences,
+            albumArtLoader = albumArtLoader,
         )
     }
-
-    val albumArtLoader: AlbumArtLoader by lazy { AlbumArtLoader(appContext) }
 
     val coverArtEmbedder: CoverArtEmbedder by lazy { CoverArtEmbedder(appContext) }
 

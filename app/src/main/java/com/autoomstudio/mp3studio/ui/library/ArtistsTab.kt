@@ -72,7 +72,7 @@ private fun ArtistRow(artist: Artist, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = songAndAlbumCountText(artist.songs.size, artist.albums.size),
+                text = songAndAlbumCountText(artist.songCount, artist.albums.size),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,

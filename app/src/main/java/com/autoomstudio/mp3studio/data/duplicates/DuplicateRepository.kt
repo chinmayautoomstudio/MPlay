@@ -1,5 +1,6 @@
 package com.autoomstudio.mp3studio.data.duplicates
 
+import com.autoomstudio.mp3studio.data.library.LibraryContentSignature
 import com.autoomstudio.mp3studio.data.model.Song
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,8 @@ class DuplicateRepository(
     private val scope: CoroutineScope,
 ) {
     private val fingerprintLock = Mutex()
+    /** Skips disk fingerprinting when the library id/size/mtime set has not changed. */
+    private var lastFingerprintSignature: Long = Long.MIN_VALUE
 
     /**
      * Duplicate groups for [songs]. Emits right away from cached fingerprints, then again as missing
@@ -50,6 +53,8 @@ class DuplicateRepository(
     private suspend fun updateFingerprints(songs: List<Song>) = fingerprintLock.withLock {
         withContext(Dispatchers.IO) {
             if (songs.isEmpty()) return@withContext
+            val signature = LibraryContentSignature.of(songs)
+            if (signature == lastFingerprintSignature) return@withContext
             val existing = dao.fingerprints().associateBy { it.songId }
             val libraryIds = songs.mapTo(HashSet()) { it.id }
             existing.keys.filterNot { it in libraryIds }
@@ -71,6 +76,7 @@ class DuplicateRepository(
                     }
                     if (computed.isNotEmpty()) dao.upsertFingerprints(computed)
                 }
+            lastFingerprintSignature = signature
         }
     }
 

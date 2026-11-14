@@ -1,6 +1,6 @@
 # Library
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-14
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-11-14
 
 ## Summary
 
@@ -55,21 +55,21 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 
 ### Album art
 
-MediaProvider refuses album-art thumbnails for files in `Download/` (`FileNotFoundException: No thumbnails in Downloads directories`). `AlbumArtLoader.load(uri)` (shared through `AppContainer.albumArtLoader`) tries the album-art URI first. If that fails, it picks a song with the same `ALBUM_ID` and reads its embedded picture with `MediaMetadataRetriever`. Album IDs with no art at all are remembered in memory, so they aren't looked up again. The loader is used by:
+MediaProvider refuses album-art thumbnails for files in `Download/` (`FileNotFoundException: No thumbnails in Downloads directories`). `AlbumArtLoader.load(uri)` (shared through `AppContainer.albumArtLoader`) tries the album-art URI first. If that fails, it picks a song with the same `ALBUM_ID` and reads its embedded picture with `MediaMetadataRetriever`. Reads are capped at 512 KB. Album IDs with no art at all are remembered in memory until the next library query clears that cache. The loader is used by:
 
-- Coil, through `ui/components/AlbumArtFetcher`, which `MPlayApp` registers as the singleton `ImageLoader`. `ArtworkImage` shows `R.drawable.ic_mp3studio_logo` under the loaded art (or alone when the URI is null / the load fails).
-- The media session's bitmap loader (see [playback](playback.md)), which falls back to the same logo via `AppLogoArtwork`.
+- Coil, through `ui/components/AlbumArtFetcher`, which `MPlayApp` registers as the singleton `ImageLoader`. The fetcher re-encodes covers toward Coil's request size when known. List/grid callers pass `requestSizePx` via `artworkRequestSizePx`. `ArtworkImage` shows `R.drawable.ic_mp3studio_logo` under the loaded art (or alone when the URI is null / the load fails).
+- The media session's bitmap loader (see [playback](playback.md)), which downsamples to ~512 px and falls back to the same logo via `AppLogoArtwork`.
 - The widget (see [widget](widget.md)).
 
 `AppLogoArtwork` decodes that drawable to a square JPEG/bitmap (~512 px). `CoverArtEmbedder` (jaudiotagger) writes it as MP4 `covr` when saving [clips](clips-and-ringtones.md) and [sing-along](sing-along.md) recordings so the library and other apps treat the logo as real cover art.
 
 ### Refresh
 
-`SongRepository.songs()` merges a `ContentObserver` (300 ms debounce), manual `refresh()` calls, and automatic scans (folder watcher debounced 2 s, plus every 60 s), then combines with `LibraryPreferences.excludedFolders` so toggles reload the list without a media rescan. Scans cover Music, Download, Podcasts, Audiobooks (10+), Recordings (12+), time out after 15 s, and never overlap (`Mutex`).
+`SongRepository.songs()` merges a `ContentObserver` (300 ms debounce), manual `refresh()` calls, and automatic scans (folder watcher debounced 2 s, plus every 5 minutes), then combines with `LibraryPreferences.excludedFolders` so toggles reload the list without a media rescan. Each query also clears `AlbumArtLoader`'s missing-art cache. Scans cover Music, Download, Podcasts, Audiobooks (10+), Recordings (12+), time out after 15 s, and never overlap (`Mutex`).
 
 ### ViewModel
 
-Combines songs (also feeding `stemRepository.onLibraryChanged` and the duplicate index), the search query (250 ms debounce), sort order and `hide_duplicates` on `Dispatchers.Default`. Hidden duplicates are removed, then filtering and sorting run. `allSongs` stays unfiltered so detail pages stay complete during a search. `onAppForeground()` rescans if the last scan is older than 2 s.
+Combines songs (also feeding `stemRepository.onLibraryChanged` and the duplicate index), the search query (250 ms debounce), sort order and `hide_duplicates` on `Dispatchers.Default`. Hidden duplicates are removed, then filtering and sorting run. `Album` / `Artist` rows keep `songIds` (not nested `Song` copies); detail screens resolve songs from `allSongs`. `allSongs` stays unfiltered so detail pages stay complete during a search. `onAppForeground()` rescans if the last scan is older than 30 s.
 
 ### Tabs
 
@@ -113,7 +113,7 @@ Long-press starts selection; taps toggle. Bulk actions: add to playlist, play ne
 ## Known limitations and TODOs
 
 - Files under 30 s are hidden, except clips and recordings.
-- The folder watcher is not recursive; the 60 s scan is the fallback.
+- The folder watcher is not recursive; the 5-minute periodic scan is the fallback.
 - On Android 11+ there is no per-file check after the delete dialog.
 - Artists are grouped by exact string, so "A feat. B" is its own artist.
 - Songs in `Download/` with no embedded cover show the app logo placeholder. The album-art fallback uses the first song of the album, so an album split between folders may show another track's cover.
@@ -133,3 +133,4 @@ Long-press starts selection; taps toggle. Bulk actions: add to playlist, play ne
 | 2026-10-14 | - | Exclude folders: `excluded_folders` in `library_prefs`, SQL filter in `MediaStoreSongSource`, Profile → Library → Exclude folders UI. |
 | 2026-10-14 | - | Swipe between Songs / Albums / Artists via `HorizontalPager` in `LibraryTabs`. |
 | 2026-10-14 | - | Library eligibility includes `IS_RECORDING` and `Recordings/` so call/voice folders (e.g. `Recordings/Call/`) appear in Exclude folders. |
+| 2026-11-14 | - | Performance: capped album-art reads + sized Coil decode; `Album`/`Artist` hold `songIds`; foreground rescan 30 s; periodic scan 5 min; clear missing-art cache on query. |

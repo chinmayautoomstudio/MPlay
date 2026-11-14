@@ -1,6 +1,6 @@
 # Architecture
 
-> Last updated: 2026-10-22
+> Last updated: 2026-11-14
 
 ## Modules
 
@@ -73,7 +73,7 @@ ViewModels: `LibraryViewModel`, `PlaybackViewModel`, `PlaylistsViewModel`, `Sepa
    - `SeparationLinks.ACTION_OPEN_QUEUE` from the separation notification
    - `EXTRA_OPEN_METRONOME` from the metronome notification
    - the payment App Link `https://<pay.returnHost>/pay/return?txn=...` (`PaymentReturnLink.parse`), passed to `BillingHost` as a return request
-4. `MPlayRoot` requests the audio permission (shows `PermissionRationaleScreen` while denied), asks for `POST_NOTIFICATIONS` once on Android 13+, calls `LibraryViewModel.onAppForeground()` on every resume, and renders `MainScreen` with `BillingHost` above it (checkout sheet, payment result, cancel dialog, and a payment check on every resume).
+4. `MPlayRoot` requests the audio permission (shows `PermissionRationaleScreen` while denied), asks for `POST_NOTIFICATIONS` once on Android 13+, calls `LibraryViewModel.onAppForeground()` on every resume, and renders `MainScreen` with `BillingHost` above it (checkout sheet, payment result, cancel dialog, and a payment check on every resume). `MPlayRoot` only collects narrow playback signals (`songId`, `playing`, `hasNowPlaying`); full now-playing / queue state is collected inside `MainScreen`'s `ExpandablePlayerHost`.
 
 ## Navigation
 
@@ -83,7 +83,7 @@ No Navigation-Compose. [`ui/main/MainScreen.kt`](../app/src/main/java/com/autoom
 - Profile sub-pages (`ProfilePage`): `Main` (the Profile screen; `MPlayTopBar` is hidden here), `EditProfile`, `Appearance`, `Library`, `Duplicates`, `ExcludeFolders`, `Separation` (settings), `SeparationQueue`, `Playback`, `Equalizer`, `About`, `Licenses`, `Plans`, `PaymentHistory` (from Plans). See [settings](features/settings-and-about.md). Selecting Profile in the bottom bar resets to `Main`; deep links still open a specific page after `openProfile()`. `PlansViewModel.openPlansRequest` ("See plans" in an upgrade sheet) collapses the player and opens `Plans`. The Now Playing Equalizer chip also collapses the player and opens `Equalizer`.
 - The trial banner (last 3 days of the trial) sits above the screen content inside the scaffold.
 - Library: Songs/Albums/Artists via `HorizontalPager`; back stack route strings `album:<id>` / `artist:<name>`.
-- `ExpandablePlayer` is a draggable sheet from the mini player to Now Playing.
+- `ExpandablePlayer` is a draggable sheet from the mini player to Now Playing (full Now Playing content is composed only while expanding).
 - Overlays: `AddToPlaylistSheet`, `PlaylistNameDialog`, `DeleteSongsHost`, `SongInfoHost`, `SeparationNoticeDialog`, `ModelMissingDialog`, `SeparationProgressPill`, `SingAlongOverlay`, `UpgradeSheet` (from Now Playing and the metronome sheet), snackbars.
 - `TrimEditorActivity` is a separate activity.
 - Back handling is layered: expanded player, then selection, then current screen.

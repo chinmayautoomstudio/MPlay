@@ -1,6 +1,6 @@
 # Metronome and BPM detection
 
-> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-10-08
+> Status: Unreleased | Added in: next version after 3.1 | Last updated: 2026-11-14
 
 ## Summary
 
@@ -41,7 +41,7 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 - Dedicated `AudioTrack` (float, mono, stream, `PERFORMANCE_MODE_LOW_LATENCY`, `USAGE_MEDIA` / `CONTENT_TYPE_SONIFICATION`) at the native output rate (fallback 48 kHz). The system mixes it with the music player.
 - Sample-accurate scheduling: the writer thread (`THREAD_PRIORITY_URGENT_AUDIO`) fills 256-frame blocks and `BeatClock.beatsIn()` gives each beat's exact frame offset. Click tails continue into the next block.
 - Beat n is at `ceil(anchor + n * sampleRate * 60 / bpm)` in double precision, so there is no drift. A BPM change re-anchors after the next beat.
-- Visual sync: a watcher thread polls `playbackHeadPosition` every 4 ms and emits each beat when it is actually heard.
+- Visual sync: a watcher thread polls `playbackHeadPosition` every 16 ms and emits each beat when it is actually heard.
 
 ### Settings
 
@@ -153,3 +153,4 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | 2026-10-08 | - | New BPM detections need Trial or Pro (`TempoDetectionGate`, `SongTempoAnalyzer` implements `TempoSource`); cached tempos stay usable. See [plans](plans.md). |
 | 2026-10-08 | - | Tap tempo removed (`TapTempo`, `TapTempoTest`); one-tap Detect BPM on the Metronome tab too, through the shared `MetronomeWithDetection`. |
 | 2026-10-08 | - | The metronome stops when the app is swiped away from recents (`MetronomeService.onTaskRemoved`, `TaskRemoval`). |
+| 2026-11-14 | - | Beat watcher poll interval 4 ms → 16 ms. |

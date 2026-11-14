@@ -46,6 +46,7 @@ import com.autoomstudio.mp3studio.ui.playback.PlaybackViewModel
 import com.autoomstudio.mp3studio.ui.playlist.PlaylistsViewModel
 import com.autoomstudio.mp3studio.ui.settings.SettingsViewModel
 import com.autoomstudio.mp3studio.ui.theme.MPlayAppTheme
+import kotlinx.coroutines.flow.map
 
 class MainActivity : ComponentActivity() {
 
@@ -181,9 +182,11 @@ private fun MPlayRoot(
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val sortOrder by viewModel.sortOrder.collectAsStateWithLifecycle()
-    val nowPlaying by playbackViewModel.state.collectAsStateWithLifecycle()
-    val queue by playbackViewModel.queue.collectAsStateWithLifecycle()
-    val suggestedSleepMinutes by playbackViewModel.suggestedSleepMinutes.collectAsStateWithLifecycle()
+    val currentSongId by playbackViewModel.songId.collectAsStateWithLifecycle()
+    val isPlaying by playbackViewModel.playing.collectAsStateWithLifecycle()
+    val hasNowPlaying by remember {
+        playbackViewModel.state.map { it != null }
+    }.collectAsStateWithLifecycle(initialValue = playbackViewModel.state.value != null)
     val playlists by playlistsViewModel.playlists.collectAsStateWithLifecycle()
     val content = uiState as? LibraryUiState.Content
     LaunchedEffect(content?.allSongs, content?.duplicates, content?.hidingDuplicates, uiState is LibraryUiState.Empty) {
@@ -204,11 +207,10 @@ private fun MPlayRoot(
     } else CompositionLocalProvider(LocalSeparatedSongIds provides separationState.readySongIds) {
         MainScreen(
             libraryState = uiState,
-            nowPlaying = nowPlaying,
-            queue = queue,
-            position = playbackViewModel.position,
-            playerActions = playbackViewModel,
-            suggestedSleepMinutes = suggestedSleepMinutes,
+            currentSongId = currentSongId,
+            isPlaying = isPlaying,
+            hasNowPlaying = hasNowPlaying,
+            playbackViewModel = playbackViewModel,
             showNowPlaying = showNowPlaying,
             onShowNowPlayingChange = { showNowPlaying = it },
             isRefreshing = isRefreshing,

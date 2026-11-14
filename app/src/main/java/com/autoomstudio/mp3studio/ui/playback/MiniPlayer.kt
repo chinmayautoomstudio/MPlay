@@ -47,6 +47,7 @@ import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.playback.NowPlayingState
 import com.autoomstudio.mp3studio.ui.common.formatDuration
 import com.autoomstudio.mp3studio.ui.components.ArtworkImage
+import com.autoomstudio.mp3studio.ui.components.artworkRequestSizePx
 import com.autoomstudio.mp3studio.ui.components.pressBounce
 import com.autoomstudio.mp3studio.ui.metronome.MetronomeMiniIndicator
 import kotlin.math.abs
@@ -110,6 +111,7 @@ fun MiniPlayerContent(
                     ArtworkImage(
                         uri = state.artworkUri,
                         contentDescription = null,
+                        requestSizePx = artworkRequestSizePx(MiniArtworkSize),
                         modifier = Modifier
                             .size(MiniArtworkSize)
                             .graphicsLayer { translationX = swipe.offset.value },

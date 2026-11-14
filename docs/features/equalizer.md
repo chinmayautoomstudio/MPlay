@@ -1,6 +1,6 @@
 # Equalizer
 
-> Status: Unreleased | Added in: Unreleased | Last updated: 2026-10-13
+> Status: Unreleased | Added in: Unreleased | Last updated: 2026-11-14
 
 ## Summary
 
@@ -86,3 +86,4 @@ None added. Uses the existing `PlaybackService` only.
 |---|---|---|
 | 2026-10-12 | - | Initial equalizer engine, persistence, concept UI and entry points (PRD v3.3). |
 | 2026-10-13 | - | Now Playing entry is a feature tile (not a chip). See [playback](playback.md). |
+| 2026-11-14 | - | `EqualizerEffect.process` smooths gains and rebuilds filters once per buffer. |

@@ -41,6 +41,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.gestures.TargetedFlingBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -75,8 +76,6 @@ import com.autoomstudio.mp3studio.data.duplicates.DuplicateIndex
 import com.autoomstudio.mp3studio.data.settings.ThemeMode
 import com.autoomstudio.mp3studio.data.stems.StemMode
 import com.autoomstudio.mp3studio.data.settings.ThemeSettings
-import com.autoomstudio.mp3studio.playback.NowPlayingState
-import com.autoomstudio.mp3studio.playback.PlaybackQueue
 import com.autoomstudio.mp3studio.data.library.SongDeleter
 import com.autoomstudio.mp3studio.ui.common.rememberWithLegacyStorage
 import com.autoomstudio.mp3studio.ui.components.MPlayTopBar
@@ -99,7 +98,8 @@ import com.autoomstudio.mp3studio.ui.plans.PlansViewModel
 import com.autoomstudio.mp3studio.ui.plans.UpgradeSheet
 import com.autoomstudio.mp3studio.ui.playback.ExpandablePlayer
 import com.autoomstudio.mp3studio.ui.playback.MiniPlayerSlotHeight
-import com.autoomstudio.mp3studio.ui.playback.PlayerActions
+import com.autoomstudio.mp3studio.ui.playback.PlaybackViewModel
+import com.autoomstudio.mp3studio.ui.playback.PlayerSheetState
 import com.autoomstudio.mp3studio.ui.playback.PlayerSheetValue
 import com.autoomstudio.mp3studio.ui.playback.animateSheetTo
 import com.autoomstudio.mp3studio.ui.playback.expandProgress
@@ -159,11 +159,11 @@ private enum class Destination(
 @Composable
 fun MainScreen(
     libraryState: LibraryUiState,
-    nowPlaying: NowPlayingState?,
-    queue: PlaybackQueue,
-    position: Flow<Long>,
-    playerActions: PlayerActions,
-    suggestedSleepMinutes: Int,
+    /** Narrow playback signals so full Now Playing / queue updates stay in [ExpandablePlayerHost]. */
+    currentSongId: Long?,
+    isPlaying: Boolean,
+    hasNowPlaying: Boolean,
+    playbackViewModel: PlaybackViewModel,
     showNowPlaying: Boolean,
     onShowNowPlayingChange: (Boolean) -> Unit,
     isRefreshing: Boolean,
@@ -276,11 +276,11 @@ fun MainScreen(
         }
     }
     val context = LocalContext.current
-    val currentSongId by rememberUpdatedState(nowPlaying?.songId)
+    val currentSongIdState by rememberUpdatedState(currentSongId)
     LaunchedEffect(separationViewModel) {
         separationViewModel.messages.collect { message ->
             val text = separationMessageText(context, message)
-            val playInstrumental = message is SeparationMessage.Ready && message.songId == currentSongId
+            val playInstrumental = message is SeparationMessage.Ready && message.songId == currentSongIdState
             val partial = message is SeparationMessage.PartiallyQueued
             scope.launch {
                 snackbarHostState.currentSnackbarData?.dismiss()
@@ -296,7 +296,7 @@ fun MainScreen(
                 )
                 if (result == SnackbarResult.ActionPerformed) {
                     when {
-                        playInstrumental -> playerActions.setStemMode(StemMode.Instrumental)
+                        playInstrumental -> playbackViewModel.setStemMode(StemMode.Instrumental)
                         partial -> plansViewModel.openPlans()
                         else -> openSeparation()
                     }
@@ -348,12 +348,7 @@ fun MainScreen(
         onClearSearch()
     }
 
-    // Keeps the last song on screen while the player surfaces animate out after the queue is cleared.
-    val lastNowPlaying = remember { mutableStateOf(nowPlaying) }
-        .apply { if (nowPlaying != null) value = nowPlaying }
-        .value
-
-    val sheetExpanded = showNowPlaying && nowPlaying != null
+    val sheetExpanded = showNowPlaying && hasNowPlaying
     val sheetState = rememberPlayerSheetState(initiallyExpanded = sheetExpanded)
     val sheetFling = rememberPlayerSheetFlingBehavior(sheetState)
     LaunchedEffect(sheetExpanded) {
@@ -362,13 +357,13 @@ fun MainScreen(
             sheetState.animateSheetTo(target)
         }
     }
-    val hasNowPlaying by rememberUpdatedState(nowPlaying != null)
+    val hasNowPlayingState by rememberUpdatedState(hasNowPlaying)
     val currentOnShowNowPlayingChange by rememberUpdatedState(onShowNowPlayingChange)
     LaunchedEffect(sheetState) {
         snapshotFlow { sheetState.settledValue }
             .drop(1)
             .collect { value ->
-                if (hasNowPlaying) currentOnShowNowPlayingChange(value == PlayerSheetValue.Expanded)
+                if (hasNowPlayingState) currentOnShowNowPlayingChange(value == PlayerSheetValue.Expanded)
             }
     }
 
@@ -447,7 +442,7 @@ fun MainScreen(
             bottomBar = {
                 Column(Modifier.background(MaterialTheme.colorScheme.surfaceContainerLow)) {
                     AnimatedVisibility(
-                        visible = nowPlaying != null,
+                        visible = hasNowPlaying,
                         enter = slideInVertically { it } + fadeIn(),
                         exit = slideOutVertically { it } + fadeOut(),
                     ) {
@@ -514,8 +509,8 @@ fun MainScreen(
                         when (shown) {
                             Destination.Library -> LibraryScreen(
                                 state = libraryState,
-                                currentSongId = nowPlaying?.songId,
-                                isPlaying = nowPlaying?.isPlaying == true,
+                                currentSongId = currentSongId,
+                                isPlaying = isPlaying,
                                 isRefreshing = isRefreshing,
                                 onRefresh = onRefresh,
                                 searchQuery = searchQuery,
@@ -529,8 +524,8 @@ fun MainScreen(
 
                             Destination.Playlists -> PlaylistsScreen(
                                 playlists = playlists,
-                                currentSongId = nowPlaying?.songId,
-                                isPlaying = nowPlaying?.isPlaying == true,
+                                currentSongId = currentSongId,
+                                isPlaying = isPlaying,
                                 playlistActions = playlistActions,
                                 songActions = songActions,
                                 onPlay = onPlay,
@@ -541,7 +536,7 @@ fun MainScreen(
                             )
 
                             Destination.Metronome -> MetronomeScreen(
-                                song = allSongs.firstOrNull { it.id == nowPlaying?.songId },
+                                song = allSongs.firstOrNull { it.id == currentSongId },
                                 modifier = contentModifier,
                             )
 
@@ -676,33 +671,19 @@ fun MainScreen(
             }
         }
 
-        val state = lastNowPlaying
-        if (state != null && miniSlotAttached && !collapsedTop.isNaN()) {
-            val currentSong = allSongs.firstOrNull { it.id == state.songId }
-            val separator = if (canSeparate && currentSong != null) {
-                SeparatorUi(
-                    job = separationState.activeJobs[currentSong.id],
-                    onSeparate = { separationViewModel.requestSeparation(listOf(currentSong)) },
-                    onCancel = separationViewModel::cancel,
-                    onRetry = separationViewModel::retry,
-                )
-            } else {
-                null
-            }
-            ExpandablePlayer(
-                state = state,
-                position = position,
-                actions = playerActions,
+        if (miniSlotAttached && !collapsedTop.isNaN()) {
+            ExpandablePlayerHost(
+                playbackViewModel = playbackViewModel,
+                allSongs = allSongs,
+                canSeparate = canSeparate,
+                separationState = separationState,
+                separationViewModel = separationViewModel,
                 sheetState = sheetState,
                 sheetFling = sheetFling,
-                collapsedTop = { collapsedTop },
+                collapsedTop = collapsedTop,
                 onExpand = { onShowNowPlayingChange(true) },
                 onCollapse = { onShowNowPlayingChange(false) },
-                song = currentSong,
                 songActions = songActions,
-                suggestedSleepMinutes = suggestedSleepMinutes,
-                separator = separator,
-                queue = queue,
                 onOpenEqualizer = {
                     onShowNowPlayingChange(false)
                     openProfile()
@@ -881,4 +862,60 @@ private fun MPlayNavigationBar(
             )
         }
     }
+}
+
+/**
+ * Collects full now-playing / queue state here so library tab updates do not recompose the player
+ * tree and player metadata ticks do not invalidate the whole [MainScreen] scaffold.
+ */
+@Composable
+private fun ExpandablePlayerHost(
+    playbackViewModel: PlaybackViewModel,
+    allSongs: List<Song>,
+    canSeparate: Boolean,
+    separationState: SeparationUiState,
+    separationViewModel: SeparationViewModel,
+    sheetState: PlayerSheetState,
+    sheetFling: TargetedFlingBehavior,
+    collapsedTop: Float,
+    onExpand: () -> Unit,
+    onCollapse: () -> Unit,
+    songActions: SongActions,
+    onOpenEqualizer: () -> Unit,
+) {
+    val nowPlaying by playbackViewModel.state.collectAsStateWithLifecycle()
+    val queue by playbackViewModel.queue.collectAsStateWithLifecycle()
+    val suggestedSleepMinutes by playbackViewModel.suggestedSleepMinutes.collectAsStateWithLifecycle()
+    // Keep the last song on screen while the player surfaces animate out after the queue is cleared.
+    val lastNowPlaying = remember { mutableStateOf(nowPlaying) }
+        .apply { if (nowPlaying != null) value = nowPlaying }
+        .value
+        ?: return
+    val currentSong = allSongs.firstOrNull { it.id == lastNowPlaying.songId }
+    val separator = if (canSeparate && currentSong != null) {
+        SeparatorUi(
+            job = separationState.activeJobs[currentSong.id],
+            onSeparate = { separationViewModel.requestSeparation(listOf(currentSong)) },
+            onCancel = separationViewModel::cancel,
+            onRetry = separationViewModel::retry,
+        )
+    } else {
+        null
+    }
+    ExpandablePlayer(
+        state = lastNowPlaying,
+        position = playbackViewModel.position,
+        actions = playbackViewModel,
+        sheetState = sheetState,
+        sheetFling = sheetFling,
+        collapsedTop = { collapsedTop },
+        onExpand = onExpand,
+        onCollapse = onCollapse,
+        song = currentSong,
+        songActions = songActions,
+        suggestedSleepMinutes = suggestedSleepMinutes,
+        separator = separator,
+        queue = queue,
+        onOpenEqualizer = onOpenEqualizer,
+    )
 }

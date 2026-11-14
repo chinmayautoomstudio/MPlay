@@ -27,6 +27,9 @@ class PlaybackViewModel(container: AppContainer) : ViewModel(), PlayerActions {
     val state: StateFlow<NowPlayingState?> = controller.state
     val queue: StateFlow<PlaybackQueue> = controller.queue
     val position: Flow<Long> = controller.positionMs()
+    /** Narrow signals for library highlighting so the full player state can stay off the root. */
+    val songId: StateFlow<Long?> = controller.songId
+    val playing: StateFlow<Boolean> = controller.playing
 
     /** Preselected duration in the sleep timer sheet: the last one used, or the default. */
     val suggestedSleepMinutes: StateFlow<Int> = appSettings.lastSleepMinutes

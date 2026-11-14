@@ -32,7 +32,7 @@ fun NowPlayingBars(
     contentDescription: String,
     modifier: Modifier = Modifier,
 ) {
-    val transition = rememberInfiniteTransition(label = "nowPlayingBars")
+    val shouldAnimate = animate && rememberAnimationsEnabled()
     Row(
         modifier = modifier
             .size(20.dp)
@@ -40,26 +40,39 @@ fun NowPlayingBars(
         horizontalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.Bottom,
     ) {
-        RestingHeights.forEachIndexed { index, resting ->
-            val height = if (animate) {
-                transition.animateFloat(
-                    initialValue = 0.25f,
-                    targetValue = 1f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(BarDurationsMs[index], easing = LinearEasing),
-                        repeatMode = RepeatMode.Reverse,
-                    ),
-                    label = "bar$index",
-                ).value
-            } else {
-                resting
+        if (shouldAnimate) {
+            AnimatedNowPlayingBars()
+        } else {
+            RestingHeights.forEach { resting ->
+                NowPlayingBar(heightFraction = resting)
             }
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .fillMaxHeight(height)
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
-            )
         }
     }
+}
+
+@Composable
+private fun AnimatedNowPlayingBars() {
+    val transition = rememberInfiniteTransition(label = "nowPlayingBars")
+    RestingHeights.forEachIndexed { index, _ ->
+        val height = transition.animateFloat(
+            initialValue = 0.25f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(BarDurationsMs[index], easing = LinearEasing),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "bar$index",
+        ).value
+        NowPlayingBar(heightFraction = height)
+    }
+}
+
+@Composable
+private fun NowPlayingBar(heightFraction: Float) {
+    Box(
+        modifier = Modifier
+            .width(4.dp)
+            .fillMaxHeight(heightFraction)
+            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
+    )
 }

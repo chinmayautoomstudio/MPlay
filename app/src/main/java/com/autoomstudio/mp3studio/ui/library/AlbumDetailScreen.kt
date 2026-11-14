@@ -15,6 +15,7 @@ import com.autoomstudio.mp3studio.ui.components.ArtworkImage
 @Composable
 fun AlbumDetailScreen(
     album: Album,
+    songs: List<Song>,
     currentSongId: Long?,
     isPlaying: Boolean,
     onBack: () -> Unit,
@@ -24,15 +25,13 @@ fun AlbumDetailScreen(
     selection: SongSelection,
     modifier: Modifier = Modifier,
 ) {
-    val songs = album.songs
-
     LazyColumn(modifier = modifier, contentPadding = PaddingValues(bottom = 8.dp)) {
         item(key = "back") { DetailBackButton(onBack = onBack) }
         item(key = "header") {
             DetailHeader(
                 title = album.title,
                 subtitle = stringResource(R.string.count_separator, album.artist, songCountText(songs.size)),
-                onPlay = { onPlay(songs, songs.first()) },
+                onPlay = { if (songs.isNotEmpty()) onPlay(songs, songs.first()) },
                 onShuffle = { onShuffle(songs) },
             ) {
                 ArtworkImage(

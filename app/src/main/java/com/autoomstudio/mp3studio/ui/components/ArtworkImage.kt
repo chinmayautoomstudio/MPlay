@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -21,6 +22,11 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.ui.theme.NeonBrush
+
+/** Pixel size for a square thumbnail decode request (density-aware). */
+@Composable
+fun artworkRequestSizePx(size: Dp): Int =
+    with(LocalDensity.current) { size.roundToPx().coerceAtLeast(1) }
 
 /**
  * Album art with the app logo underneath, visible when the file has no art or the load fails.

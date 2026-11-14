@@ -30,7 +30,12 @@ class AlbumArtBitmapLoader(
         if (AlbumArtLoader.albumIdOf(uri.toString()) == null) return delegate.loadBitmap(uri)
         return scope.future(Dispatchers.IO) {
             val bytes = albumArt.load(uri) ?: AppLogoArtwork.jpegBytes(context)
-            delegate.decodeBitmap(bytes).await()
+            AlbumArtLoader.decodeSampled(bytes, NOTIFICATION_ART_PX)
+                ?: delegate.decodeBitmap(bytes).await()
         }
+    }
+
+    private companion object {
+        const val NOTIFICATION_ART_PX = 512
     }
 }

@@ -26,6 +26,7 @@ class SongRepository(
     private val scanner: AudioFolderScanner,
     private val watcher: AudioFolderWatcher,
     private val libraryPreferences: LibraryPreferences,
+    private val albumArtLoader: AlbumArtLoader? = null,
 ) {
 
     private val refreshRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -45,6 +46,7 @@ class SongRepository(
             .onStart { emit(Unit) }
             .conflate()
         return combine(triggers, libraryPreferences.excludedFolders) { _, excluded ->
+            albumArtLoader?.clearMissingCache()
             source.querySongs(excluded)
         }
     }
@@ -95,6 +97,6 @@ class SongRepository(
     private companion object {
         const val CHANGE_DEBOUNCE_MS = 300L
         const val WATCH_DEBOUNCE_MS = 2_000L
-        const val PERIODIC_SCAN_MS = 60_000L
+        const val PERIODIC_SCAN_MS = 300_000L
     }
 }

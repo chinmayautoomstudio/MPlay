@@ -1,6 +1,6 @@
 # AI vocal separation (stems)
 
-> Status: Shipped | Added in: 3.0 | Last updated: 2026-10-08
+> Status: Shipped | Added in: 3.0 | Last updated: 2026-11-14
 
 ## Summary
 
@@ -122,7 +122,7 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 
 ### Reconciliation
 
-`onLibraryChanged` waits 3 s, then re-attaches stems to a re-indexed song with the same size and fingerprint, or deletes stems whose source is gone or changed.
+`onLibraryChanged` no-ops when the library id/size/mtime signature is unchanged; otherwise it waits 3 s, then re-attaches stems to a re-indexed song with the same size and fingerprint, or deletes stems whose source is gone or changed.
 
 ## Data and persistence
 
@@ -175,3 +175,4 @@ Channel `separation` (low importance). Progress ID 4101; finished / needs-app ID
 | 2026-10-07 | - | Export folder renamed to `Music/MP3 Studio Stems`. The queue runs only while signed in (`onSignedIn`/`onSignedOut`, `SeparationBackend.cancel()`, worker auth check). See [accounts](accounts.md). |
 | 2026-10-08 | - | M3 weekly usage limit: reserve before queueing, `completed`/`released` reports via `usage_reports` and `UsageSyncWorker`, new `EnqueueResult` values, usage display, limit sheet (Room schema v7). Time notice warns when a selection is bigger than the uses left; checked end to end against the deployed functions. |
 | 2026-10-08 | - | Separation pauses when the app is swiped away from recents and resumes when it is opened again (`SeparationController.pause()`/`resume()`, `TaskRemoval`, `SeparationTaskWatcher`). |
+| 2026-11-14 | - | `onLibraryChanged` skips reconcile when the library content signature is unchanged. |

@@ -89,7 +89,7 @@ class LibraryQueriesTest {
         )
         val albums = LibraryQueries.groupAlbums(songs)
         assertEquals(listOf("alpha", "Beta"), albums.map { it.title })
-        assertEquals(listOf(3L, 2L, 1L), albums[1].songs.ids())
+        assertEquals(listOf(3L, 2L, 1L), albums[1].songIds)
         assertEquals("Artist", albums[1].artist)
     }
 
@@ -113,6 +113,8 @@ class LibraryQueriesTest {
         val artists = LibraryQueries.groupArtists(songs)
         assertEquals(listOf("Abba", "zed", SongMapper.UNKNOWN_ARTIST), artists.map { it.name })
         assertEquals(2, artists[0].albums.size)
-        assertEquals(setOf(3L, 4L), artists[0].songs.ids().toSet())
+        assertEquals(setOf(3L, 4L), artists[0].songIds.toSet())
+        val byId = songs.associateBy { it.id }
+        assertEquals(listOf(3L, 4L), LibraryQueries.resolveSongs(artists[0].songIds, byId).ids())
     }
 }

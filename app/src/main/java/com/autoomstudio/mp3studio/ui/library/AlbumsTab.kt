@@ -20,6 +20,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,6 +64,10 @@ fun AlbumsTab(
 
 @Composable
 fun AlbumCard(album: Album, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    // Two-column grid: decode near half the screen width instead of full-res covers.
+    val artRequestPx = with(LocalDensity.current) {
+        (LocalConfiguration.current.screenWidthDp.dp / 2).roundToPx().coerceAtLeast(1)
+    }
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
@@ -72,6 +78,7 @@ fun AlbumCard(album: Album, onClick: () -> Unit, modifier: Modifier = Modifier) 
             uri = album.artUri,
             contentDescription = stringResource(R.string.album_art_description, album.title),
             cornerRadius = 14.dp,
+            requestSizePx = artRequestPx,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f),

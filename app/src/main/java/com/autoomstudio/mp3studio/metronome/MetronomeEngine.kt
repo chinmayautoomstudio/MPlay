@@ -235,7 +235,7 @@ class MetronomeEngine(private val onBeat: (BeatTick) -> Unit) {
         const val TAG = "MetronomeEngine"
         const val FALLBACK_RATE = 48_000
         const val BLOCK_FRAMES = 256
-        const val WATCH_INTERVAL_MS = 4L
+        const val WATCH_INTERVAL_MS = 16L
         const val JOIN_TIMEOUT_MS = 500L
     }
 }

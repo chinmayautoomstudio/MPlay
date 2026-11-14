@@ -68,7 +68,7 @@ class PlaybackController(
     private var controller: MediaController? = null
 
     private val listener = object : Player.Listener {
-        override fun onEvents(player: Player, events: Player.Events) = sync(player)
+        override fun onEvents(player: Player, events: Player.Events) = sync(player, events)
 
         override fun onPositionDiscontinuity(
             oldPosition: Player.PositionInfo,
@@ -84,7 +84,8 @@ class PlaybackController(
     }
 
     private val sessionListener = object : MediaController.Listener {
-        override fun onExtrasChanged(controller: MediaController, extras: Bundle) = sync(controller)
+        override fun onExtrasChanged(controller: MediaController, extras: Bundle) =
+            sync(controller, rebuildQueue = false)
     }
 
     /** Connects early so the UI reflects playback that is already running in the service. */
@@ -317,7 +318,7 @@ class PlaybackController(
         }
     }
 
-    private fun sync(player: Player) {
+    private fun sync(player: Player, events: Player.Events? = null, rebuildQueue: Boolean = true) {
         _playing.value = player.isPlaying
         _songId.value = player.currentMediaItem?.mediaId?.toLongOrNull()
         if (player.mediaItemCount == 0) {
@@ -325,25 +326,38 @@ class PlaybackController(
             _queue.value = PlaybackQueue.Empty
             return
         }
-        _queue.value = playbackQueueOf(
-            count = player.mediaItemCount,
-            currentIndex = player.currentMediaItemIndex,
-        ) { index ->
-            val item = player.getMediaItemAt(index)
-            val meta = item.mediaMetadata
-            val durationFromMeta = meta.durationMs?.coerceAtLeast(0L)
-            val duration = if (index == player.currentMediaItemIndex) {
-                player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0L) ?: durationFromMeta ?: 0L
-            } else {
-                durationFromMeta ?: 0L
-            }
-            QueueEntry(
-                mediaId = item.mediaId.toLongOrNull() ?: 0L,
-                title = meta.title?.toString().orEmpty(),
-                artist = meta.artist?.toString().orEmpty(),
-                artworkUri = meta.artworkUri,
-                durationMs = duration,
+        val shouldRebuildQueue = rebuildQueue && (
+            events == null ||
+                events.contains(Player.EVENT_TIMELINE_CHANGED) ||
+                events.contains(Player.EVENT_MEDIA_METADATA_CHANGED) ||
+                _queue.value.entries.size != player.mediaItemCount
             )
+        if (shouldRebuildQueue) {
+            _queue.value = playbackQueueOf(
+                count = player.mediaItemCount,
+                currentIndex = player.currentMediaItemIndex,
+            ) { index ->
+                val item = player.getMediaItemAt(index)
+                val meta = item.mediaMetadata
+                val durationFromMeta = meta.durationMs?.coerceAtLeast(0L)
+                val duration = if (index == player.currentMediaItemIndex) {
+                    player.duration.takeIf { it != C.TIME_UNSET }?.coerceAtLeast(0L) ?: durationFromMeta ?: 0L
+                } else {
+                    durationFromMeta ?: 0L
+                }
+                QueueEntry(
+                    mediaId = item.mediaId.toLongOrNull() ?: 0L,
+                    title = meta.title?.toString().orEmpty(),
+                    artist = meta.artist?.toString().orEmpty(),
+                    artworkUri = meta.artworkUri,
+                    durationMs = duration,
+                )
+            }
+        } else {
+            val index = player.currentMediaItemIndex.coerceIn(0, _queue.value.entries.lastIndex)
+            if (_queue.value.currentIndex != index) {
+                _queue.value = _queue.value.copy(currentIndex = index)
+            }
         }
         val metadata = player.mediaMetadata
         val extras = (player as? MediaController)?.sessionExtras ?: Bundle.EMPTY

@@ -188,7 +188,7 @@ class LibraryViewModel(
     }
 
     companion object {
-        private const val FOREGROUND_SCAN_INTERVAL_MS = 2_000L
+        private const val FOREGROUND_SCAN_INTERVAL_MS = 30_000L
         private const val SEARCH_DEBOUNCE_MS = 250L
 
         val Factory = viewModelFactory {

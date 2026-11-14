@@ -66,13 +66,17 @@ class EqualizerEffect(
         if (!params.enabled && smoothEnabled == 0f) return
         if (params.isNeutral && smoothEnabled == 0f) return
 
+        // Smooth gains and rebuild filters once per buffer, not once per sample frame.
+        smoothToward(params)
+        ensureFilters()
+        val wet = smoothEnabled
+        if (wet <= 0f && !params.enabled) {
+            reset()
+            return
+        }
+
         val isStereo = channelCount == 2
         for (frame in 0 until frameCount) {
-            smoothToward(params)
-            ensureFilters()
-            val wet = smoothEnabled
-            if (wet <= 0f && !params.enabled) continue
-
             val base = frame * channelCount
             if (isStereo) {
                 processStereoFrame(samples, base, wet)

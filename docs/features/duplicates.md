@@ -1,6 +1,6 @@
 # Duplicate detection
 
-> Status: Shipped | Added in: 2.0 | Last updated: 2026-10-06
+> Status: Shipped | Added in: 2.0 | Last updated: 2026-11-14
 
 ## Summary
 
@@ -33,7 +33,7 @@ Quality order: lossless (flac, wav, alac, aiff) first, then higher bitrate, then
 
 ### Background fingerprinting
 
-Runs on `applicationScope` under a `Mutex`: prunes fingerprints for removed songs, only fingerprints songs whose byte size matches another song, skips valid cache entries, and upserts in batches of 50 so groups fill in progressively.
+Runs on `applicationScope` under a `Mutex`: skips the whole pass when the library id/size/mtime signature is unchanged (`LibraryContentSignature`), otherwise prunes fingerprints for removed songs, only fingerprints songs whose byte size matches another song, skips valid cache entries, and upserts in batches of 50 so groups fill in progressively.
 
 ### Review screen
 
@@ -65,3 +65,4 @@ None of its own.
 | Date | Commit | Change |
 |---|---|---|
 | 2026-10-03 | `201e1c9` | Duplicate detection, review screen, Room schema v2. |
+| 2026-11-14 | - | Skip fingerprint I/O when the library content signature is unchanged. |

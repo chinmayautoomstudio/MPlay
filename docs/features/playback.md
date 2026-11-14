@@ -1,6 +1,6 @@
 # Playback
 
-> Status: Shipped | Added in: 1.0 | Last updated: 2026-10-30
+> Status: Shipped | Added in: 1.0 | Last updated: 2026-11-14
 
 ## Summary
 
@@ -23,9 +23,10 @@ Paths are relative to `app/src/main/java/com/autoomstudio/mp3studio/`.
 | `playback/SleepTimerRunner.kt` | `Player.Listener` in the service that ticks, fades and pauses. |
 | `playback/AlbumArtBitmapLoader.kt` | Media3 `BitmapLoader` for the session: album-art URIs through `AlbumArtLoader`, everything else to `DataSourceBitmapLoader`. |
 | `playback/SongMediaItems.kt` | `Song.toMediaItem()`, `originalUri`, `withPlaybackUri()` (used for stems). |
-| `ui/playback/PlaybackViewModel.kt` | Implements `PlayerActions`; owns a `PlaybackController`; exposes `queue`. |
+| `ui/playback/PlaybackViewModel.kt` | Implements `PlayerActions`; owns a `PlaybackController`; exposes `queue`, `songId`, `playing`. |
 | `ui/playback/PlayerActions.kt` | Interface for transport, sleep timer, `setLofi`, `setStemMode`, queue jump/move/remove. |
-| `ui/playback/ExpandablePlayer.kt` | One card that morphs from mini to full player by `expandProgress`. |
+| `ui/playback/ExpandablePlayer.kt` | One card that morphs from mini to full player by `expandProgress`. Full Now Playing content is composed only while expand progress is above ~0.05. |
+| `ui/main/MainScreen.kt` (`ExpandablePlayerHost`) | Collects now-playing / queue / sleep suggestion so the library scaffold only sees `songId` / `playing` / `hasNowPlaying`. |
 | `ui/playback/PlayerSheet.kt` | `AnchoredDraggableState<PlayerSheetValue>` anchors, fling and drag. |
 | `ui/playback/UpNextSheet.kt` | Nested peek/expanded sheet on Now Playing: current + upcoming, tap to jump, drag reorder, remove. |
 | `ui/playback/MiniPlayer.kt` | Title/artist, play/pause, next, scrub strip, metronome indicator. |
@@ -72,13 +73,13 @@ State flows back through session extras: `sleep_end_elapsed`, `sleep_end_of_song
 - On connect with an empty queue, `restoreSession()` loads the saved queue paused.
 - Added in `e13b2f7` for sing-along: `play()`, `pause()`, `currentPositionMs()`, `isSeekable()`.
 - `previousTrack()` uses `seekToPreviousMediaItem()`, so it always changes song; `previous()` (the Previous button) uses `seekToPrevious()`, which restarts the current song after 3 s.
-- `sync()` also publishes `PlaybackQueue` from the Media3 timeline (title, artist, artwork, duration from `MediaMetadata`, with the current item's duration from the player when known). `Song.toMediaItem()` stores `durationMs` on metadata for Up Next rows.
+- `sync()` publishes `NowPlayingState` on every player event. `PlaybackQueue` is rebuilt only on timeline or media-metadata changes (or when the entry count changes); play/pause and extras-only updates just refresh the current index. `Song.toMediaItem()` stores `durationMs` on metadata for Up Next rows.
 
 ### Up Next
 
 - On the expanded Now Playing screen, a nested bottom sheet (`UpNextSheet`) peeks with an "Up Next" handle. Swipe up or tap the handle to expand; swipe down or Back returns to the peek, then Back collapses Now Playing.
 - The list is `PlaybackQueue.upNext` (current index through the end of the timeline). Tap jumps with `playQueueIndex`; the drag handle calls `moveMediaItem`; the close control calls `removeMediaItem`.
-- Rows are keyed by absolute timeline index so the same song can appear more than once.
+- Rows are keyed by `mediaId` plus absolute timeline index so the same song can appear more than once without fighting Lazy list identity.
 - The shared morphing artwork in `ExpandablePlayer` is drawn above Now Playing content, so its alpha is multiplied by `(1 - UpNextSheetState.expandProgress)` and swipe-to-skip on the art is disabled while the sheet is mostly open, so the cover does not float over the queue.
 
 ### Swipe to skip
@@ -155,3 +156,4 @@ Saved on media item transition, timeline change, play/pause, discontinuity, and 
 | 2026-10-13 | - | Up Next nested sheet on Now Playing (`UpNextSheet`, `PlaybackQueue`): swipe up for current + upcoming, tap to jump, drag reorder, remove. |
 | 2026-10-13 | - | Shared Now Playing artwork fades with `UpNextSheetState.expandProgress` so it no longer overlays the Up Next list. |
 | 2026-10-30 | - | Platform/legacy controllers get Transport when signed in; `onConnectAsync` / `onPlaybackResumption` complete off Main so Samsung shade play/pause works. |
+| 2026-11-14 | - | Performance: defer full Now Playing while collapsed; isolate player collectors in `ExpandablePlayerHost`; selective queue rebuild; stable Up Next keys; sized mini art. |

@@ -8,6 +8,8 @@ import coil3.fetch.FetchResult
 import coil3.fetch.Fetcher
 import coil3.fetch.SourceFetchResult
 import coil3.request.Options
+import coil3.size.Dimension
+import coil3.size.Size
 import com.autoomstudio.mp3studio.data.library.AlbumArtLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -22,11 +24,14 @@ class AlbumArtFetcher(
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult {
-        val bytes = withContext(Dispatchers.IO) { loader.load(uri) }
-            ?: throw FileNotFoundException("No album art for $uri")
+        val bytes = withContext(Dispatchers.IO) {
+            val raw = loader.load(uri) ?: throw FileNotFoundException("No album art for $uri")
+            val maxSide = options.size.maxSidePx()
+            if (maxSide != null) AlbumArtLoader.subsampledJpeg(raw, maxSide) else raw
+        }
         return SourceFetchResult(
             source = ImageSource(Buffer().write(bytes), options.fileSystem),
-            mimeType = null,
+            mimeType = "image/jpeg",
             dataSource = DataSource.DISK,
         )
     }
@@ -38,4 +43,11 @@ class AlbumArtFetcher(
             return AlbumArtFetcher(android.net.Uri.parse(uriString), options, loader)
         }
     }
+}
+
+private fun Size.maxSidePx(): Int? {
+    if (this == Size.ORIGINAL) return null
+    val w = (width as? Dimension.Pixels)?.px ?: return null
+    val h = (height as? Dimension.Pixels)?.px ?: return null
+    return maxOf(w, h).coerceAtLeast(1)
 }

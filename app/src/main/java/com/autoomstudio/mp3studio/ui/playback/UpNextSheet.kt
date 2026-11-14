@@ -73,6 +73,7 @@ import com.autoomstudio.mp3studio.playback.QueueEntry
 import com.autoomstudio.mp3studio.ui.common.formatDuration
 import com.autoomstudio.mp3studio.ui.components.ArtworkImage
 import com.autoomstudio.mp3studio.ui.components.NowPlayingBars
+import com.autoomstudio.mp3studio.ui.components.artworkRequestSizePx
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
@@ -250,7 +251,7 @@ private fun UpNextList(
     ) {
         itemsIndexed(
             items = items,
-            key = { _, indexed -> indexed.index },
+            key = { _, indexed -> "${indexed.value.mediaId}-${indexed.index}" },
         ) { relIndex, indexed ->
             val entry = indexed.value
             val absoluteIndex = indexed.index
@@ -353,6 +354,7 @@ private fun UpNextRow(
         ArtworkImage(
             uri = entry.artworkUri,
             contentDescription = stringResource(R.string.album_art_description, entry.title),
+            requestSizePx = artworkRequestSizePx(48.dp),
             modifier = Modifier.size(48.dp),
         )
         Spacer(modifier = Modifier.width(12.dp))

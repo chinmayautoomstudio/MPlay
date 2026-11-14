@@ -37,6 +37,7 @@ import com.autoomstudio.mp3studio.data.model.Song
 import com.autoomstudio.mp3studio.ui.common.formatDuration
 import com.autoomstudio.mp3studio.ui.components.ArtworkImage
 import com.autoomstudio.mp3studio.ui.components.ComingSoon
+import com.autoomstudio.mp3studio.ui.components.artworkRequestSizePx
 import com.autoomstudio.mp3studio.ui.library.DetailBackButton
 
 /** The duplicate setting and the review screen's choices. */
@@ -182,7 +183,12 @@ private fun DuplicateCopyRow(song: Song, group: DuplicateGroup, actions: Duplica
             }
         },
         leadingContent = {
-            ArtworkImage(uri = song.albumArtUri, contentDescription = null, modifier = Modifier.size(44.dp))
+            ArtworkImage(
+                uri = song.albumArtUri,
+                contentDescription = null,
+                requestSizePx = artworkRequestSizePx(44.dp),
+                modifier = Modifier.size(44.dp),
+            )
         },
         trailingContent = {
             RadioButton(selected = isKept, onClick = null)

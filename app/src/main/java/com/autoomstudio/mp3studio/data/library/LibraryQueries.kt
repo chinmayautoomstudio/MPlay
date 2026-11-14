@@ -40,7 +40,7 @@ object LibraryQueries {
         return songs.sortedWith(comparator)
     }
 
-    /** One album per MediaStore album ID, sorted by title, songs in track order. */
+    /** One album per MediaStore album ID, sorted by title, song ids in track order. */
     fun groupAlbums(songs: List<Song>): List<Album> =
         songs.groupBy { it.albumId }
             .map { (albumId, albumSongs) ->
@@ -52,7 +52,7 @@ object LibraryQueries {
                     title = first.album,
                     artist = artists.singleOrNull() ?: VARIOUS_ARTISTS,
                     artUri = first.albumArtUri,
-                    songs = ordered,
+                    songIds = ordered.map { it.id },
                 )
             }
             .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.title })
@@ -62,10 +62,18 @@ object LibraryQueries {
         songs.groupBy { it.artist }
             .map { (name, artistSongs) ->
                 val albums = groupAlbums(artistSongs)
-                Artist(name = name, albums = albums, songs = albums.flatMap { it.songs })
+                Artist(
+                    name = name,
+                    albums = albums,
+                    songIds = albums.flatMap { it.songIds },
+                )
             }
             .sortedWith(
                 compareBy<Artist> { it.name == SongMapper.UNKNOWN_ARTIST }
                     .thenBy(String.CASE_INSENSITIVE_ORDER) { it.name },
             )
+
+    /** Resolves [ids] in order against [byId], dropping missing entries. */
+    fun resolveSongs(ids: List<Long>, byId: Map<Long, Song>): List<Song> =
+        ids.mapNotNull { byId[it] }
 }

@@ -102,8 +102,14 @@ fun ExpandablePlayer(
         val upNextSheetState = rememberUpNextSheetState()
         val upNextProgress = { upNextSheetState.expandProgress }
         val showMini by remember { derivedStateOf { progress() < 0.3f } }
+        // Keep the heavy full player out of the tree while collapsed (alpha was 0 but still composed).
+        val showFull by remember { derivedStateOf { progress() > 0.05f } }
         val prominentArt by remember { derivedStateOf { progress() > 0.5f } }
         val artAboveUpNext by remember { derivedStateOf { upNextProgress() < 0.5f } }
+        val miniArtSizePx = with(density) { MiniArtworkSize.toPx().roundToInt().coerceAtLeast(1) }
+        val artRequestSize by remember(fullWidth, miniArtSizePx) {
+            derivedStateOf { if (progress() > 0.2f) fullWidth else miniArtSizePx }
+        }
         val backEnabled = sheetState.targetValue == PlayerSheetValue.Expanded
         val swipe = rememberSwipeSkipState()
 
@@ -137,41 +143,43 @@ fun ExpandablePlayer(
                 .drawBehind { drawRect(lerp(collapsedColor, expandedColor, progress())) }
                 .playerSheetDrag(sheetState, sheetFling),
         ) {
-            NowPlayingContent(
-                state = state,
-                position = position,
-                actions = actions,
-                onCollapse = onCollapse,
-                showArtwork = false,
-                backEnabled = backEnabled,
-                song = song,
-                songActions = songActions,
-                suggestedSleepMinutes = suggestedSleepMinutes,
-                separator = separator,
-                onOpenEqualizer = onOpenEqualizer,
-                queue = queue,
-                upNextSheetState = upNextSheetState,
-                onArtworkPositioned = {
-                    positions.fullArt = it
-                    updateFullArtRect()
-                },
-                modifier = Modifier
-                    .layout { measurable, constraints ->
-                        val placeable = measurable.measure(Constraints.fixed(fullWidth, fullHeight))
-                        layout(constraints.maxWidth, constraints.maxHeight) {
-                            placeable.place(-cardLeft(progress()).roundToInt(), 0)
-                        }
-                    }
-                    .graphicsLayer {
-                        val visible = ((progress() - 0.5f) / 0.5f).coerceIn(0f, 1f)
-                        alpha = visible
-                        translationY = (1f - visible) * slidePx
-                    }
-                    .onGloballyPositioned {
-                        positions.fullRoot = it
+            if (showFull) {
+                NowPlayingContent(
+                    state = state,
+                    position = position,
+                    actions = actions,
+                    onCollapse = onCollapse,
+                    showArtwork = false,
+                    backEnabled = backEnabled,
+                    song = song,
+                    songActions = songActions,
+                    suggestedSleepMinutes = suggestedSleepMinutes,
+                    separator = separator,
+                    onOpenEqualizer = onOpenEqualizer,
+                    queue = queue,
+                    upNextSheetState = upNextSheetState,
+                    onArtworkPositioned = {
+                        positions.fullArt = it
                         updateFullArtRect()
                     },
-            )
+                    modifier = Modifier
+                        .layout { measurable, constraints ->
+                            val placeable = measurable.measure(Constraints.fixed(fullWidth, fullHeight))
+                            layout(constraints.maxWidth, constraints.maxHeight) {
+                                placeable.place(-cardLeft(progress()).roundToInt(), 0)
+                            }
+                        }
+                        .graphicsLayer {
+                            val visible = ((progress() - 0.5f) / 0.5f).coerceIn(0f, 1f)
+                            alpha = visible
+                            translationY = (1f - visible) * slidePx
+                        }
+                        .onGloballyPositioned {
+                            positions.fullRoot = it
+                            updateFullArtRect()
+                        },
+                )
+            }
 
             if (showMini) {
                 MiniPlayerContent(
@@ -198,7 +206,7 @@ fun ExpandablePlayer(
                 contentDescription = stringResource(R.string.album_art_description, state.title),
                 cornerRadius = 0.dp,
                 prominent = prominentArt,
-                requestSizePx = fullWidth,
+                requestSizePx = artRequestSize,
                 modifier = Modifier
                     .layout { measurable, constraints ->
                         val p = progress()

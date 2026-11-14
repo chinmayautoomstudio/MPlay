@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.autoomstudio.mp3studio.R
 import com.autoomstudio.mp3studio.data.model.Playlist
 import com.autoomstudio.mp3studio.ui.components.ArtworkImage
+import com.autoomstudio.mp3studio.ui.components.artworkRequestSizePx
 import com.autoomstudio.mp3studio.ui.library.songCountText
 
 /** Picks a playlist for a song, or starts a new one. */
@@ -99,6 +100,7 @@ fun PlaylistArtwork(playlist: Playlist, size: Dp, modifier: Modifier = Modifier)
     ArtworkImage(
         uri = playlist.songs.firstOrNull()?.albumArtUri,
         contentDescription = null,
+        requestSizePx = artworkRequestSizePx(size),
         modifier = modifier.size(size),
     )
 }

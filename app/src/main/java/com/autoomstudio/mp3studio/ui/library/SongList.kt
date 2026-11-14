@@ -51,6 +51,7 @@ import com.autoomstudio.mp3studio.data.model.Song
 import com.autoomstudio.mp3studio.data.stems.StemMode
 import com.autoomstudio.mp3studio.ui.common.formatDuration
 import com.autoomstudio.mp3studio.ui.components.ArtworkImage
+import com.autoomstudio.mp3studio.ui.components.artworkRequestSizePx
 import com.autoomstudio.mp3studio.ui.components.NowPlayingBars
 
 /** Actions offered by every song row's three-dot menu. */
@@ -181,6 +182,7 @@ fun SongRow(
             ArtworkImage(
                 uri = song.albumArtUri,
                 contentDescription = stringResource(R.string.album_art_description, song.album),
+                requestSizePx = artworkRequestSizePx(52.dp),
                 modifier = Modifier.size(52.dp),
             )
         }

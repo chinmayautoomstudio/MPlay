@@ -310,7 +310,7 @@ class TrimEditorViewModel(
     }
 
     companion object {
-        private const val LOOP_CHECK_MS = 50L
+        private const val LOOP_CHECK_MS = 100L
         private const val LOOP_TOLERANCE_MS = 250L
 
         val Factory = viewModelFactory {

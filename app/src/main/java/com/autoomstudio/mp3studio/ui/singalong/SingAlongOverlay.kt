@@ -469,7 +469,7 @@ private fun FailReason.message(): Int = when (this) {
     FailReason.TooShort -> R.string.singalong_fail_short
 }
 
-private const val LEVEL_POLL_MS = WAVE_STEP_MS.toLong()
+private const val LEVEL_POLL_MS = 100L
 private val STOP_SIZE = 88.dp
 private val STOP_AREA = 200.dp
 private const val LEVEL_RELEASE = 0.85f

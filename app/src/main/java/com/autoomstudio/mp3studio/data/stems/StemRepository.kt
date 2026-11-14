@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import com.autoomstudio.mp3studio.data.duplicates.FileFingerprinter
+import com.autoomstudio.mp3studio.data.library.LibraryContentSignature
 import com.autoomstudio.mp3studio.data.model.Song
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +39,8 @@ class StemRepository(
     private val workRoot = File(stemsDir, WORK_DIR)
     private val reconcileMutex = Mutex()
     private var reconcileJob: Job? = null
+    /** Skips reconcile when the library id/size/mtime set has not changed. */
+    private var lastReconcileSignature: Long = Long.MIN_VALUE
 
     /** Stem sets by song id; read synchronously by the playback service when it resolves URIs. */
     val stemSets: StateFlow<Map<Long, StemSetEntity>> = dao.observeStemSets()
@@ -179,10 +182,13 @@ class StemRepository(
 
     /** Runs [reconcile] in the background once the library has settled; later calls replace earlier ones. */
     fun onLibraryChanged(songs: List<Song>) {
+        val signature = LibraryContentSignature.of(songs)
+        if (signature == lastReconcileSignature) return
         reconcileJob?.cancel()
         reconcileJob = scope.launch {
             delay(RECONCILE_DELAY_MS)
             reconcile(songs)
+            lastReconcileSignature = signature
         }
     }
 
