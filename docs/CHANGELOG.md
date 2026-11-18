@@ -10,6 +10,9 @@ Each entry should say what changed and link to the feature doc. Use these groups
 - Soft Play Store rating prompt after three studio feature uses or 10 minutes of idle time; Rate tries Play In-App Review then opens the store listing, Not now waits 10 days. ([in-app-review](features/in-app-review.md))
 - Automated user emails through SendGrid with app-owned templates in Postgres: welcome (first trial grant), payment receipt, upcoming AutoPay debit, renewal failed, grace ending, subscription expired, and AutoPay mandate ending. Delivery is logged in `email_outbox`. ([payments](features/payments.md), [backend](backend.md))
 
+### Docs
+- Pre-release manual QA checklist for Google Play (Markdown tables by module; payments and website Admin out of scope). ([qa/MP3-Studio-Pre-Release-QA-Checklist.md](qa/MP3-Studio-Pre-Release-QA-Checklist.md))
+
 ### Changed
 - Soft Play Store rating prompt shows a decorative looping five-star Lottie above the message (not a custom star picker). ([in-app-review](features/in-app-review.md))
 - Transactional email HTML uses the dark MP3 Studio brand (logo, cyan/purple accents, gradient CTA, Play Store deep link) for all seven templates. ([payments](features/payments.md))

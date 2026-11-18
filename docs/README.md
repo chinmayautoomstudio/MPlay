@@ -19,6 +19,7 @@ MP3 Studio (formerly MPlay) is a local-music player for Android (package `com.au
 - [backend.md](backend.md): Supabase project, server tables, Row Level Security, auth settings, migrations and the live test runner.
 - [store-review.md](store-review.md): the Google account and notes for app store reviewers.
 - [ui-ux-improvements.md](ui-ux-improvements.md): backlog of UI/UX opportunities against the current Compose app (not yet implemented).
+- [qa/MP3-Studio-Pre-Release-QA-Checklist.md](qa/MP3-Studio-Pre-Release-QA-Checklist.md): manual pre-Play release QA checklist (payments out of scope).
 - `features/`: one file per feature area (listed below).
 - [templates/feature-template.md](templates/feature-template.md): skeleton for new feature docs.
 
